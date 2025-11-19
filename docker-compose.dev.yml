@@ -1,0 +1,122 @@
+# Development environment with hot-reload
+version: '3.8'
+
+services:
+  # Development AegisIsle application
+  aegis-isle-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: aegis-isle-dev
+    ports:
+      - "8000:8000"
+      - "8888:8888"  # Jupyter notebook
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+      - LOG_LEVEL=DEBUG
+      - API_RELOAD=True
+      - DATABASE_URL=postgresql://aegis:devpassword@postgres-dev:5432/aegis_isle_dev
+      - REDIS_URL=redis://redis-dev:6379/0
+      - QDRANT_HOST=qdrant-dev
+      - QDRANT_PORT=6333
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./src:/app/src:ro
+      - ./config:/app/config:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - ./notebooks:/app/notebooks
+    depends_on:
+      - postgres-dev
+      - redis-dev
+      - qdrant-dev
+    restart: unless-stopped
+    networks:
+      - aegis-dev-network
+    command: >
+      sh -c "uvicorn src.aegis_isle.api.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # PostgreSQL for development
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: aegis-isle-postgres-dev
+    environment:
+      POSTGRES_DB: aegis_isle_dev
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: devpassword
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    networks:
+      - aegis-dev-network
+
+  # Redis for development
+  redis-dev:
+    image: redis:7-alpine
+    container_name: aegis-isle-redis-dev
+    ports:
+      - "6380:6379"
+    restart: unless-stopped
+    networks:
+      - aegis-dev-network
+
+  # Qdrant for development
+  qdrant-dev:
+    image: qdrant/qdrant:v1.7.0
+    container_name: aegis-isle-qdrant-dev
+    ports:
+      - "6334:6333"
+      - "6335:6334"
+    volumes:
+      - qdrant_dev_data:/qdrant/storage
+    restart: unless-stopped
+    networks:
+      - aegis-dev-network
+
+  # Jupyter notebook for development and experimentation
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile.jupyter
+    container_name: aegis-isle-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - ./notebooks:/home/jovyan/work/notebooks
+      - ./src:/home/jovyan/work/src:ro
+      - ./data:/home/jovyan/work/data
+    networks:
+      - aegis-dev-network
+    command: start-notebook.sh --NotebookApp.token='' --NotebookApp.password=''
+
+  # PGAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: aegis-isle-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@aegisisle.dev
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres-dev
+    networks:
+      - aegis-dev-network
+
+volumes:
+  postgres_dev_data:
+  qdrant_dev_data:
+  pgadmin_data:
+
+networks:
+  aegis-dev-network:
+    driver: bridge

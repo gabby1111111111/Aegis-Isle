@@ -1,0 +1,52 @@
+# Development Dockerfile with hot reload
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    tesseract-ocr-chi-sim \
+    poppler-utils \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set work directory
+WORKDIR /app
+
+# Copy dependency files
+COPY requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install development dependencies
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    black \
+    flake8 \
+    mypy \
+    jupyter \
+    ipython
+
+# Create directories
+RUN mkdir -p /app/data/uploads /app/data/processed /app/logs /app/models/local /app/notebooks
+
+# Expose ports
+EXPOSE 8000 8888
+
+# Default command for development
+CMD ["uvicorn", "src.aegis_isle.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
