@@ -1,140 +1,165 @@
+# Aegis Isle Multi-Agent RAG System
+# Production Docker Compose Configuration
+# Required Services: Backend + Qdrant + Redis
+
 version: '3.8'
 
 services:
-  # Main AegisIsle application
-  aegis-isle:
+  # Main Application Backend
+  backend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: aegis-isle-api
+    container_name: aegis-isle-backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
+      # Application settings
       - ENVIRONMENT=production
-      - DEBUG=False
-      - LOG_LEVEL=INFO
-      - DATABASE_URL=postgresql://aegis:password@postgres:5432/aegis_isle
-      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=false
+      - API_V1_PREFIX=/api/v1
+      - LOG_LEVEL=info
+      - LOG_FORMAT=json
+      - AUDIT_LOG_ENABLED=true
+
+      # Vector Database (Qdrant)
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - QDRANT_COLLECTION=aegis_documents
+
+      # Redis Cache & Queue
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+
+      # Security & Authentication
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - ALGORITHM=HS256
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+
+      # LLM API Keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+      # File Processing
+      - MAX_UPLOAD_SIZE=50000000  # 50MB
+      - UPLOAD_PATH=/app/data/uploads
+      - PROCESSED_PATH=/app/data/processed
+
+      # OCR Settings
+      - TESSERACT_CMD=tesseract
+      - POPPLER_PATH=/usr/bin
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./models:/app/models
+      - app_data:/app/data
+      - app_logs:/app/logs
+      - app_models:/app/models
+      - ./.env:/app/.env:ro
     depends_on:
-      - postgres
-      - redis
-      - qdrant
-    restart: unless-stopped
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - aegis-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
-  # PostgreSQL database for metadata and agent memory
-  postgres:
-    image: postgres:15-alpine
-    container_name: aegis-isle-postgres
-    environment:
-      POSTGRES_DB: aegis_isle
-      POSTGRES_USER: aegis
-      POSTGRES_PASSWORD: password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
-    networks:
-      - aegis-network
-
-  # Redis for caching and session storage
-  redis:
-    image: redis:7-alpine
-    container_name: aegis-isle-redis
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    networks:
-      - aegis-network
-
-  # Qdrant vector database
+  # Qdrant Vector Database for Embeddings
   qdrant:
     image: qdrant/qdrant:v1.7.0
     container_name: aegis-isle-qdrant
+    restart: unless-stopped
     ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
+      - "6333:6333"      # HTTP API
+      - "6334:6334"      # gRPC API
     environment:
       - QDRANT__SERVICE__HTTP_PORT=6333
       - QDRANT__SERVICE__GRPC_PORT=6334
-    restart: unless-stopped
-    networks:
-      - aegis-network
-
-  # Nginx reverse proxy (optional)
-  nginx:
-    image: nginx:alpine
-    container_name: aegis-isle-nginx
-    ports:
-      - "80:80"
-      - "443:443"
+      - QDRANT__LOG_LEVEL=info
+      - QDRANT__STORAGE__OPTIMIZERS__DELETED_THRESHOLD=0.2
+      - QDRANT__STORAGE__OPTIMIZERS__VACUUM_MIN_VECTOR_NUMBER=1000
+      - QDRANT__STORAGE__OPTIMIZERS__DEFAULT_SEGMENT_NUMBER=0
+      # Performance tuning
+      - QDRANT__STORAGE__PERFORMANCE__MAX_SEARCH_THREADS=0
+      - QDRANT__STORAGE__PERFORMANCE__MAX_OPTIMIZATION_THREADS=1
     volumes:
-      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./config/nginx/ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - aegis-isle
-    restart: unless-stopped
+      - qdrant_data:/qdrant/storage
     networks:
       - aegis-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
-  # Prometheus for monitoring (optional)
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: aegis-isle-prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
+  # Redis Cache and Message Queue
+  redis:
+    image: redis:7.2-alpine
+    container_name: aegis-isle-redis
     restart: unless-stopped
-    networks:
-      - aegis-network
-
-  # Grafana for dashboards (optional)
-  grafana:
-    image: grafana/grafana:latest
-    container_name: aegis-isle-grafana
     ports:
-      - "3000:3000"
+      - "6379:6379"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    command: >
+      sh -c '
+        if [ -n "$$REDIS_PASSWORD" ]; then
+          redis-server --requirepass "$$REDIS_PASSWORD"
+                      --appendonly yes
+                      --maxmemory 512mb
+                      --maxmemory-policy allkeys-lru
+                      --save 60 1000
+        else
+          redis-server --appendonly yes
+                      --maxmemory 512mb
+                      --maxmemory-policy allkeys-lru
+                      --save 60 1000
+        fi
+      '
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./config/grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - prometheus
-    restart: unless-stopped
+      - redis_data:/data
     networks:
       - aegis-network
+    healthcheck:
+      test: >
+        sh -c '
+          if [ -n "$$REDIS_PASSWORD" ]; then
+            redis-cli -a "$$REDIS_PASSWORD" ping
+          else
+            redis-cli ping
+          fi
+        '
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
+# Named volumes for persistent data
 volumes:
-  postgres_data:
-  redis_data:
+  app_data:
+    driver: local
+  app_logs:
+    driver: local
+  app_models:
+    driver: local
   qdrant_data:
-  prometheus_data:
-  grafana_data:
+    driver: local
+  redis_data:
+    driver: local
 
+# Custom network for inter-service communication
 networks:
   aegis-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

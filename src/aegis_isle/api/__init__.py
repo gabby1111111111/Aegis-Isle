@@ -11,7 +11,8 @@ from .routers import (
     query_router,
     agents_router,
     health_router,
-    admin_router
+    admin_router,
+    auth_router
 )
 from .middleware import setup_middleware
 from .dependencies import get_rag_pipeline, get_agent_orchestrator
@@ -23,6 +24,7 @@ __all__ = [
     "agents_router",
     "health_router",
     "admin_router",
+    "auth_router",
     "setup_middleware",
     "get_rag_pipeline",
     "get_agent_orchestrator",

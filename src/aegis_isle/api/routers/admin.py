@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
-from ..dependencies import get_rag_pipeline, get_agent_orchestrator, require_admin, get_metrics_middleware
+from ..dependencies import get_rag_pipeline, get_agent_orchestrator, require_admin, get_metrics_middleware, CurrentUser
 from ...core.config import settings
 from ...core.logging import logger
 from ...rag.pipeline import RAGPipeline, RAGConfig
@@ -31,7 +31,7 @@ class SystemStatsResponse(BaseModel):
 
 @admin_router.get("/config")
 async def get_system_config(
-    admin_user: Dict = Depends(require_admin)
+    admin_user: CurrentUser = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Get current system configuration."""
 
@@ -83,7 +83,7 @@ async def get_system_config(
 async def update_system_config(
     request: ConfigUpdateRequest,
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
-    admin_user: Dict = Depends(require_admin)
+    admin_user: CurrentUser = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Update system configuration."""
 
@@ -126,7 +126,7 @@ async def update_system_config(
 async def get_system_stats(
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
     orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
-    admin_user: Dict = Depends(require_admin)
+    admin_user: CurrentUser = Depends(require_admin)
 ) -> SystemStatsResponse:
     """Get comprehensive system statistics."""
 
@@ -196,7 +196,7 @@ async def get_system_stats(
 @admin_router.post("/maintenance/clear-cache")
 async def clear_system_cache(
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
-    admin_user: Dict = Depends(require_admin)
+    admin_user: CurrentUser = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Clear system caches."""
 
@@ -220,7 +220,7 @@ async def clear_system_cache(
 @admin_router.post("/maintenance/health-check")
 async def run_comprehensive_health_check(
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
-    admin_user: Dict = Depends(require_admin)
+    admin_user: CurrentUser = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Run a comprehensive health check on all system components."""
 
@@ -252,7 +252,7 @@ async def run_comprehensive_health_check(
 async def get_system_logs(
     lines: int = 100,
     level: Optional[str] = None,
-    admin_user: Dict = Depends(require_admin)
+    admin_user: CurrentUser = Depends(require_admin)
 ) -> Dict[str, Any]:
     """Get recent system logs."""
 

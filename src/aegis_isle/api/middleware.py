@@ -10,11 +10,11 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.base import BaseHTTPMiddleware
 
 from ..core.config import settings
-from ..core.logging import logger
+from ..core.logging import logger, audit_logger
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware for logging HTTP requests."""
+    """Middleware for logging HTTP requests with audit support."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request and log details."""
@@ -25,23 +25,54 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id
 
+        # Extract client information
+        client_ip = request.client.host if request.client else "unknown"
+        user_agent = request.headers.get("user-agent", "unknown")
+
         # Log request
         start_time = time.time()
         logger.info(
             f"Request {request_id}: {request.method} {request.url} "
-            f"from {request.client.host if request.client else 'unknown'}"
+            f"from {client_ip}"
         )
 
         # Process request
         try:
             response = await call_next(request)
             duration = time.time() - start_time
+            duration_ms = duration * 1000
 
             # Log response
             logger.info(
                 f"Request {request_id}: {response.status_code} "
                 f"({duration:.3f}s)"
             )
+
+            # Get authenticated user info if available
+            user_id = None
+            username = None
+            try:
+                # Try to extract user info from request state if auth middleware has set it
+                if hasattr(request.state, 'current_user'):
+                    user_info = request.state.current_user
+                    user_id = getattr(user_info, 'user_id', None)
+                    username = getattr(user_info, 'username', None)
+            except:
+                pass
+
+            # Log API access audit event (only for API endpoints)
+            if str(request.url.path).startswith("/api/"):
+                audit_logger.log_api_access(
+                    method=request.method,
+                    endpoint=request.url.path,
+                    user_id=user_id,
+                    username=username,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    status_code=response.status_code,
+                    response_time_ms=duration_ms,
+                    request_id=request_id
+                )
 
             # Add request ID to response headers
             response.headers["X-Request-ID"] = request_id
@@ -50,9 +81,24 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         except Exception as e:
             duration = time.time() - start_time
+            duration_ms = duration * 1000
+
             logger.error(
                 f"Request {request_id}: Error after {duration:.3f}s - {str(e)}"
             )
+
+            # Log API access audit event for errors (only for API endpoints)
+            if str(request.url.path).startswith("/api/"):
+                audit_logger.log_api_access(
+                    method=request.method,
+                    endpoint=request.url.path,
+                    ip_address=client_ip,
+                    user_agent=user_agent,
+                    status_code=500,  # Internal server error
+                    response_time_ms=duration_ms,
+                    request_id=request_id
+                )
+
             raise
 
 

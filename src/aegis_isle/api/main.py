@@ -15,7 +15,8 @@ from .routers import (
     query_router,
     agents_router,
     health_router,
-    admin_router
+    admin_router,
+    auth_router
 )
 
 
@@ -91,6 +92,12 @@ def create_app() -> FastAPI:
         health_router,
         prefix="/api/v1/health",
         tags=["health"]
+    )
+
+    app.include_router(
+        auth_router,
+        prefix="/api/v1",
+        tags=["authentication"]
     )
 
     app.include_router(

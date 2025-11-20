@@ -16,6 +16,8 @@ langchain==0.0.335
 langchain-community==0.0.10
 langchain-openai==0.0.2
 langchain-anthropic==0.0.1
+langchain-core==0.1.15
+langgraph==0.0.20
 llamaindex==0.9.18
 
 # Vector Databases
@@ -31,6 +33,9 @@ python-multipart==0.0.6
 pillow==10.1.0
 pytesseract==0.3.10
 easyocr==1.7.0
+unstructured==0.11.8
+pdfplumber==0.10.3
+pdf2image==1.16.3
 
 # Data Processing
 pandas==2.1.4
@@ -56,6 +61,11 @@ toml==0.10.2
 loguru==0.7.2
 prometheus-client==0.19.0
 
+# Authentication and Security
+python-jose[cryptography]==3.3.0  # JWT token handling
+passlib[bcrypt]==1.7.4  # Password hashing
+bcrypt==4.1.1  # Password hashing backend
+
 # Testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
@@ -76,3 +86,13 @@ kubernetes==28.1.0
 # Multi-modal Support
 clip-by-openai==1.0
 opencv-python==4.8.1.78
+
+# Tool System Dependencies
+beautifulsoup4==4.12.2  # For HTML content extraction
+duckduckgo-search==3.8.0  # For DuckDuckGo search API
+google-api-python-client==2.109.0  # For Google Custom Search
+plotly==5.17.0  # For interactive charts
+kaleido==0.2.1  # For plotly static image export
+
+# Security and Sandboxing
+RestrictedPython==6.0  # For safer code execution (optional)
