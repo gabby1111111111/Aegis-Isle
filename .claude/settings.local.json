@@ -8,7 +8,22 @@
       "Bash(python -m pip install --upgrade pip)",
       "Bash(python -m pip install fastapi uvicorn pydantic python-dotenv loguru)",
       "Bash(python -m pip install sqlalchemy aiofiles python-multipart)",
-      "Bash(python demo.py)"
+      "Bash(python demo.py)",
+      "Bash(docker-compose up -d)",
+      "Bash(docker --version)",
+      "Bash(docker compose version)",
+      "Bash(python -m pip list)",
+      "Bash(pip install python-jose[cryptography] passlib[bcrypt] bcrypt -q)",
+      "Bash(python -c \"import sys; print(f''Python {sys.version}'')\")",
+      "Bash(timeout 15 python -m uvicorn src.aegis_isle.api.main:app --host 0.0.0.0 --port 8000 --log-level info)",
+      "Bash(pip install pydantic-settings -q)",
+      "Bash(timeout 20 python -m uvicorn src.aegis_isle.api.main:app --host 0.0.0.0 --port 8000 --log-level info)",
+      "Bash(pip install langgraph -q)",
+      "Bash(pip install langchain-openai langchain-anthropic langchain-community -q)",
+      "Bash(python demo_auth_system.py)",
+      "Bash(pip install langchain-openai langchain-anthropic -q)",
+      "Bash(python -m uvicorn src.aegis_isle.api.main:app --host 0.0.0.0 --port 8000 --log-level info)",
+      "Bash(python auth_server.py)"
     ],
     "deny": [],
     "ask": []

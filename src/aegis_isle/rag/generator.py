@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from ..core.config import settings
 from ..core.logging import logger
-from .retriever import QueryResult
+from .retriever import EnhancedQueryResult
 
 
 class GenerationConfig(BaseModel):
@@ -45,7 +45,7 @@ class BaseGenerator(ABC):
     async def generate(
         self,
         prompt: str,
-        retrieval_context: Optional[QueryResult] = None,
+        retrieval_context: Optional[EnhancedQueryResult] = None,
         **kwargs
     ) -> GenerationResult:
         """Generate text based on prompt and optional context."""
@@ -100,7 +100,7 @@ class LLMGenerator(BaseGenerator):
     async def generate(
         self,
         prompt: str,
-        retrieval_context: Optional[QueryResult] = None,
+        retrieval_context: Optional[EnhancedQueryResult] = None,
         **kwargs
     ) -> GenerationResult:
         """Generate text with optional retrieval context."""
@@ -142,8 +142,8 @@ class LLMGenerator(BaseGenerator):
         **kwargs
     ) -> GenerationResult:
         """Generate text with provided context chunks."""
-        # Create a mock QueryResult for consistency
-        from .retriever import RetrievalResult, QueryResult
+        # Create a mock EnhancedQueryResult for consistency
+        from .retriever import RetrievalResult, EnhancedQueryResult
         from .document_processor import DocumentChunk
 
         mock_results = []
@@ -156,7 +156,7 @@ class LLMGenerator(BaseGenerator):
             result = RetrievalResult(chunk=chunk, score=1.0)
             mock_results.append(result)
 
-        context = QueryResult(
+        context = EnhancedQueryResult(
             query=query,
             results=mock_results,
             total_time=0.0
@@ -164,7 +164,7 @@ class LLMGenerator(BaseGenerator):
 
         return await self.generate(query, context, **kwargs)
 
-    def _build_context_prompt(self, query: str, context: QueryResult) -> str:
+    def _build_context_prompt(self, query: str, context: EnhancedQueryResult) -> str:
         """Build a prompt that includes retrieved context."""
         context_text = "\n\n".join([
             f"Context {i+1}:\n{result.chunk.content}"
@@ -301,7 +301,7 @@ class HuggingFaceGenerator(BaseGenerator):
     async def generate(
         self,
         prompt: str,
-        retrieval_context: Optional[QueryResult] = None,
+        retrieval_context: Optional[EnhancedQueryResult] = None,
         **kwargs
     ) -> GenerationResult:
         """Generate text using local Hugging Face model."""
@@ -369,7 +369,7 @@ class HuggingFaceGenerator(BaseGenerator):
     ) -> GenerationResult:
         """Generate text with provided context chunks."""
         # Similar to LLMGenerator implementation
-        from .retriever import RetrievalResult, QueryResult
+        from .retriever import RetrievalResult, EnhancedQueryResult
         from .document_processor import DocumentChunk
 
         mock_results = []
@@ -382,7 +382,7 @@ class HuggingFaceGenerator(BaseGenerator):
             result = RetrievalResult(chunk=chunk, score=1.0)
             mock_results.append(result)
 
-        context = QueryResult(
+        context = EnhancedQueryResult(
             query=query,
             results=mock_results,
             total_time=0.0
@@ -390,7 +390,7 @@ class HuggingFaceGenerator(BaseGenerator):
 
         return await self.generate(query, context, **kwargs)
 
-    def _build_context_prompt(self, query: str, context: QueryResult) -> str:
+    def _build_context_prompt(self, query: str, context: EnhancedQueryResult) -> str:
         """Build a prompt that includes retrieved context."""
         context_text = "\n\n".join([
             f"Context {i+1}: {result.chunk.content}"

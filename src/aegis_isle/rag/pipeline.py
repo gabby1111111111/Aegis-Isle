@@ -12,7 +12,7 @@ from ..core.logging import logger
 from .chunker import BaseChunker, get_chunker
 from .document_processor import DocumentProcessor, ProcessedDocument
 from .generator import BaseGenerator, GenerationResult, get_generator
-from .retriever import BaseRetriever, VectorRetriever, HybridRetriever, QueryResult
+from .retriever import BaseRetriever, VectorRetriever, HybridRetriever, EnhancedQueryResult
 
 
 class RAGConfig(BaseModel):
@@ -45,7 +45,7 @@ class RAGResult(BaseModel):
     query: str
     answer: str
     sources: List[Dict[str, Any]]
-    retrieval_result: QueryResult
+    retrieval_result: EnhancedQueryResult
     generation_result: GenerationResult
     total_time: float
     metadata: Dict[str, Any] = {}
@@ -249,7 +249,7 @@ class RAGPipeline:
                 query=query,
                 answer=f"Sorry, I encountered an error while processing your query: {str(e)}",
                 sources=[],
-                retrieval_result=QueryResult(query=query, results=[], total_time=0.0),
+                retrieval_result=EnhancedQueryResult(query=query, results=[], total_time=0.0),
                 generation_result=GenerationResult(
                     generated_text="",
                     model=self.config.generation_model,

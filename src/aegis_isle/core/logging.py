@@ -46,7 +46,6 @@ class AuditLogger:
             format=self._json_formatter,
             rotation="1 day",
             retention="365 days",  # Keep audit logs for 1 year
-            compression="gzip",
             filter=lambda record: record["extra"].get("audit", False),
             serialize=False  # We handle JSON serialization ourselves
         )
@@ -336,7 +335,6 @@ def configure_logging():
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}",
         rotation="1 day",
         retention="30 days",
-        compression="gzip",
         filter=lambda record: not record["extra"].get("audit", False)  # Exclude audit logs
     )
 
@@ -347,7 +345,6 @@ def configure_logging():
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}\n{exception}",
         rotation="1 day",
         retention="90 days",
-        compression="gzip",
         filter=lambda record: not record["extra"].get("audit", False)  # Exclude audit logs
     )
 
