@@ -1,29 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -m venv venv)",
-      "Bash(.venvScriptsactivate)",
-      "Bash(pip install --upgrade pip)",
-      "Bash(./venv/Scripts/activate)",
-      "Bash(python -m pip install --upgrade pip)",
-      "Bash(python -m pip install fastapi uvicorn pydantic python-dotenv loguru)",
-      "Bash(python -m pip install sqlalchemy aiofiles python-multipart)",
-      "Bash(python demo.py)",
-      "Bash(docker-compose up -d)",
-      "Bash(docker --version)",
-      "Bash(docker compose version)",
-      "Bash(python -m pip list)",
-      "Bash(pip install python-jose[cryptography] passlib[bcrypt] bcrypt -q)",
-      "Bash(python -c \"import sys; print(f''Python {sys.version}'')\")",
-      "Bash(timeout 15 python -m uvicorn src.aegis_isle.api.main:app --host 0.0.0.0 --port 8000 --log-level info)",
-      "Bash(pip install pydantic-settings -q)",
-      "Bash(timeout 20 python -m uvicorn src.aegis_isle.api.main:app --host 0.0.0.0 --port 8000 --log-level info)",
-      "Bash(pip install langgraph -q)",
-      "Bash(pip install langchain-openai langchain-anthropic langchain-community -q)",
-      "Bash(python demo_auth_system.py)",
-      "Bash(pip install langchain-openai langchain-anthropic -q)",
-      "Bash(python -m uvicorn src.aegis_isle.api.main:app --host 0.0.0.0 --port 8000 --log-level info)",
-      "Bash(python auth_server.py)"
+      "Bash(timeout 3 ping localhost -n 2)",
+      "Bash(curl -X GET \"http://localhost:8000/api/v1/auth/me\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGVzIjpbInVzZXIiLCJhZG1pbiIsInN1cGVyX2FkbWluIl0sImV4cCI6MTc2MzczNDcyNX0.LD_yAZhJF-zvUMBARhw35miOg01MoIlNiAaRzQ19_NE\")",
+      "Bash(curl -X GET \"http://localhost:8000/api/v1/auth/status\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGVzIjpbInVzZXIiLCJhZG1pbiIsInN1cGVyX2FkbWluIl0sImV4cCI6MTc2MzczNDcyNX0.LD_yAZhJF-zvUMBARhw35miOg01MoIlNiAaRzQ19_NE\")",
+      "Bash(curl -X GET \"http://localhost:8000/api/v1/auth/admin-test\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGVzIjpbInVzZXIiLCJhZG1pbiIsInN1cGVyX2FkbWluIl0sImV4cCI6MTc2MzczNDcyNX0.LD_yAZhJF-zvUMBARhw35miOg01MoIlNiAaRzQ19_NE\")",
+      "Bash(curl -X POST \"http://localhost:8000/api/v1/auth/token\" -H \"Content-Type: application/x-www-form-urlencoded\" -d \"username=testuser&password=testpass123\")",
+      "Bash(curl -X GET \"http://localhost:8000/api/v1/auth/admin-test\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsInJvbGVzIjpbInVzZXIiXSwiZXhwIjoxNzYzNzM0Nzc3fQ.E8jg3e_wY5eN83IMauJoZ-IB44PQwV9sDOK_IlTkTAQ\")"
     ],
     "deny": [],
     "ask": []
