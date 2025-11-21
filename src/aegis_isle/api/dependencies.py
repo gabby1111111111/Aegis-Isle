@@ -65,30 +65,38 @@ oauth2_scheme = OAuth2PasswordBearer(
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Mock database for users (in production, use real database)
-USERS_DB: Dict[str, UserInDB] = {
-    # Default admin user (configurable via environment variables)
-    os.getenv("ADMIN_USERNAME", "admin"): UserInDB(
-        username=os.getenv("ADMIN_USERNAME", "admin"),
-        user_id="admin_001",
-        email="admin@aegisisle.com",
-        full_name="System Administrator",
-        hashed_password=pwd_context.hash(os.getenv("ADMIN_PASSWORD", "admin123")),
-        roles=["user", "admin", "super_admin"],
-        is_active=True,
-        created_at=datetime.utcnow()
-    ),
-    # Default test user
-    "testuser": UserInDB(
-        username="testuser",
-        user_id="user_001",
-        email="test@aegisisle.com",
-        full_name="Test User",
-        hashed_password=pwd_context.hash("testpass123"),
-        roles=["user"],
-        is_active=True,
-        created_at=datetime.utcnow()
-    )
-}
+# Use lazy initialization to avoid bcrypt issues during module import
+_USERS_DB: Optional[Dict[str, UserInDB]] = None
+
+def get_users_db() -> Dict[str, UserInDB]:
+    """Get user database, initializing if needed."""
+    global _USERS_DB
+    if _USERS_DB is None:
+        _USERS_DB = {
+            # Default admin user (configurable via environment variables)
+            os.getenv("ADMIN_USERNAME", "admin"): UserInDB(
+                username=os.getenv("ADMIN_USERNAME", "admin"),
+                user_id="admin_001",
+                email="admin@aegisisle.com",
+                full_name="System Administrator",
+                hashed_password=pwd_context.hash(os.getenv("ADMIN_PASSWORD", "admin123")),
+                roles=["user", "admin", "super_admin"],
+                is_active=True,
+                created_at=datetime.utcnow()
+            ),
+            # Default test user
+            "testuser": UserInDB(
+                username="testuser",
+                user_id="user_001",
+                email="test@aegisisle.com",
+                full_name="Test User",
+                hashed_password=pwd_context.hash("testpass123"),
+                roles=["user"],
+                is_active=True,
+                created_at=datetime.utcnow()
+            )
+        }
+    return _USERS_DB
 
 
 # Authentication Functions
@@ -104,7 +112,7 @@ def get_password_hash(password: str) -> str:
 
 def get_user(username: str) -> Optional[UserInDB]:
     """Get user from database by username."""
-    return USERS_DB.get(username)
+    return get_users_db().get(username)
 
 
 def authenticate_user(username: str, password: str) -> Optional[UserInDB]:

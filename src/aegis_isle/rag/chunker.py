@@ -1147,8 +1147,8 @@ def get_chunker(strategy: str = "table_aware_recursive", **kwargs) -> EnhancedCh
         chunker_class = TableAwareRecursiveChunker
 
     # Use settings defaults if not provided
-    chunk_size = kwargs.get("chunk_size", settings.chunk_size)
-    chunk_overlap = kwargs.get("chunk_overlap", settings.chunk_overlap)
+    chunk_size = kwargs.pop("chunk_size", settings.chunk_size)
+    chunk_overlap = kwargs.pop("chunk_overlap", settings.chunk_overlap)
 
     return chunker_class(
         chunk_size=chunk_size,

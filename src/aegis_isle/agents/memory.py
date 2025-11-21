@@ -29,7 +29,7 @@ class MemoryEntry(Base):
     message_id = Column(String, index=True, nullable=False)
     content = Column(Text, nullable=False)
     message_type = Column(String, default="text")
-    metadata = Column(Text)  # JSON string
+    meta_data = Column(Text)  # JSON string (renamed from metadata to avoid SQLAlchemy reserved word)
     importance_score = Column(Integer, default=1)
     is_system = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -68,7 +68,7 @@ class AgentMemory:
                 message_id=message.id,
                 content=message.content,
                 message_type=message.message_type,
-                metadata=json.dumps(message.metadata),
+                meta_data=json.dumps(message.metadata),
                 importance_score=importance_score,
                 is_system=is_system,
                 created_at=message.timestamp
@@ -291,7 +291,7 @@ class AgentMemory:
         messages = []
         for entry in entries:
             try:
-                metadata = json.loads(entry.metadata) if entry.metadata else {}
+                metadata = json.loads(entry.meta_data) if entry.meta_data else {}
                 message = AgentMessage(
                     id=entry.message_id,
                     sender_id=entry.agent_id,

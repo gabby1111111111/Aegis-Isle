@@ -58,10 +58,21 @@ class Settings(BaseSettings):
     ocr_enabled: bool = Field(default=True, env="OCR_ENABLED")
     ocr_language: str = Field(default="eng+chi_sim", env="OCR_LANGUAGE")
 
-    # Security
+    # Security & Authentication
     secret_key: str = Field(default="change-this-in-production", env="SECRET_KEY")
     access_token_expire_minutes: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
     allowed_hosts: str = Field(default="localhost,127.0.0.1", env="ALLOWED_HOSTS")
+
+    # OAuth2 + RBAC Configuration
+    admin_username: str = Field(default="admin", env="ADMIN_USERNAME")
+    admin_password: str = Field(default="admin123", env="ADMIN_PASSWORD")
+    jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM")
+
+    # Audit Logging Configuration
+    audit_log_enabled: bool = Field(default=True, env="AUDIT_LOG_ENABLED")
+    audit_log_retention_days: int = Field(default=365, env="AUDIT_LOG_RETENTION_DAYS")
+    structured_logging: bool = Field(default=True, env="STRUCTURED_LOGGING")
+    elk_compatible: bool = Field(default=True, env="ELK_COMPATIBLE")
 
     # Monitoring
     enable_metrics: bool = Field(default=True, env="ENABLE_METRICS")
