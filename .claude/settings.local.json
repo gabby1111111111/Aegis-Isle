@@ -23,7 +23,11 @@
       "Bash(curl -X GET \"http://localhost:8000/api/v1/auth/admin-test\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGVzIjpbInVzZXIiLCJhZG1pbiIsInN1cGVyX2FkbWluIl0sImV4cCI6MTc2Mzc1MjkwMH0.y4ypMqrdh-e6x81MEotlpbHkxEtJsjWZar_0wqs5iQ0\" -s)",
       "Bash(curl -X GET \"http://localhost:8000/api/v1/auth/super-admin-test\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInJvbGVzIjpbInVzZXIiLCJhZG1pbiIsInN1cGVyX2FkbWluIl0sImV4cCI6MTc2Mzc1MjkwMH0.y4ypMqrdh-e6x81MEotlpbHkxEtJsjWZar_0wqs5iQ0\" -s)",
       "Bash(curl -X POST \"http://localhost:8000/api/v1/auth/token\" -H \"Content-Type: application/x-www-form-urlencoded\" -d \"username=testuser&password=testpass123\" -s)",
-      "Bash(curl -X GET \"http://localhost:8000/api/v1/auth/admin-test\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsInJvbGVzIjpbInVzZXIiXSwiZXhwIjoxNzYzNzUyOTU2fQ.1-5ILnXkMFHqIMn4elRVt_djs4jfjzzAm5ohxG8Wb_Y\" -s)"
+      "Bash(curl -X GET \"http://localhost:8000/api/v1/auth/admin-test\" -H \"Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsInJvbGVzIjpbInVzZXIiXSwiZXhwIjoxNzYzNzUyOTU2fQ.1-5ILnXkMFHqIMn4elRVt_djs4jfjzzAm5ohxG8Wb_Y\" -s)",
+      "Bash(chmod +x setup_dev_env.sh run_dev.py)",
+      "Bash(python run_dev.py --mode auth --port 8000)",
+      "Bash(python run_dev.py --mode auth --port 8001)",
+      "Bash(python run_dev.py --help)"
     ],
     "deny": [],
     "ask": []
