@@ -12,7 +12,11 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
-
+    class Config:
+            env_file = ".env"
+            env_file_encoding = "utf-8"
+            case_sensitive = False
+            extra = "ignore"
     # Environment
     environment: str = Field(default="development", env="ENVIRONMENT")
     debug: bool = Field(default=True, env="DEBUG")
@@ -34,7 +38,7 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default="openai", env="LLM_PROVIDER")
     openai_api_key: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
     anthropic_api_key: Optional[str] = Field(default=None, env="ANTHROPIC_API_KEY")
-
+    openai_base_url: Optional[str] = Field(default=None, env="OPENAI_BASE_URL")
     # Model Settings
     default_llm_model: str = Field(default="gpt-4-1106-preview", env="DEFAULT_LLM_MODEL")
     embedding_model: str = Field(default="text-embedding-ada-002", env="EMBEDDING_MODEL")

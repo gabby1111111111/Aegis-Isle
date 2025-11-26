@@ -437,7 +437,9 @@ class EnhancedDocumentProcessor:
         """Create enhanced metadata for a file."""
         stat = file_path.stat()
         mime_type, _ = mimetypes.guess_type(str(file_path))
-
+        custom_metadata.pop('filename', None)
+        custom_metadata.pop('file_path', None)
+        custom_metadata.pop('file_size', None)
         return DocumentMetadata(
             filename=file_path.name,
             file_path=str(file_path),

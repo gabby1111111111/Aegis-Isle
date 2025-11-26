@@ -4,7 +4,7 @@ Logging configuration for AegisIsle with structured audit logging support.
 
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Literal
 from pathlib import Path
 
@@ -43,7 +43,7 @@ class AuditLogger:
         logger.add(
             "logs/audit/audit_{time:YYYY-MM-DD}.jsonl",
             level="INFO",
-            format=self._json_formatter,
+            format="{message}",  # Use simple format, we handle JSON in the message
             rotation="1 day",
             retention="365 days",  # Keep audit logs for 1 year
             filter=lambda record: record["extra"].get("audit", False),
@@ -122,7 +122,7 @@ class AuditLogger:
             "event_type": event_type,
             "action": action,
             "outcome": outcome,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         # Add user information
@@ -160,15 +160,28 @@ class AuditLogger:
         # Add any additional fields
         audit_data.update(kwargs)
 
-        # Create log message
+        # Create human-readable message
         message = f"{event_type.upper()}: {action}"
         if outcome == "failure":
             message += f" - FAILED"
         if error_message:
             message += f" - {error_message}"
 
-        # Log the audit event
-        self.audit_logger.bind(audit_data=audit_data).log(level.upper(), message)
+        # Create ELK-compatible log structure
+        log_entry = {
+            "@timestamp": datetime.now(timezone.utc).isoformat(),
+            "@version": "1",
+            "level": level.lower(),
+            "logger": "aegis-isle-audit",
+            "message": message,
+            "service": "aegis-isle",
+            "environment": settings.environment,
+            **audit_data
+        }
+
+        # Format as JSON and log
+        json_message = json.dumps(log_entry, ensure_ascii=False)
+        self.audit_logger.log(level.upper(), json_message)
 
     def log_authentication(
         self,

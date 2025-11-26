@@ -11,7 +11,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
 from langchain_core.runnables import RunnableLambda
 
-from .base import AgentMessage, AgentResponse, BaseAgent, AgentRole
+from .base import AgentMessage, AgentResponse, BaseAgent, AgentRole, AgentConfig
 from .router import AgentRouter
 from .implementations import EnhancedChartAgent, EnhancedResearcherAgent
 from ..tools import get_tool_registry, PythonREPLTool, SearchTool, ToolConfig

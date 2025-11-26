@@ -80,7 +80,16 @@ class LLMGenerator(BaseGenerator):
         try:
             if self.provider == "openai":
                 from openai import AsyncOpenAI
-                self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+                # 构建OpenAI客户端配置
+                client_kwargs = {"api_key": settings.openai_api_key}
+
+                # 如果配置了自定义base_url（如SiliconFlow等），使用它
+                if settings.openai_base_url:
+                    client_kwargs["base_url"] = settings.openai_base_url
+                    logger.info(f"Using custom OpenAI base URL: {settings.openai_base_url}")
+
+                self._client = AsyncOpenAI(**client_kwargs)
                 self._generate_method = self._generate_openai
 
             elif self.provider == "anthropic":
@@ -409,7 +418,8 @@ def get_generator(
 ) -> BaseGenerator:
     """Factory function to get a generator based on provider."""
     model = model or settings.default_llm_model
-
+    kwargs.pop('max_tokens', None)
+    kwargs.pop('temperature', None)
     config = GenerationConfig(
         model=model,
         max_tokens=kwargs.get("max_tokens", settings.max_tokens),

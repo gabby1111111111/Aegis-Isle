@@ -15,6 +15,7 @@ from .document_processor import DocumentChunk
 from .embedder import get_embedder, MultiModalEmbedder
 
 
+
 class RetrievalResult(BaseModel):
     """Result of a retrieval operation."""
 
@@ -63,7 +64,12 @@ class QueryExpander:
         try:
             if "openai" in self.llm_model.lower():
                 from openai import AsyncOpenAI
-                client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+                # 构建OpenAI客户端配置
+                client_kwargs = {"api_key": settings.openai_api_key}
+                if settings.openai_base_url:
+                    client_kwargs["base_url"] = settings.openai_base_url
+                client = AsyncOpenAI(**client_kwargs)
 
                 prompt = f"""Generate {max_expansions} semantically related queries for: "{query}"
                 Rules:
@@ -189,7 +195,12 @@ class Reranker:
         """Rerank using LLM scoring."""
         try:
             from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=settings.openai_api_key)
+
+            # 构建OpenAI客户端配置
+            client_kwargs = {"api_key": settings.openai_api_key}
+            if settings.openai_base_url:
+                client_kwargs["base_url"] = settings.openai_base_url
+            client = AsyncOpenAI(**client_kwargs)
 
             # Score each result
             scored_results = []
@@ -813,7 +824,14 @@ class VectorRetriever(BaseRetriever):
         try:
             if "openai" in self.embedding_model.lower():
                 from openai import AsyncOpenAI
-                self._embedder = AsyncOpenAI(api_key=settings.openai_api_key)
+
+                # 构建OpenAI客户端配置
+                client_kwargs = {"api_key": settings.openai_api_key}
+                if settings.openai_base_url:
+                    client_kwargs["base_url"] = settings.openai_base_url
+                    logger.info(f"Using custom OpenAI base URL for embeddings: {settings.openai_base_url}")
+
+                self._embedder = AsyncOpenAI(**client_kwargs)
                 self._embed_method = self._openai_embed
             else:
                 # Use sentence transformers for other models
@@ -848,7 +866,7 @@ class VectorRetriever(BaseRetriever):
                 host=settings.qdrant_host,
                 port=settings.qdrant_port
             )
-
+            
             # Ensure collection exists
             collections = self._vector_db.get_collections().collections
             collection_names = [c.name for c in collections]
@@ -856,7 +874,7 @@ class VectorRetriever(BaseRetriever):
             if settings.qdrant_collection not in collection_names:
                 self._vector_db.create_collection(
                     collection_name=settings.qdrant_collection,
-                    vectors_config=VectorParams(size=1536, distance=Distance.COSINE)
+                    vectors_config=VectorParams(size=384, distance=Distance.COSINE)
                 )
                 logger.info(f"Created legacy Qdrant collection: {settings.qdrant_collection}")
 
@@ -887,7 +905,7 @@ class VectorRetriever(BaseRetriever):
         try:
             import faiss
 
-            self._dimension = 1536  # OpenAI embedding dimension
+            self._dimension = 384  # OpenAI embedding dimension
             self._vector_db = faiss.IndexFlatIP(self._dimension)
             self._id_to_chunk = {}
 
@@ -928,45 +946,79 @@ class VectorRetriever(BaseRetriever):
         try:
             # Generate embeddings for chunks
             texts = [chunk.content for chunk in chunks]
+            logger.info(f"Generating embeddings for {len(texts)} chunks...")
             embeddings = await self._embed_method(texts)
+            logger.info(f"Generated {len(embeddings)} embeddings")
 
             # Add to vector database
             if self.vector_db_type == "qdrant":
+                logger.info("Adding to Qdrant...")
                 await self._add_to_qdrant(chunks, embeddings)
             elif self.vector_db_type == "chromadb":
+                logger.info("Adding to ChromaDB...")
                 await self._add_to_chromadb(chunks, embeddings)
             elif self.vector_db_type == "faiss":
+                logger.info(f"Adding to FAISS (dimension={self._dimension})...")
                 await self._add_to_faiss(chunks, embeddings)
 
             logger.info(f"Added {len(chunks)} chunks to legacy vector database")
             return True
 
         except Exception as e:
+            import traceback
             logger.error(f"Failed to add chunks to vector database: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return False
 
     async def _add_to_qdrant(self, chunks: List[DocumentChunk], embeddings: List[List[float]]):
         """Add chunks to Qdrant."""
-        from qdrant_client.models import PointStruct
+        try:
+            from qdrant_client.models import PointStruct
 
-        points = []
-        for chunk, embedding in zip(chunks, embeddings):
-            point = PointStruct(
-                id=chunk.id,
-                vector=embedding,
-                payload={
-                    "document_id": chunk.document_id,
-                    "content": chunk.content,
-                    "chunk_index": chunk.chunk_index,
-                    "metadata": chunk.metadata
-                }
+            logger.info(f"Preparing {len(chunks)} points for Qdrant...")
+
+            # 检查embedding维度
+            if embeddings and len(embeddings) > 0:
+                embedding_dim = len(embeddings[0])
+                logger.info(f"Embedding dimension: {embedding_dim}")
+
+                # 检查是否与collection配置匹配
+                try:
+                    collection_info = self._vector_db.get_collection(settings.qdrant_collection)
+                    expected_dim = collection_info.config.params.vectors.size
+                    if embedding_dim != expected_dim:
+                        raise ValueError(f"Embedding dimension mismatch: got {embedding_dim}, collection expects {expected_dim}")
+                except Exception as e:
+                    logger.warning(f"Could not verify collection dimension: {e}")
+
+            points = []
+            for chunk, embedding in zip(chunks, embeddings):
+                point = PointStruct(
+                    id=chunk.id,
+                    vector=embedding,
+                    payload={
+                        "document_id": chunk.document_id,
+                        "content": chunk.content,
+                        "chunk_index": chunk.chunk_index,
+                        "metadata": chunk.metadata
+                    }
+                )
+                points.append(point)
+
+            logger.info(f"Upserting {len(points)} points to Qdrant collection '{settings.qdrant_collection}'...")
+            result = self._vector_db.upsert(
+                collection_name=settings.qdrant_collection,
+                points=points
             )
-            points.append(point)
+            logger.info(f"Successfully added {len(points)} points to Qdrant. Operation result: {result}")
 
-        self._vector_db.upsert(
-            collection_name=settings.qdrant_collection,
-            points=points
-        )
+        except Exception as e:
+            import traceback
+            logger.error(f"Qdrant upsert operation failed: {e}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
 
     async def _add_to_chromadb(self, chunks: List[DocumentChunk], embeddings: List[List[float]]):
         """Add chunks to ChromaDB."""
@@ -983,14 +1035,32 @@ class VectorRetriever(BaseRetriever):
 
     async def _add_to_faiss(self, chunks: List[DocumentChunk], embeddings: List[List[float]]):
         """Add chunks to FAISS."""
-        import numpy as np
+        try:
+            import numpy as np
 
-        embeddings_array = np.array(embeddings, dtype=np.float32)
-        start_id = self._vector_db.ntotal
-        self._vector_db.add(embeddings_array)
+            logger.info(f"Converting {len(embeddings)} embeddings to numpy array...")
+            embeddings_array = np.array(embeddings, dtype=np.float32)
+            logger.info(f"Embedding array shape: {embeddings_array.shape}, expected dimension: {self._dimension}")
 
-        for i, chunk in enumerate(chunks):
-            self._id_to_chunk[start_id + i] = chunk
+            # 检查维度是否匹配
+            if embeddings_array.shape[1] != self._dimension:
+                raise ValueError(f"Embedding dimension mismatch: got {embeddings_array.shape[1]}, expected {self._dimension}")
+
+            start_id = self._vector_db.ntotal
+            logger.info(f"Adding embeddings to FAISS index (current size: {start_id})...")
+            self._vector_db.add(embeddings_array)
+            logger.info(f"Successfully added to FAISS, new size: {self._vector_db.ntotal}")
+
+            for i, chunk in enumerate(chunks):
+                self._id_to_chunk[start_id + i] = chunk
+
+            logger.info(f"Stored {len(chunks)} chunks in ID mapping")
+
+        except Exception as e:
+            import traceback
+            logger.error(f"FAISS add operation failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
 
     async def search(
         self,

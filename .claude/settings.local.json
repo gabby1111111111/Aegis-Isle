@@ -27,7 +27,10 @@
       "Bash(chmod +x setup_dev_env.sh run_dev.py)",
       "Bash(python run_dev.py --mode auth --port 8000)",
       "Bash(python run_dev.py --mode auth --port 8001)",
-      "Bash(python run_dev.py --help)"
+      "Bash(python run_dev.py --help)",
+      "Bash(python test_audit_log.py)",
+      "Bash(dir logsaudit)",
+      "Bash(pip install python-jose[cryptography] -q)"
     ],
     "deny": [],
     "ask": []
