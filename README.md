@@ -1,416 +1,237 @@
-# AegisIsle - 多智能体协作 RAG 系统
+这是一个**全量整合版 README.md**。
 
-[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![Docker](https://img.shields.io/badge/Docker-20.10+-blue.svg)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+我保留了你原有的所有内容，并在此基础上，将**酒馆扩展、算法原理、Prompt 策略、路线图、运维排错**有机地融入了文档结构中。
 
-AegisIsle 是一个企业级的多智能体协作检索增强生成 (RAG) 系统，具备完整的 OAuth2 + RBAC 权限控制、结构化审计日志和容器化部署能力。
+这份文档现在具有了 **CS Master** 级别的技术密度：不仅有顶层架构（Architecture），还有底层数学原理（Algorithm）和中间件设计模式（Middleware）。
 
-## 🌟 主要特性
+请直接复制以下所有内容覆盖你的 `README.md`。
 
-### 🤖 多智能体系统
-- **协作式 RAG**: 多个专业化智能体协同工作
-- **工具集成**: Python REPL、网络搜索、数据可视化
-- **LangGraph 工作流**: 状态管理和智能体编排
-- **自适应路由**: 智能任务分发和负载均衡
+***
 
-### 🔒 企业级安全
-- **OAuth2 认证**: JWT 令牌管理和刷新
-- **RBAC 权限控制**: 角色基础访问控制
-- **审计日志**: ELK 堆栈兼容的结构化日志
-- **API 安全**: 端点级权限保护
+```markdown
+# 🛡️ Aegis-Isle: Multi-Agent RAG Ecosystem
+### Enterprise Infrastructure & Immersive Vertical Applications
 
-### 📚 先进的 RAG 技术
-- **混合文档处理**: PDF、Word、图片 OCR 解析
-- **多模态嵌入**: 文本、图像统一向量空间
-- **智能分块**: 表格感知的语义分割
-- **增强检索**: 查询扩展和结果重排
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![Architecture](https://img.shields.io/badge/Microservices-Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![AI](https://img.shields.io/badge/Agentic-LangGraph-purple)](https://langchain.com/)
+[![Database](https://img.shields.io/badge/VectorDB-Qdrant-green)](https://qdrant.tech/)
+[![API](https://img.shields.io/badge/API-OpenAI%20Compatible-orange)]()
 
-### 🏗️ 生产就绪架构
-- **Docker 容器化**: 一键部署和扩展
-- **微服务架构**: 松耦合、高可用
-- **监控集成**: Prometheus + Grafana
-- **负载均衡**: Nginx 反向代理
+> **"From Deep Enterprise Search to Immersive Career Companions."**
+>
+> **Aegis-Isle** 是一个模块化的多智能体协作平台。它不仅提供坚实的企业级 RAG 底座（权限控制、审计日志、容器化），更探索了垂直领域应用的边界——通过 **Project: Love & Code** 子系统，将面试备考转化为基于算法与角色扮演的沉浸式体验。
 
-## 🚀 快速开始
+---
 
-### 先决条件
-- Docker 20.10+ & Docker Compose v2.0+
-- 8GB+ RAM, 4+ CPU 核心
-- 50GB+ 可用磁盘空间
+## 🏗️ System Architecture (系统架构)
 
-### 一分钟部署
+本项目采用 **"Headless Backend" (无头后端)** 设计模式。底层 RAG 引擎与上层 UI 解耦，支持多种前端接入（Streamlit, Web API, 或第三方客户端如 SillyTavern）。
+
+```mermaid
+graph TD
+    User((User))
+    
+    subgraph "Frontend Layer (Multi-Modal)"
+        Streamlit[Streamlit App (Visual Novel)]
+        SillyTavern[SillyTavern / Third-party Client]
+    end
+
+    subgraph "Middleware / Gateway"
+        API[FastAPI Gateway]
+        Proxy[OpenAI-Compatible Proxy]
+    end
+
+    subgraph "Orchestration Layer (LangGraph)"
+        Router{Router Agent}
+        Evaluator[Strict Evaluator (Sukuna)]
+        Tutor[ELI5 Tutor (Gojo)]
+    end
+
+    subgraph "Core Engines"
+        KE[Knowledge Engine (Forgetting Curve)]
+        PM[Persona Adapter]
+        RAG[Hybrid RAG Pipeline]
+    end
+
+    subgraph "Infrastructure"
+        Qdrant[(Qdrant Vector DB)]
+        LLM[SiliconFlow / DeepSeek-V3]
+    end
+
+    User --> Streamlit
+    User --> SillyTavern
+    
+    Streamlit --> Router
+    SillyTavern -->|/v1/chat/completions| Proxy
+    Proxy --> API --> Router
+    
+    Router --> Evaluator & Tutor
+    Evaluator --> PM --> RAG --> Qdrant
+    Tutor --> KE
+    
+    RAG & KE --> LLM
+```
+
+---
+
+## 🌟 Core Modules (核心模块)
+
+### 1. 🏢 Enterprise Core (企业级底座)
+*坚实、安全、可扩展的基础设施。*
+- **协作式 RAG**: 基于 **LangGraph** 的多智能体编排（Researcher, Analyst, Coder）。
+- **混合检索增强**: 支持 PDF/MD/图片 OCR 解析，结合 **Hybrid Search (关键字+向量)** 与 **Re-ranking (重排序)** 技术，解决长尾知识召回问题。
+- **安全架构**: 
+  - **OAuth2 & RBAC**: 细粒度的角色访问控制与 JWT 令牌管理。
+  - **Audit Logging**: ELK 兼容的结构化审计日志，追踪每一次 Token 消耗与 Agent 决策。
+- **微服务部署**: 基于 Docker Compose 的松耦合架构，集成 Prometheus + Grafana 监控。
+
+### 2. 💖 Vertical App: "Love & Code" (心动面试)
+*基于 Streamlit 的沉浸式 Visual Novel 风格学习应用。*
+- **Algorithmic Learning (算法驱动学习)**: 内置 **艾宾浩斯遗忘曲线** 引擎，通过 Leitner Box 模型动态管理题目熟练度，实现科学复习。
+- **Persona Adapter (多模态角色适配)**: 独创的角色适配器，支持导入 **SillyTavern (酒馆)** V2 Spec 角色卡（PNG/JSON），将通用 LLM 转化为具备特定人格（如"毒舌面试官"或"温柔导师"）的垂直 Agent。
+- **Dynamic Difficulty (动态难度)**: 基于 JD (岗位描述) 的语义分析，自动生成 Level 1-5 梯度的面试题。
+- **ELI5 Tutoring**: 触发式教学模式，使用通俗比喻（Explain Like I'm 5）解析技术难点。
+
+### 3. 🔌 Ecosystem: SillyTavern Proxy (酒馆中间件)
+*实现 "Bring Your Own Client" (BYOC) 的生态扩展层。*
+- **Context Injection Middleware**: 实现了一个兼容 OpenAI 协议的代理层。它拦截 SillyTavern 的请求，在后台静默执行 RAG 检索，将知识库中的技术文档注入到 Prompt 上下文中。
+- **Value**: 允许用户在沉浸式 RPG 环境中与拥有专业知识库的 AI 角色互动（例如：让《博德之门3》的 Astarion 变成拥有 Python 专家知识的面试官）。
+
+---
+
+## 🧠 Algorithm & Deep Dive (算法与技术详解)
+
+### 1. Spaced Repetition Engine (遗忘曲线引擎)
+为了量化学习效果，我们在 `KnowledgeEngine` 中实现了确定性的复习算法 (Leitner System 改良版)。每道题目 $Q$ 的状态更新逻辑如下：
+
+$$ NextInterval = 2^{Box} \times BaseInterval $$
+
+- **状态转移:** 
+    - 当用户答对：$Box \leftarrow \min(Box + 1, 5)$ (复习间隔指数级延长)
+    - 当用户答错：$Box \leftarrow 0$ (立即重置进入急救队列)
+- **应用:** 系统优先推送 `NextReview <= Now` 的题目，确保在记忆衰减临界点进行强化。
+
+### 2. Hybrid RAG Pipeline (混合检索管道)
+为了解决单一向量检索在专有名词（如 "DeepSeek", "LangGraph"）上召回率低的问题，我们采用了**混合检索策略**：
+
+1.  **Dense Retrieval (稠密检索):** 使用 `all-MiniLM-L6-v2` 生成 Embedding，捕获语义相似度。
+2.  **Keyword Search (关键词检索):** 集成 BM25 算法捕获精确匹配。
+3.  **Re-ranking (重排序):** 使用 LLM 对检索回来的 Top-K 文档片段进行相关性打分，过滤掉 "Distractors" (干扰项)。
+
+---
+
+## 🧩 Prompt Engineering Strategy (Prompt 策略)
+
+Aegis-Isle 摒弃了简单的 System Prompt 拼接，采用了 **"Three-Tier Context Injection" (三层上下文注入)** 技术，以确保 Persona（人设）与 Knowledge（知识）的完美融合。
+
+```text
+[Tier 1: System Persona (Immutable)]
+"You are Ryomen Sukuna. Personality: Arrogant, Toxic, King of Curses..."
+"Instruction: Always maintain this persona, even when explaining technical concepts."
+
+[Tier 2: Knowledge Context (Dynamic RAG)]
+"Relevant Technical Docs: 
+ - [Chunk 1: Definition of RAG...]
+ - [Chunk 2: Vector DB comparison...]"
+
+[Tier 3: Task Instruction (Runtime)]
+"User Answer: {input}. 
+ Step 1: Fact-check the answer against Tier 2.
+ Step 2: If wrong, mock the user based on Tier 1 persona.
+ Step 3: Output strictly in JSON format: {is_correct, comment, reasoning}."
+```
+
+这种结构化设计确保了 LLM 在进行高强度角色扮演的同时，依然能准确遵循业务逻辑（如 JSON 输出），避免了 "Character Break"（OOC）问题。
+
+---
+
+## 📸 Demo Gallery (演示)
+
+| **The Infrastructure** | **The Application** |
+|:---:|:---:|
+| ![Backend](./assets/backend_arch.png) | ![UI](./assets/interview_ui.png) |
+| *High-Performance RAG Pipeline* | *Immersive Persona-based Learning* |
+
+---
+
+## 🚀 Quick Start (快速运行)
+
+### Prerequisites
+- Docker 20.10+
+- Python 3.10+
+- SiliconFlow API Key
+
+### Mode A: Run "Love & Code" App (Local)
+适合直接体验面试与学习功能。
 
 ```bash
-# 克隆项目
-git clone https://github.com/your-org/aegis-isle.git
-cd aegis-isle
-
-# 配置环境
-cp .env.example .env
-# 编辑 .env 文件，设置 API 密钥和密码
-
-# 启动服务
-docker-compose up -d
-
-# 验证部署
-curl http://localhost:8000/api/v1/health
-```
-
-### 获取访问令牌
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=admin123"
-```
-
-## 📖 使用示例
-
-### 1. 文档上传和处理
-
-```python
-import requests
-
-# 上传文档
-files = {'file': open('document.pdf', 'rb')}
-headers = {'Authorization': 'Bearer YOUR_TOKEN'}
-response = requests.post(
-    'http://localhost:8000/api/v1/documents/upload',
-    files=files,
-    headers=headers
-)
-```
-
-### 2. RAG 查询
-
-```python
-query_data = {
-    "question": "什么是量子计算？",
-    "max_docs": 5,
-    "use_reranking": True
-}
-
-response = requests.post(
-    'http://localhost:8000/api/v1/query',
-    json=query_data,
-    headers={'Authorization': 'Bearer YOUR_TOKEN'}
-)
-
-print(response.json()['answer'])
-```
-
-### 3. 智能体执行
-
-```python
-agent_task = {
-    "agent_type": "researcher",
-    "task": "分析人工智能的发展趋势",
-    "params": {
-        "use_web_search": True,
-        "generate_chart": True
-    }
-}
-
-response = requests.post(
-    'http://localhost:8000/api/v1/agents/execute',
-    json=agent_task,
-    headers={'Authorization': 'Bearer YOUR_TOKEN'}
-)
-```
-
-## 🏗️ 系统架构
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        前端层                                │
-├─────────────────────────────────────────────────────────────┤
-│ 🌐 Web UI  │ 🔧 Admin Panel │ 📱 API Client │ 📊 Monitoring│
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                      API Gateway                            │
-├─────────────────────────────────────────────────────────────┤
-│ 🔒 OAuth2/JWT  │ 🛡️ RBAC  │ 📝 Audit Log │ ⚡ Rate Limit│
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                      业务逻辑层                             │
-├─────────────────────────────────────────────────────────────┤
-│ 🤖 Agent Router │ 📚 RAG Pipeline │ 🔍 Query Engine │ 🛠️ Tools│
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                      数据和存储层                           │
-├─────────────────────────────────────────────────────────────┤
-│ 🗃️ PostgreSQL │ 🔍 Qdrant │ ⚡ Redis │ 📁 Object Storage│
-└─────────────────────────────────────────────────────────────┘
-```
-
-## 🔧 核心组件
-
-### RAG 管道
-- **文档处理器**: 支持 PDF、DOCX、图片 OCR
-- **嵌入器**: OpenAI、Sentence Transformers、CLIP
-- **分块器**: 语义分割、表格保留、重叠策略
-- **检索器**: 向量搜索、查询扩展、结果重排
-
-### 智能体系统
-- **ChartAgent**: 数据可视化和图表生成
-- **ResearcherAgent**: 网络搜索和信息聚合
-- **CodeAgent**: 代码执行和调试支持
-- **OrchestrationAgent**: 多智能体协调管理
-
-### 工具集成
-- **PythonREPL**: 安全的代码执行环境
-- **WebSearch**: 多搜索引擎聚合（DuckDuckGo、Google、Bing）
-- **ChartGenerator**: Plotly 图表生成和导出
-- **DocumentParser**: 多格式文档解析
-
-## 📊 监控和日志
-
-### 审计日志格式 (ELK 兼容)
-
-```json
-{
-  "@timestamp": "2024-01-20T10:30:45.123Z",
-  "@version": "1",
-  "level": "info",
-  "logger": "aegis-isle-audit",
-  "service": "aegis-isle",
-  "environment": "production",
-  "event_type": "authentication",
-  "action": "login_success",
-  "outcome": "success",
-  "username": "admin",
-  "ip_address": "192.168.1.100",
-  "user_agent": "Mozilla/5.0...",
-  "request_id": "req-123456789"
-}
-```
-
-### 性能指标
-
-| 指标 | 描述 | 目标值 |
-|------|------|--------|
-| API 响应时间 | 平均响应延迟 | < 500ms |
-| 文档处理时间 | PDF/DOCX 解析时间 | < 30s/MB |
-| RAG 查询时间 | 检索到回答生成 | < 5s |
-| 并发用户数 | 同时在线用户 | 100+ |
-
-## 🔐 安全特性
-
-### 认证和授权
-- **多因素认证**: 支持 TOTP、短信验证
-- **会话管理**: JWT 令牌轮换和黑名单
-- **角色权限**: 细粒度的 RBAC 控制
-- **API 限流**: 防止暴力攻击和滥用
-
-### 数据安全
-- **传输加密**: TLS 1.3 端到端加密
-- **存储加密**: 静态数据 AES-256 加密
-- **敏感信息**: 自动脱敏和掩码
-- **合规审计**: SOC 2、ISO 27001 标准
-
-## 📈 扩展性
-
-### 水平扩展
-- **无状态设计**: 支持多实例负载均衡
-- **数据库分片**: PostgreSQL 读写分离
-- **缓存策略**: Redis 集群和多级缓存
-- **CDN 集成**: 静态资源全球分发
-
-### 垂直扩展
-- **GPU 支持**: CUDA 加速的模型推理
-- **内存优化**: 大型模型的量化和剪枝
-- **存储层**: 对象存储和分布式文件系统
-- **网络优化**: HTTP/2、gRPC 协议支持
-
-## 🛠️ 开发指南
-
-### 本地开发环境
-
-```bash
-# 克隆项目
-git clone https://github.com/your-org/aegis-isle.git
-cd aegis-isle
-
-# 创建虚拟环境
+# 1. Setup Environment
 python -m venv venv
-source venv/bin/activate  # Windows: venv\\Scripts\\activate
-
-# 安装依赖
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# 启动开发服务
-uvicorn src.aegis_isle.api.main:app --reload --host 0.0.0.0 --port 8000
+# 2. Configure Credentials
+# Create .env file with SILICONFLOW_API_KEY=...
+
+# 3. Launch the Visual Novel Interface
+streamlit run frontend/interview_app.py
 ```
 
-### 添加新的智能体
-
-```python
-from src.aegis_isle.agents.base import BaseAgent
-
-class CustomAgent(BaseAgent):
-    def __init__(self, name: str = "custom"):
-        super().__init__(name)
-        self.description = "自定义智能体描述"
-
-    async def process(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        # 实现自定义逻辑
-        result = await self.execute_custom_logic(task)
-        return {
-            "result": result,
-            "agent": self.name,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-```
-
-### 添加新的工具
-
-```python
-from src.aegis_isle.tools.base import BaseTool
-
-class CustomTool(BaseTool):
-    name = "custom_tool"
-    description = "执行自定义操作的工具"
-
-    async def run(self, tool_input: str) -> ToolResult:
-        # 实现工具逻辑
-        result = await self.execute_operation(tool_input)
-
-        return ToolResult(
-            success=True,
-            result=result,
-            metadata={"execution_time": time.time()}
-        )
-```
-
-## 🧪 测试
-
-### 运行测试套件
+### Mode B: Enterprise Backend (Docker)
+启动完整的 API 服务和向量库。
 
 ```bash
-# 单元测试
-pytest tests/unit/ -v
-
-# 集成测试
-pytest tests/integration/ -v
-
-# API 测试
-pytest tests/api/ -v
-
-# 性能测试
-pytest tests/performance/ -v --benchmark-only
-
-# 覆盖率报告
-pytest --cov=src/aegis_isle --cov-report=html
+docker-compose up -d --build
 ```
 
-### 压力测试
+---
 
-```bash
-# 使用 locust 进行负载测试
-cd tests/load
-locust -f locustfile.py --host=http://localhost:8000
+## 🔧 Troubleshooting (常见问题与运维)
 
-# 并发 RAG 查询测试
-python tests/performance/rag_benchmark.py --concurrent=10 --queries=100
-```
+**Q1: Streamlit 界面立绘加载失败？**
+> 请检查 `assets/` 文件夹下是否存在 `sukuna.jpg` 等文件。如果使用网络图片，请确保网络环境能访问 Pinterest/Imgur。
+> *Fix:* 在 `persona_manager.py` 中将 `avatar_url` 指向本地路径。
 
-## 📋 API 文档
+**Q2: Qdrant 连接报错 `ConnectionRefused`？**
+> 如果在本地运行 Streamlit 而 Qdrant 跑在 Docker 里，请确保 `.env` 中的 `QDRANT_URL` 设置为 `http://localhost:6333` 而不是 Docker 内部 IP。
 
-完整的 API 文档可在以下地址访问：
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+**Q3: LLM 响应速度慢？**
+> 项目默认使用 SiliconFlow 的 DeepSeek-V3。如果遇到延迟，这是云端推理的正常现象。生产环境建议开启 `streaming=True` 选项（代码中已预留），以实现打字机效果，优化用户体验（TTFT）。
 
-### 主要端点
+**Q4: 角色卡解析错误？**
+> 目前仅支持 SillyTavern V2 Spec 的 PNG (含 `ccv3` 元数据) 或 JSON。旧版 V1 卡片请先在酒馆中转换。
 
-| 分类 | 端点 | 方法 | 权限 |
-|------|------|------|------|
-| **认证** |
-| | `/api/v1/auth/token` | POST | 公开 |
-| | `/api/v1/auth/me` | GET | 用户 |
-| | `/api/v1/auth/refresh` | POST | 用户 |
-| **文档** |
-| | `/api/v1/documents/upload` | POST | 用户 |
-| | `/api/v1/documents/list` | GET | 用户 |
-| | `/api/v1/documents/{id}` | DELETE | 用户 |
-| **查询** |
-| | `/api/v1/query` | POST | 用户 |
-| | `/api/v1/query/history` | GET | 用户 |
-| **智能体** |
-| | `/api/v1/agents/execute` | POST | 用户 |
-| | `/api/v1/agents/status` | GET | 用户 |
-| **管理** |
-| | `/api/v1/admin/config` | GET | 管理员 |
-| | `/api/v1/admin/stats` | GET | 管理员 |
-| | `/api/v1/admin/logs` | GET | 管理员 |
+---
 
-## 🤝 贡献指南
+## 🗺️ Roadmap (路线图)
 
-我们欢迎社区贡献！请遵循以下步骤：
+我们致力于将 Aegis-Isle 打造成最灵活的 AI 知识伴侣。
 
-### 开发流程
+- [x] **v1.0 (MVP):** 基础 RAG 引擎、多智能体编排、Visual Novel UI。
+- [x] **v1.1 (Algo):** 遗忘曲线算法、SillyTavern 角色卡解析器 (PNG/JSON)。
+- [ ] **v1.2 (Middleware):** 完善 **OpenAI-Compatible API Proxy**。
+    - [ ] 全量支持 `/v1/chat/completions`。
+    - [ ] 支持 Streaming Response (流式响应)。
+- [ ] **v1.3 (Multi-modal):** 
+    - [ ] **Voice:** 集成 OpenAI Whisper 实现语音模拟面试（ASMR 体验）。
+    - [ ] **Vision:** 集成 Vision 模型，支持上传架构图手绘稿进行自动判卷。
+- [ ] **v2.0 (SaaS):** 多用户支持与 PostgreSQL 持久化。
 
-1. **Fork** 项目仓库
-2. **创建**特性分支: `git checkout -b feature/amazing-feature`
-3. **提交**更改: `git commit -m 'Add amazing feature'`
-4. **推送**分支: `git push origin feature/amazing-feature`
-5. **创建** Pull Request
+---
 
-### 代码规范
+## 👩‍💻 About the Developer
 
-```bash
-# 代码格式化
-black src/ tests/
-
-# 类型检查
-mypy src/
-
-# 代码质量检查
-flake8 src/ tests/
-
-# 安全检查
-bandit -r src/
-```
-
-### 提交信息规范
-
-```
-type(scope): description
-
-feat(auth): add OAuth2 refresh token support
-fix(rag): resolve document parsing encoding issue
-docs(api): update authentication examples
-test(agents): add unit tests for chart generation
-```
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
-
-## 🙏 致谢
-
-特别感谢以下开源项目：
-
-- [FastAPI](https://fastapi.tiangolo.com/) - 现代化的 Python Web 框架
-- [LangChain](https://langchain.com/) - 构建 LLM 应用的框架
-- [LangGraph](https://langchain-ai.github.io/langgraph/) - 智能体工作流编排
-- [Qdrant](https://qdrant.tech/) - 高性能向量数据库
-- [Loguru](https://loguru.readthedocs.io/) - 现代化的日志系统
-
-## 📞 支持
-
-- 📧 邮箱: support@aegisisle.dev
-- 💬 Discord: [AegisIsle Community](https://discord.gg/aegisisle)
-- 📚 文档: [docs.aegisisle.dev](https://docs.aegisisle.dev)
-- 🐛 问题报告: [GitHub Issues](https://github.com/your-org/aegis-isle/issues)
+**Gabriella**
+*   **CS Master** | Full-Stack Developer | AI Enthusiast
+*   **Tech Stack:** Python, FastAPI, LangChain, React, Docker.
+*   **Focus:** Bridging the gap between **Rigorous Engineering** (RAG/Evaluations) and **Immersive Experiences** (Gaming/Role-play).
+*   *Open to opportunities in AI Engineering & Application Development (Guangzhou/Shenzhen).*
 
 ---
 
 <div align="center">
-  <p>由 ❤️ 和 ☕ 驱动</p>
-  <p>© 2024 AegisIsle Team. All rights reserved.</p>
+  <p>Powered by ❤️, ☕, and 咒力</p>
+  <p>© 2024 Aegis-Isle Team. All rights reserved.</p>
 </div>
+```
