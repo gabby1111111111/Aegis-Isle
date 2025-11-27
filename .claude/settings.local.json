@@ -30,7 +30,11 @@
       "Bash(python run_dev.py --help)",
       "Bash(python test_audit_log.py)",
       "Bash(dir logsaudit)",
-      "Bash(pip install python-jose[cryptography] -q)"
+      "Bash(pip install python-jose[cryptography] -q)",
+      "Bash(python test_interview_system.py)",
+      "Bash(python test_interview_standalone.py)",
+      "Bash(python test_interview_verification.py)",
+      "Bash(python test_interview_workflow.py)"
     ],
     "deny": [],
     "ask": []
