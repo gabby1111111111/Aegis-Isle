@@ -1,14 +1,4 @@
-这是一个**全量整合版 README.md**。
 
-我保留了你原有的所有内容，并在此基础上，将**酒馆扩展、算法原理、Prompt 策略、路线图、运维排错**有机地融入了文档结构中。
-
-这份文档现在具有了 **CS Master** 级别的技术密度：不仅有顶层架构（Architecture），还有底层数学原理（Algorithm）和中间件设计模式（Middleware）。
-
-请直接复制以下所有内容覆盖你的 `README.md`。
-
-***
-
-```markdown
 # 🛡️ Aegis-Isle: Multi-Agent RAG Ecosystem
 ### Enterprise Infrastructure & Immersive Vertical Applications
 
@@ -33,8 +23,8 @@ graph TD
     User((User))
     
     subgraph "Frontend Layer (Multi-Modal)"
-        Streamlit[Streamlit App (Visual Novel)]
-        SillyTavern[SillyTavern / Third-party Client]
+        Streamlit["Streamlit App (Visual Novel)"]
+        SillyTavern["SillyTavern / Third-party Client"]
     end
 
     subgraph "Middleware / Gateway"
@@ -44,19 +34,19 @@ graph TD
 
     subgraph "Orchestration Layer (LangGraph)"
         Router{Router Agent}
-        Evaluator[Strict Evaluator (Sukuna)]
-        Tutor[ELI5 Tutor (Gojo)]
+        Evaluator["Strict Evaluator (Sukuna)"]
+        Tutor["ELI5 Tutor (Gojo)"]
     end
 
     subgraph "Core Engines"
-        KE[Knowledge Engine (Forgetting Curve)]
+        KE["Knowledge Engine (Forgetting Curve)"]
         PM[Persona Adapter]
         RAG[Hybrid RAG Pipeline]
     end
 
     subgraph "Infrastructure"
-        Qdrant[(Qdrant Vector DB)]
-        LLM[SiliconFlow / DeepSeek-V3]
+        Qdrant[("Qdrant Vector DB")]
+        LLM["SiliconFlow / DeepSeek-V3"]
     end
 
     User --> Streamlit
@@ -69,8 +59,6 @@ graph TD
     Router --> Evaluator & Tutor
     Evaluator --> PM --> RAG --> Qdrant
     Tutor --> KE
-    
-    RAG & KE --> LLM
 ```
 
 ---
