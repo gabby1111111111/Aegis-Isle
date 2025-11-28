@@ -10,11 +10,22 @@ import asyncio
 from pathlib import Path
 from typing import Optional, Dict, Any
 import base64
+import os
 
 import streamlit as st
 
-# Add src to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+# Add src to path for imports - get absolute path
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent
+src_path = project_root / "src"
+
+# Add to Python path if not already there
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+# Also add project root
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from aegis_isle.interview import (
     KnowledgeEngine,
@@ -23,6 +34,135 @@ from aegis_isle.interview import (
     app as interview_graph,
     InterviewState
 )
+
+
+# ============================================================================
+# Language Configuration
+# ============================================================================
+
+TRANSLATIONS = {
+    "zh": {
+        "title": "✨ 面试准备学院 ✨",
+        "subtitle": "通过AI驱动的角色系统掌握技能",
+        "sidebar_config": "⚙️ 配置",
+        "jd_section": "📄 职位描述",
+        "jd_label": "输入职位描述",
+        "jd_help": "粘贴职位描述以生成相关问题",
+        "kb_section": "📚 知识库",
+        "kb_upload": "上传学习材料",
+        "kb_help": "上传文本文件以生成面试问题",
+        "kb_process": "📥 处理知识库",
+        "kb_success": "从知识库生成了 {} 个问题！",
+        "card_section": "🎭 角色卡片",
+        "card_upload": "上传角色卡片",
+        "card_help": "上传SillyTavern角色卡片（JSON或PNG）",
+        "card_load": "📥 加载角色",
+        "card_success": "已加载角色: {} ({})",
+        "card_error": "加载角色出错: {}",
+        "persona_section": "🎯 角色分配",
+        "persona_interviewer": "面试官（评估者）",
+        "persona_interviewer_help": "谁来评估你的答案？",
+        "persona_tutor": "导师（错误答案）",
+        "persona_tutor_help": "答错时谁来教你？",
+        "persona_mentor": "顾问（正确答案）",
+        "persona_mentor_help": "答对时谁来鼓励你？",
+        "progress_section": "📊 你的进度",
+        "total_questions": "总题数",
+        "due_review": "待复习",
+        "success_rate": "正确率",
+        "mastered": "已掌握",
+        "start_button": "🎬 开始面试",
+        "current_speaker": "👤 当前发言者",
+        "interview_session": "💬 面试会话",
+        "answer_key": "💡 答案要点（参考）",
+        "correct": "✅ 正确！",
+        "incorrect": "❌ 错误",
+        "score": "得分",
+        "feedback_label": "的反馈：",
+        "next_question": "⏭️ 下一题",
+        "your_answer": "✍️ 你的答案",
+        "answer_placeholder": "在此输入你的答案...",
+        "answer_help": "请回答上面的问题",
+        "submit_answer": "📤 提交答案",
+        "session_stats": "📈 会话统计",
+        "no_questions": "没有可用的问题！请通过知识库添加问题。",
+        "no_question_loaded": "未加载问题！",
+        "empty_answer": "请在提交前提供答案！",
+        "evaluating": "正在评估你的答案...",
+        "eval_complete": "评估完成！",
+        "eval_error": "评估过程中出错: {}",
+        "processing_kb": "正在处理知识库...",
+        "kb_error": "处理知识库出错: {}",
+        "character_tachie": "🎨 角色立绘\n\n（根据角色放置角色图片）",
+        "question_label": "问题 {}:",
+        "difficulty": "难度",
+        "category": "类别",
+        "language": "🌐 语言",
+    },
+    "en": {
+        "title": "✨ Interview Prep Academy ✨",
+        "subtitle": "Master Your Skills with AI-Powered Personas",
+        "sidebar_config": "⚙️ Configuration",
+        "jd_section": "📄 Job Description",
+        "jd_label": "Enter Job Description",
+        "jd_help": "Paste the job description to generate relevant questions",
+        "kb_section": "📚 Knowledge Base",
+        "kb_upload": "Upload Study Material",
+        "kb_help": "Upload text file to generate interview questions",
+        "kb_process": "📥 Process Knowledge Base",
+        "kb_success": "Generated {} questions from knowledge base!",
+        "card_section": "🎭 Character Cards",
+        "card_upload": "Upload Character Card",
+        "card_help": "Upload SillyTavern character card (JSON or PNG)",
+        "card_load": "📥 Load Character",
+        "card_success": "Loaded character: {} ({})",
+        "card_error": "Error loading character: {}",
+        "persona_section": "🎯 Persona Assignments",
+        "persona_interviewer": "Interviewer (Evaluator)",
+        "persona_interviewer_help": "Who evaluates your answers?",
+        "persona_tutor": "Tutor (Wrong Answer)",
+        "persona_tutor_help": "Who teaches you when wrong?",
+        "persona_mentor": "Mentor (Correct Answer)",
+        "persona_mentor_help": "Who encourages you when correct?",
+        "progress_section": "📊 Your Progress",
+        "total_questions": "Total Questions",
+        "due_review": "Due for Review",
+        "success_rate": "Success Rate",
+        "mastered": "Mastered",
+        "start_button": "🎬 Start Interview Session",
+        "current_speaker": "👤 Current Speaker",
+        "interview_session": "💬 Interview Session",
+        "answer_key": "💡 Answer Key (for reference)",
+        "correct": "✅ Correct!",
+        "incorrect": "❌ Incorrect",
+        "score": "Score",
+        "feedback_label": "'s Feedback:",
+        "next_question": "⏭️ Next Question",
+        "your_answer": "✍️ Your Answer",
+        "answer_placeholder": "Type your answer here...",
+        "answer_help": "Provide your answer to the question above",
+        "submit_answer": "📤 Submit Answer",
+        "session_stats": "📈 Session Statistics",
+        "no_questions": "No questions available! Please add questions via the knowledge base.",
+        "no_question_loaded": "No question loaded!",
+        "empty_answer": "Please provide an answer before submitting!",
+        "evaluating": "Evaluating your answer...",
+        "eval_complete": "Evaluation complete!",
+        "eval_error": "Error during evaluation: {}",
+        "processing_kb": "Processing knowledge base...",
+        "kb_error": "Error processing knowledge base: {}",
+        "character_tachie": "🎨 Character Tachie\n\n(Place character images here based on persona)",
+        "question_label": "Question {}:",
+        "difficulty": "Difficulty",
+        "category": "Category",
+        "language": "🌐 Language",
+    }
+}
+
+def t(key: str) -> str:
+    """Get translated text based on current language."""
+    lang = st.session_state.get("language", "zh")
+    return TRANSLATIONS.get(lang, TRANSLATIONS["zh"]).get(key, key)
 
 
 # ============================================================================
@@ -319,12 +459,12 @@ def display_question(question: Question):
     st.markdown(f"""
     <div class="question-box">
         <div class="question-text">
-            <strong>Question {question.id[-8:]}:</strong><br>
+            <strong>{t("question_label").format(question.id[-8:])}:</strong><br>
             {question.content}
         </div>
         <div style="margin-top: 15px; font-size: 14px; opacity: 0.8;">
-            Difficulty: {'⭐' * question.difficulty} ({question.difficulty}/5) |
-            Category: {question.category}
+            {t("difficulty")}: {'⭐' * question.difficulty} ({question.difficulty}/5) |
+            {t("category")}: {question.category}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -338,7 +478,7 @@ def display_stats(stats: Dict[str, Any]):
         st.markdown(f"""
         <div class="stat-card">
             <div class="stat-value">{stats['total_questions']}</div>
-            <div class="stat-label">Total Questions</div>
+            <div class="stat-label">{t("total_questions")}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -346,7 +486,7 @@ def display_stats(stats: Dict[str, Any]):
         st.markdown(f"""
         <div class="stat-card">
             <div class="stat-value">{stats['due_for_review']}</div>
-            <div class="stat-label">Due for Review</div>
+            <div class="stat-label">{t("due_review")}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -355,7 +495,7 @@ def display_stats(stats: Dict[str, Any]):
         st.markdown(f"""
         <div class="stat-card">
             <div class="stat-value">{success_rate:.1f}%</div>
-            <div class="stat-label">Success Rate</div>
+            <div class="stat-label">{t("success_rate")}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -364,7 +504,7 @@ def display_stats(stats: Dict[str, Any]):
         st.markdown(f"""
         <div class="stat-card">
             <div class="stat-value">{mastered}</div>
-            <div class="stat-label">Mastered</div>
+            <div class="stat-label">{t("mastered")}</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -375,6 +515,9 @@ def display_stats(stats: Dict[str, Any]):
 
 def initialize_session_state():
     """Initialize Streamlit session state."""
+    if "language" not in st.session_state:
+        st.session_state.language = "zh"  # 默认中文
+
     if "knowledge_engine" not in st.session_state:
         st.session_state.knowledge_engine = KnowledgeEngine()
 
@@ -428,21 +571,21 @@ def load_next_question():
         st.session_state.current_speaker = st.session_state.interviewer_persona
         return True
     else:
-        st.warning("No questions available! Please add questions via the knowledge base.")
+        st.warning(t("no_questions"))
         return False
 
 
 async def process_answer():
     """Process user's answer through the interview graph."""
     if not st.session_state.current_question:
-        st.error("No question loaded!")
+        st.error(t("no_question_loaded"))
         return
 
     if not st.session_state.user_answer.strip():
-        st.warning("Please provide an answer before submitting!")
+        st.warning(t("empty_answer"))
         return
 
-    with st.spinner("Evaluating your answer..."):
+    with st.spinner(t("evaluating")):
         try:
             # Prepare state for interview graph
             initial_state: InterviewState = {
@@ -477,10 +620,10 @@ async def process_answer():
             else:
                 st.session_state.current_speaker = st.session_state.tutor_persona
 
-            st.success("Evaluation complete!")
+            st.success(t("eval_complete"))
 
         except Exception as e:
-            st.error(f"Error during evaluation: {e}")
+            st.error(t("eval_error").format(e))
             import traceback
             st.code(traceback.format_exc())
 
@@ -488,7 +631,7 @@ async def process_answer():
 async def ingest_knowledge_base(uploaded_file, jd_context: str):
     """Ingest knowledge base file."""
     if uploaded_file:
-        with st.spinner("Processing knowledge base..."):
+        with st.spinner(t("processing_kb")):
             try:
                 # Read file content
                 text_content = uploaded_file.read().decode("utf-8")
@@ -499,11 +642,11 @@ async def ingest_knowledge_base(uploaded_file, jd_context: str):
                     jd_context=jd_context
                 )
 
-                st.success(f"Generated {len(questions)} questions from knowledge base!")
+                st.success(t("kb_success").format(len(questions)))
                 return True
 
             except Exception as e:
-                st.error(f"Error processing knowledge base: {e}")
+                st.error(t("kb_error").format(e))
                 import traceback
                 st.code(traceback.format_exc())
                 return False
@@ -531,22 +674,38 @@ def main():
     initialize_session_state()
 
     # Title
-    st.markdown('<h1 class="main-title">✨ Interview Prep Academy ✨</h1>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; font-family: Cinzel, serif; font-size: 18px; color: #ff6b9d; margin-bottom: 30px;">Master Your Skills with AI-Powered Personas</p>', unsafe_allow_html=True)
+    st.markdown(f'<h1 class="main-title">{t("title")}</h1>', unsafe_allow_html=True)
+    st.markdown(f'<p style="text-align: center; font-family: Cinzel, serif; font-size: 18px; color: #ff6b9d; margin-bottom: 30px;">{t("subtitle")}</p>', unsafe_allow_html=True)
 
     # ========================================================================
     # Sidebar - Configuration Area
     # ========================================================================
     with st.sidebar:
-        st.markdown("## ⚙️ Configuration")
+        # Language Selector at the top
+        st.markdown(f"## {t('language')}")
+        lang_option = st.selectbox(
+            "",
+            options=["中文", "English"],
+            index=0 if st.session_state.language == "zh" else 1,
+            key="lang_selector"
+        )
+        if lang_option == "中文" and st.session_state.language != "zh":
+            st.session_state.language = "zh"
+            st.rerun()
+        elif lang_option == "English" and st.session_state.language != "en":
+            st.session_state.language = "en"
+            st.rerun()
+
+        st.markdown("---")
+        st.markdown(f"## {t('sidebar_config')}")
 
         # Job Description Upload
-        st.markdown("### 📄 Job Description")
+        st.markdown(f"### {t('jd_section')}")
         jd_text = st.text_area(
-            "Enter Job Description",
+            t("jd_label"),
             value=st.session_state.jd_context,
             height=150,
-            help="Paste the job description to generate relevant questions"
+            help=t("jd_help")
         )
         if jd_text != st.session_state.jd_context:
             st.session_state.jd_context = jd_text
@@ -554,14 +713,14 @@ def main():
         st.markdown("---")
 
         # Knowledge Base Upload
-        st.markdown("### 📚 Knowledge Base")
+        st.markdown(f"### {t('kb_section')}")
         kb_file = st.file_uploader(
-            "Upload Study Material",
+            t("kb_upload"),
             type=["txt", "md"],
-            help="Upload text file to generate interview questions"
+            help=t("kb_help")
         )
 
-        if kb_file and st.button("📥 Process Knowledge Base"):
+        if kb_file and st.button(t("kb_process")):
             success = asyncio.run(ingest_knowledge_base(kb_file, jd_text))
             if success:
                 st.balloons()
@@ -569,14 +728,14 @@ def main():
         st.markdown("---")
 
         # Character Card Upload
-        st.markdown("### 🎭 Character Cards")
+        st.markdown(f"### {t('card_section')}")
         card_file = st.file_uploader(
-            "Upload Character Card",
+            t("card_upload"),
             type=["json", "png"],
-            help="Upload SillyTavern character card (JSON or PNG)"
+            help=t("card_help")
         )
 
-        if card_file and st.button("📥 Load Character"):
+        if card_file and st.button(t("card_load")):
             try:
                 # Save uploaded file temporarily
                 temp_path = Path(f"temp_{card_file.name}")
@@ -585,52 +744,52 @@ def main():
 
                 # Load character
                 persona = st.session_state.persona_manager.load_card(temp_path)
-                st.success(f"Loaded character: {persona.name} ({persona.role})")
+                st.success(t("card_success").format(persona.name, persona.role))
 
                 # Clean up
                 temp_path.unlink()
 
             except Exception as e:
-                st.error(f"Error loading character: {e}")
+                st.error(t("card_error").format(e))
 
         st.markdown("---")
 
         # Persona Slot Selection
-        st.markdown("### 🎯 Persona Assignments")
+        st.markdown(f"### {t('persona_section')}")
 
         available_personas = st.session_state.persona_manager.list_personas()
 
         st.session_state.interviewer_persona = st.selectbox(
-            "Interviewer (Evaluator)",
+            t("persona_interviewer"),
             options=[p.lower().replace(" ", "_") for p in available_personas],
             index=0,
-            help="Who evaluates your answers?"
+            help=t("persona_interviewer_help")
         )
 
         st.session_state.tutor_persona = st.selectbox(
-            "Tutor (Wrong Answer)",
+            t("persona_tutor"),
             options=[p.lower().replace(" ", "_") for p in available_personas],
             index=1 if len(available_personas) > 1 else 0,
-            help="Who teaches you when wrong?"
+            help=t("persona_tutor_help")
         )
 
         st.session_state.mentor_persona = st.selectbox(
-            "Mentor (Correct Answer)",
+            t("persona_mentor"),
             options=[p.lower().replace(" ", "_") for p in available_personas],
             index=2 if len(available_personas) > 2 else 0,
-            help="Who encourages you when correct?"
+            help=t("persona_mentor_help")
         )
 
         st.markdown("---")
 
         # Stats
-        st.markdown("### 📊 Your Progress")
+        st.markdown(f"### {t('progress_section')}")
         stats = st.session_state.knowledge_engine.get_progress_statistics()
 
-        st.metric("Total Questions", stats['total_questions'])
-        st.metric("Due for Review", stats['due_for_review'])
+        st.metric(t("total_questions"), stats['total_questions'])
+        st.metric(t("due_review"), stats['due_for_review'])
         success_rate = stats['overall_success_rate'] * 100
-        st.metric("Success Rate", f"{success_rate:.1f}%")
+        st.metric(t("success_rate"), f"{success_rate:.1f}%")
 
     # ========================================================================
     # Main Area
@@ -638,7 +797,7 @@ def main():
 
     # Load initial question if none exists
     if st.session_state.current_question is None:
-        if st.button("🎬 Start Interview Session"):
+        if st.button(t("start_button")):
             load_next_question()
 
     # Display current session
@@ -647,7 +806,7 @@ def main():
         char_col, dialogue_col = st.columns([1, 2])
 
         with char_col:
-            st.markdown("### 👤 Current Speaker")
+            st.markdown(f"### {t('current_speaker')}")
 
             # Get current persona
             current_persona = st.session_state.persona_manager.get_persona(
@@ -667,17 +826,17 @@ def main():
                 """, unsafe_allow_html=True)
 
                 # Placeholder for character image (tachie)
-                st.info("🎨 Character Tachie\n\n(Place character images here based on persona)")
+                st.info(t("character_tachie"))
 
         with dialogue_col:
-            st.markdown("### 💬 Interview Session")
+            st.markdown(f"### {t('interview_session')}")
 
             # Display question
             if st.session_state.evaluation_result is None:
                 display_question(st.session_state.current_question)
 
                 # Show expected answer hint (optional)
-                with st.expander("💡 Answer Key (for reference)"):
+                with st.expander(t("answer_key")):
                     st.info(st.session_state.current_question.answer_key)
 
             # Display evaluation if exists
@@ -692,10 +851,10 @@ def main():
                 st.markdown(f"""
                 <div class="{eval_class}">
                     <h3 style="margin-top: 0; color: white;">
-                        {'✅ Correct!' if is_correct else '❌ Incorrect'}
+                        {t('correct') if is_correct else t('incorrect')}
                     </h3>
                     <p style="font-size: 18px; margin: 10px 0;">
-                        <strong>Score:</strong> {score}/10
+                        <strong>{t('score')}:</strong> {score}/10
                     </p>
                     <p style="font-size: 16px; line-height: 1.6;">
                         {comment}
@@ -714,7 +873,7 @@ def main():
                     st.markdown(f"""
                     <div class="{feedback_class}">
                         <h3 style="margin-top: 0; color: white;">
-                            {persona_name}'s Feedback:
+                            {persona_name}{t('feedback_label')}
                         </h3>
                         <p style="font-size: 16px; line-height: 1.8;">
                             {st.session_state.feedback}
@@ -726,7 +885,7 @@ def main():
                 st.markdown("<br>", unsafe_allow_html=True)
                 col1, col2, col3 = st.columns([1, 2, 1])
                 with col2:
-                    if st.button("⏭️ Next Question", use_container_width=True):
+                    if st.button(t("next_question"), use_container_width=True):
                         load_next_question()
                         st.rerun()
 
@@ -736,15 +895,15 @@ def main():
 
     if st.session_state.current_question and st.session_state.evaluation_result is None:
         st.markdown("---")
-        st.markdown("### ✍️ Your Answer")
+        st.markdown(f"### {t('your_answer')}")
 
         # Text input for answer
         user_answer = st.text_area(
-            "Type your answer here...",
+            t("answer_placeholder"),
             value=st.session_state.user_answer,
             height=150,
             key="answer_input",
-            help="Provide your answer to the question above"
+            help=t("answer_help")
         )
 
         # Update session state
@@ -753,7 +912,7 @@ def main():
         # Submit button
         col1, col2, col3 = st.columns([1, 1, 1])
         with col2:
-            if st.button("📤 Submit Answer", use_container_width=True, type="primary"):
+            if st.button(t("submit_answer"), use_container_width=True, type="primary"):
                 asyncio.run(process_answer())
                 st.rerun()
 
@@ -762,7 +921,7 @@ def main():
     # ========================================================================
 
     st.markdown("---")
-    st.markdown("### 📈 Session Statistics")
+    st.markdown(f"### {t('session_stats')}")
 
     stats = st.session_state.knowledge_engine.get_progress_statistics()
     display_stats(stats)

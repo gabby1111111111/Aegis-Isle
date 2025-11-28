@@ -225,7 +225,7 @@ class KnowledgeEngine:
             Exception: If LLM generation fails
         """
         try:
-            from ..rag.generator import TextGenerator, GenerationConfig
+            from ..rag.generator import LLMGenerator, GenerationConfig
 
             # Prepare prompt for question generation
             prompt = self._build_question_generation_prompt(text, jd_context)
@@ -237,17 +237,14 @@ class KnowledgeEngine:
                 temperature=0.7
             )
 
-            generator = TextGenerator(config, provider=settings.llm_provider)
+            generator = LLMGenerator(config, provider=settings.llm_provider)
 
             # Generate questions
             logger.info("Generating interview questions from text...")
             result = await generator.generate(prompt)
 
-            if not result.success:
-                raise Exception(f"LLM generation failed: {result.error_message}")
-
             # Parse generated questions
-            questions = self._parse_generated_questions(result.content, jd_context)
+            questions = self._parse_generated_questions(result.generated_text, jd_context)
 
             # Add to database
             for question in questions:

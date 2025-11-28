@@ -11,7 +11,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from .knowledge_engine import Question
 from .persona_manager import PersonaManager
-from ..rag.generator import TextGenerator, GenerationConfig
+from ..rag.generator import LLMGenerator, GenerationConfig
 from ..core.config import settings
 from ..core.logging import logger
 
@@ -75,7 +75,7 @@ async def _call_llm_with_persona(
             temperature=temperature
         )
 
-        generator = TextGenerator(config, provider=settings.llm_provider)
+        generator = LLMGenerator(config, provider=settings.llm_provider)
 
         # Construct full prompt
         full_prompt = f"""{system_prompt}
@@ -88,11 +88,7 @@ Response:"""
         # Generate response
         result = await generator.generate(full_prompt)
 
-        if not result.success:
-            logger.error(f"LLM generation failed: {result.error_message}")
-            raise Exception(f"LLM generation failed: {result.error_message}")
-
-        return result.content.strip()
+        return result.generated_text.strip()
 
     except Exception as e:
         logger.error(f"Failed to call LLM with persona: {e}")

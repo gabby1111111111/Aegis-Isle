@@ -34,7 +34,16 @@
       "Bash(python test_interview_system.py)",
       "Bash(python test_interview_standalone.py)",
       "Bash(python test_interview_verification.py)",
-      "Bash(python test_interview_workflow.py)"
+      "Bash(python test_interview_workflow.py)",
+      "Bash(python run_interview_app.py)",
+      "Bash(streamlit run frontend/interview_app.py --theme.base=dark --theme.primaryColor=\"#ff6b9d\" --theme.backgroundColor=\"#1a1625\" --server.headless=true --server.port=8501)",
+      "Bash(pip install loguru pydantic-settings)",
+      "Bash(streamlit run:*)",
+      "Bash(timeout:*)",
+      "Bash(python:*)",
+      "Bash(where python)",
+      "Bash(E:\\anaconda\\python.exe -m pip install:*)",
+      "Bash(\"E:/anaconda/python.exe\" -m pip install:*)"
     ],
     "deny": [],
     "ask": []
