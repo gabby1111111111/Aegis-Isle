@@ -37,7 +37,7 @@ from aegis_isle.interview.story_manager import StoryManager
 
 
 # ============================================================================
-# Language Configuration
+# Language Configurationren
 # ============================================================================
 
 TRANSLATIONS = {
@@ -136,198 +136,307 @@ def t(key: str) -> str:
 # ============================================================================
 
 def load_custom_css():
-    """Load visual novel style with white background and large black text."""
+    """Load CSS based on current stage."""
     
-    # Load background image
-    bg_image_data = ""
-    try:
-        bg_path = Path("data/emperor_background.jpg")
-        if bg_path.exists():
-            with open(bg_path, "rb") as f:
-                import base64
-                encoded = base64.b64encode(f.read()).decode()
-                bg_image_data = f"background-image: url('data:image/jpeg;base64,{encoded}');"
-    except Exception as e:
-        print(f"Background image not loaded: {e}")
+    stage = st.session_state.get("stage", "config")
     
-    css = f"""
-    <style>
-    /* 视觉小说风格 - 白底黑字 + 背景图 */
-    .stApp {{
-        background: #f5f5f5;
-        {bg_image_data}
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-        color: #1a1a1a;
-        font-size: 18px;
-        line-height: 1.8;
-    }}
+    if stage == "config":
+        # === Title Screen Style (Reference Image) ===
+        css = """
+        <style>
+        .stApp {
+            background: #ffffff;
+            color: #000000;
+        }
+        
+        /* Center content vertically and horizontally using Flexbox */
+        .main .block-container {
+            max-width: 100%;
+            height: 90vh; /* Use viewport height */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding-top: 0;
+            padding-bottom: 0;
+            text-align: center;
+            background: transparent;
+            box-shadow: none;
+            border: none;
+            position: static;
+            max-height: none;
+            overflow: hidden;
+        }
+        
+        /* Hide default elements we don't want */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        
+        /* Button Style - Black Block - Larger */
+        .stButton > button {
+            background-color: #000000;
+            color: #ffffff;
+            border: none;
+            border-radius: 0;
+            padding: 20px 80px;
+            font-size: 28px;
+            font-weight: 900;
+            letter-spacing: 3px;
+            transition: all 0.3s;
+            margin-top: 40px;
+            text-transform: uppercase;
+        }
+        
+        .stButton > button:hover {
+            background-color: #333333;
+            color: #ffffff;
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+        }
+        
+        /* Ensure button container doesn't take full width */
+        .stButton {
+            width: auto !important;
+            display: inline-block;
+        }
+        
+        /* Input fields if any */
+        .stTextInput > div > div > input {
+            text-align: center;
+            border: 2px solid #000;
+            border-radius: 0;
+        }
+        </style>
+        """
+    else:
+        # === Visual Novel Style (Interview Mode) ===
+        
+        # Load background image
+        bg_image_data = ""
+        try:
+            bg_path = Path("data/emperor_background.jpg")
+            if bg_path.exists():
+                with open(bg_path, "rb") as f:
+                    import base64
+                    encoded = base64.b64encode(f.read()).decode()
+                    bg_image_data = f"background-image: url('data:image/jpeg;base64,{encoded}');"
+        except Exception as e:
+            print(f"Background image not loaded: {e}")
+            
+        css = f"""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Noto+Sans+SC:wght@400;900&display=swap');
+
+        /* Global Styles */
+        .stApp {{
+            background: #f5f5f5;
+            {bg_image_data}
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: #1a1a1a;
+            font-family: 'Nsongoto Serif SC', 'Songti SC', 'SimSun', serif;
+        }}
+        
+        /* Screentone Overlay (网点纸效果) */
+        .stApp::after {{
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-image: radial-gradient(#000 1px, transparent 1px);
+            background-size: 4px 4px;
+            opacity: 0.15;
+            z-index: -1;
+            pointer-events: none;
+        }}
+        
+        /* 隐藏默认元素 */
+        #MainMenu {{visibility: hidden;}}
+        footer {{visibility: hidden;}}
+        header {{visibility: hidden;}}
+
+        /* === 游戏面板 (Game Panel) === */
+        .main .block-container {{
+            position: fixed;
+            bottom: 5vh;
+            left: 10vw;
+            right: 10vw;
+            width: 80vw;
+            max-width: 1200px;
+            margin: 0 auto;
+            
+            background: rgba(255, 255, 255, 0.98);
+            border: 4px solid #000000;
+            
+            /* 双层边框效果 */
+            box-shadow: 
+                0 0 0 4px #ffffff, /* 白间隙 */
+                0 0 0 8px #000000, /* 外黑框 */
+                0 20px 50px rgba(0,0,0,0.5); /* 阴影 */
+            
+            padding: 2rem 5rem; /* 减少上下内边距 */
+            z-index: 1000;
+            height: 35vh; /* 固定高度，缩小面板 */
+            overflow-y: auto;
+            border-radius: 2px;
+        }}
+        
+        /* === 独立名字栏 (Nameplate) === */
+        .character-nameplate {{
+            position: fixed;
+            bottom: 38vh; /* 调整位置：5vh (bottom) + 35vh (height) - 2vh (overlap) */
+            left: 12vw;
+            z-index: 1002;
+            
+            background: #000000;
+            color: #ffffff;
+            padding: 10px 50px;
+            
+            font-family: 'Noto Sans SC', sans-serif;
+            font-weight: 900;
+            font-size: 32px; /* 名字也加大 */
+            letter-spacing: 3px;
+            
+            /* 倾斜设计 */
+            transform: skew(-15deg);
+            border: 3px solid #ffffff;
+            box-shadow: 
+                0 0 0 3px #000000,
+                5px 5px 15px rgba(0,0,0,0.4);
+        }}
+        
+        .character-nameplate span {{
+            display: block;
+            transform: skew(15deg); /* 文字回正 */
+        }}
+
+        /* === 系统消息 (Technical Protocol) === */
+        .system-protocol {{
+            background: #000000;
+            color: #ffffff;
+            padding: 20px;
+            margin-bottom: 25px;
+            font-family: 'Noto Sans SC', sans-serif;
+            border: 1px solid #000;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }}
+
+        /* === 角色台词 (Dialogue) === */
+        .dialogue-text {{
+            font-family: 'Songti SC', 'SimSun', 'Noto Serif SC', serif; /* 优先宋体 */
+            font-size: 26px; /* 调小字号 */
+            line-height: 1.6;
+            color: #000000;
+            font-weight: 500; /* 不加粗，宋体本身较细，500适中 */
+            text-align: justify;
+            text-shadow: none; /* 去掉阴影，保持干净 */
+        }}
+        
+        /* 强制统一内部所有元素样式，解决Markdown导致的字体不一致 */
+        .dialogue-text * {{
+            font-size: inherit !important;
+            font-weight: inherit !important;
+            font-family: inherit !important;
+            line-height: inherit !important;
+            color: inherit !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }}
+        
+        /* 光标闪烁效果 */
+        .cursor-blink {{
+            display: inline-block;
+            width: 14px;
+            height: 34px;
+            background-color: #000000;
+            margin-left: 8px;
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+        }}
+        
+        @keyframes blink {{
+            0%, 100% {{ opacity: 1; }}
+            50% {{ opacity: 0; }}
+        }}
+        
+        /* 下一步按钮容器 (覆盖Streamlit默认按钮样式) */
+        .next-button-container button {{
+            position: fixed !important;
+            bottom: 7vh !important;
+            right: 12vw !important;
+            left: auto !important; /* 强制取消左对齐 */
+            background: transparent !important;
+            border: none !important;
+            color: #000000 !important;
+            font-size: 40px !important;
+            line-height: 1 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            z-index: 1005 !important;
+            box-shadow: none !important;
+            animation: bounce 1s infinite;
+        }}
+        
+        .next-button-container button:hover {{
+            color: #333333 !important;
+            background: transparent !important;
+            transform: translateY(2px);
+        }}
+        
+        .next-button-container button:active {{
+            background: transparent !important;
+            color: #000000 !important;
+        }}
+        
+        @keyframes bounce {{
+            0%, 100% {{ transform: translateY(0); }}
+            50% {{ transform: translateY(6px); }}
+        }}
+
+        /* === 输入框与按钮 === */
+        .stTextInput input {{
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid #000000;
+            border-radius: 0;
+            color: #000000;
+            font-family: 'Noto Serif SC', serif;
+            font-size: 24px;
+            padding: 12px 0;
+            font-weight: bold;
+        }}
+        
+        .stTextInput input:focus {{
+            box-shadow: none;
+            border-bottom: 3px solid #000000;
+        }}
+        
+        .stButton > button {{
+            background: #000000;
+            color: #ffffff;
+            border: none;
+            border-radius: 0;
+            font-family: 'Noto Sans SC', sans-serif;
+            font-weight: bold;
+            padding: 10px 30px;
+            margin-top: 10px;
+        }}
+        
+        .stButton > button:hover {{
+            background: #333333;
+        }}
+        
+        /* 侧边栏 */
+        section[data-testid="stSidebar"] {{
+            background: #ffffff;
+            border-right: 3px solid #000000;
+        }}
+        </style>
+        """
     
-    /* 白色半透明遮罩 - 移除，让背景完整显示 */
-    
-    /* 主内容区域 - 固定在底部的对话框 */
-    .main .block-container {{
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: rgba(255, 255, 255, 0.98);
-        border: 3px solid #000000;
-        border-bottom: none;
-        border-radius: 15px 15px 0 0;
-        padding: 2.5rem;
-        box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.3);
-        max-width: 100%;
-        margin: 0;
-        z-index: 1000;
-        max-height: 25vh;
-        overflow-y: auto;
-    }}
-    
-    /* 侧边栏 */
-    section[data-testid="stSidebar"] {{
-        background: #ffffff;
-        border-right: 3px solid #333333;
-        box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
-    }}
-    
-    /* 侧边栏文字 - 超大 */
-    section[data-testid="stSidebar"] label,
-    section[data-testid="stSidebar"] p,
-    section[data-testid="stSidebar"] span,
-    section[data-testid="stSidebar"] div {{
-        color: #1a1a1a !important;
-        font-size: 18px !important;
-        font-weight: 500 !important;
-    }}
-    
-    /* 侧边栏标题 - 更大 */
-    section[data-testid="stSidebar"] h1,
-    section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3 {{
-        color: #000000 !important;
-        font-size: 24px !important;
-        font-weight: bold !important;
-        margin-bottom: 1rem !important;
-    }}
-    
-    /* 侧边栏按钮 */
-    section[data-testid="stSidebar"] .stButton > button {{
-        font-size: 18px !important;
-        width: 100%;
-        margin-bottom: 12px;
-    }}
-    
-    /* 标题 - 超超大 */
-    h1 {{
-        color: #000000;
-        font-weight: bold;
-        font-size: 42px;
-        letter-spacing: 0.5px;
-        margin-bottom: 1.5rem;
-    }}
-    
-    h2 {{
-        color: #1a1a1a;
-        font-size: 32px;
-        font-weight: bold;
-        margin-bottom: 1rem;
-    }}
-    
-    h3 {{
-        color: #333333;
-        font-size: 26px;
-        font-weight: 600;
-    }}
-    
-    /* 普通文字 - 超大号 */
-    p, div, span, label {{
-        font-size: 22px;
-        line-height: 2.0;
-    }}
-    
-    /* 按钮 - 简洁黑白 */
-    .stButton > button {{
-        background: #ffffff;
-        color: #000000;
-        border: 3px solid #000000;
-        border-radius: 8px;
-        padding: 16px 40px;
-        font-weight: bold;
-        font-size: 22px;
-        box-shadow: 4px 4px 0px #000000;
-        transition: all 0.2s;
-    }}
-    
-    .stButton > button:hover {{
-        background: #000000;
-        color: #ffffff;
-        transform: translate(2px, 2px);
-        box-shadow: 2px 2px 0px #000000;
-    }}
-    
-    /* 输入框 - 清晰边框 */
-    .stTextInput input, .stTextArea textarea {{
-        background: #ffffff;
-        border: 2px solid #333333;
-        border-radius: 6px;
-        color: #000000;
-        font-size: 22px;
-        padding: 16px;
-        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
-    }}
-    
-    .stTextInput input:focus, .stTextArea textarea:focus {{
-        border-color: #000000;
-        border-width: 3px;
-        box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
-    }}
-    
-    /* 信息框 */
-    .stAlert, .stInfo {{
-        background: #ffffff;
-        border: 2px solid #333333;
-        border-radius: 6px;
-        border-left: 6px solid #000000;
-        padding: 1.2rem;
-        color: #1a1a1a;
-        font-size: 17px;
-    }}
-    
-    /* 选择框 */
-    .stSelectbox select {{
-        background: #ffffff;
-        border: 2px solid #333333;
-        color: #000000;
-        border-radius: 6px;
-        font-size: 18px;
-        padding: 10px;
-    }}
-    
-    /* 文件上传 */
-    [data-testid="stFileUploader"] {{
-        background: #ffffff;
-        border: 3px dashed #333333;
-        border-radius: 8px;
-        padding: 2rem;
-    }}
-    
-    /* 分隔线 */
-    hr {{
-        border: none;
-        height: 3px;
-        background: #000000;
-        margin: 2.5rem 0;
-    }}
-    
-    /* Streamlit标记文字超大 */
-    .stMarkdown {{
-        font-size: 22px;
-        line-height: 2.0;
-    }}
-    </style>
-    """
     st.markdown(css, unsafe_allow_html=True)
 
 
@@ -379,6 +488,10 @@ def initialize_session_state():
     # Track if we should show a story node
     if "pending_story_node" not in st.session_state:
         st.session_state.pending_story_node = None
+    
+    # Emperor's Satisfaction Score (0-100)
+    if "satisfaction_score" not in st.session_state:
+        st.session_state.satisfaction_score = 50  # Start at 50%
 
 
 # ============================================================================
@@ -430,11 +543,22 @@ async def submit_answer(user_answer: str):
         st.session_state.feedback_data = feedback
         
         # Update progress
-        is_correct = feedback.get("verdict", {}).get("status") == "correct"
+        verdict_status = feedback.get("verdict", {}).get("status")
+        is_correct = verdict_status == "correct"
+        is_partial = verdict_status == "partial"
+        
         st.session_state.knowledge_engine.update_progress(
             st.session_state.current_question.id,
             is_correct
         )
+        
+        # Update Emperor's Satisfaction Score
+        if is_correct:
+            st.session_state.satisfaction_score = min(100, st.session_state.satisfaction_score + 15)
+        elif is_partial:
+            st.session_state.satisfaction_score = min(100, st.session_state.satisfaction_score + 5)
+        else:
+            st.session_state.satisfaction_score = max(0, st.session_state.satisfaction_score - 10)
         
         # Track this question as answered
         st.session_state.answered_question_ids.append(st.session_state.current_question.id)
@@ -592,27 +716,74 @@ def render_sidebar():
             st.caption(t("current_char").format(st.session_state.current_persona.name))
 
 
+def stream_text(text, placeholder_container):
+    """Stream text with a typewriter effect."""
+    import time
+    
+    # Split text into chunks to simulate natural typing
+    # Simple character by character for now
+    full_text = ""
+    text_placeholder = placeholder_container.empty()
+    
+    for char in text:
+        full_text += char
+        # Add cursor
+        text_placeholder.markdown(f"""
+        <div class="dialogue-text">
+            {full_text}<span class="cursor-blink"></span>
+        </div>
+        """, unsafe_allow_html=True)
+        time.sleep(0.02) # Typing speed
+        
+    # Final state: text only (cursor removed)
+    text_placeholder.markdown(f"""
+    <div class="dialogue-text">
+        {full_text}
+    </div>
+    """, unsafe_allow_html=True)
+
+
 def render_intro():
     """Render the Cinematic Intro."""
     persona = st.session_state.current_persona
     
-    st.markdown(f"<h1 style='text-align: center; font-family: Cinzel'>{persona.name}</h1>", unsafe_allow_html=True)
-    
-    # Cinematic Text Box
+    # Nameplate
     st.markdown(f"""
-    <div class="cinematic-box">
-        {persona.first_message}
+    <div class="character-nameplate">
+        <span>{persona.name}</span>
     </div>
     """, unsafe_allow_html=True)
     
-    # User Response
-    user_response = st.text_input(t("intro_placeholder"), key="intro_input")
+    # Dialogue Box Container
+    dialogue_container = st.container()
     
-    if st.button(t("start_button")):
+    # Stream the intro message if it hasn't been shown yet
+    if "intro_shown" not in st.session_state:
+        # Clean text: Remove "Name:" prefix if present
+        clean_text = persona.first_message.replace(f"{persona.name}：", "").replace(f"{persona.name}:", "")
+        # Also handle "人类帝皇" specifically if name doesn't match exactly
+        clean_text = clean_text.replace("人类帝皇：", "").replace("人类帝皇:", "")
+        
+        stream_text(clean_text, dialogue_container)
+        st.session_state.intro_shown = True
+    else:
+        # Show static if already shown
+        clean_text = persona.first_message.replace(f"{persona.name}：", "").replace(f"{persona.name}:", "")
+        clean_text = clean_text.replace("人类帝皇：", "").replace("人类帝皇:", "")
+        
+        dialogue_container.markdown(f"""
+        <div class="dialogue-text">
+            {clean_text}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Next Button (Clickable Arrow)
+    st.markdown('<div class="next-button-container">', unsafe_allow_html=True)
+    if st.button("▼", key="intro_next"):
         st.session_state.stage = "interview"
-        # Trigger first question generation
         asyncio.run(generate_new_question())
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 def render_story_node():
@@ -625,55 +796,70 @@ def render_story_node():
     # Get trigger description
     trigger_info = st.session_state.story_manager.triggers.get(story_trigger)
     
+    # Generate story content if not already generated
+    if "current_story_content" not in st.session_state:
+         # ... (Generation logic same as before) ...
+         # For brevity, assuming generation is fast or handled elsewhere
+         # Re-implementing generation here for correctness:
+        success_rate = st.session_state.story_manager.get_success_rate()
+        if "box_1" in story_trigger:
+            node_type = "node_a"
+            title = "🧬 初次觉醒"
+        elif "box_3" in story_trigger:
+            node_type = "node_b"  
+            title = "⚔️ 晋升试炼"
+        else:
+            node_type = "mastery"
+            title = "👑 荣誉时刻"
+            
+        with st.spinner("剧情生成中..."):
+            story_data = asyncio.run(st.session_state.generator.generate_story_node(
+                st.session_state.current_persona,
+                node_type,
+                success_rate,
+                language=st.session_state.language
+            ))
+            st.session_state.current_story_content = story_data.get("story_content", "...")
+            st.session_state.current_story_title = title
+
+    # Render UI
     st.markdown(f"""
-    <div class="cinematic-box" style="border: 3px solid #ffd700; background: linear-gradient(180deg, #1a0a0a 0%, #000000 100%); box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);">
-        <h2 style="text-align: center; color: #ffd700; font-size: 28px;">🌟 {trigger_info.description if trigger_info else '剧情节点'} 🌟</h2>
+    <div class="character-nameplate" style="background: #ffd700; color: #000; border-color: #000;">
+        <span>{st.session_state.current_story_title}</span>
     </div>
     """, unsafe_allow_html=True)
     
-    # Generate story content
-    success_rate = st.session_state.story_manager.get_success_rate()
+    dialogue_container = st.container()
     
-    # Determine node type based on trigger
-    if "box_1" in story_trigger:
-        node_type = "node_a"
-        title = "🧬 初次觉醒 - Gene Awakening"
-    elif "box_3" in story_trigger:
-        node_type = "node_b"  
-        title = "⚔️ 晋升试炼 - Ascension Trial"
+    # Stream text
+    if "story_text_shown" not in st.session_state:
+        stream_text(st.session_state.current_story_content, dialogue_container)
+        st.session_state.story_text_shown = True
     else:
-        node_type = "mastery"
-        title = "👑 荣誉时刻 - Moment of Glory"
+        dialogue_container.markdown(f"""
+        <div class="dialogue-text">
+            {st.session_state.current_story_content}
+        </div>
+        """, unsafe_allow_html=True)
     
-    # Story content placeholder
-    with st.spinner("剧情生成中..."):
-        story_data = asyncio.run(st.session_state.generator.generate_story_node(
-            st.session_state.current_persona,
-            node_type,
-            success_rate,
-            language=st.session_state.language
-        ))
-        
-        story_content = story_data.get("story_content", "剧情生成中...")
-        
-    st.markdown(f"""
-    <div class="cinematic-box" style="padding: 40px;">
-        <h3 style="color: #ff6b9d; text-align: center; margin-bottom: 20px;">{title}</h3>
-        <p style="font-size: 19px; line-height: 2.0; text-align: justify;">{story_content}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Button to continue
-    if st.button("✨ 继续修行 ✨", key="continue_from_story"):
+    # Next Button for Story Node
+    st.markdown('<div class="next-button-container">', unsafe_allow_html=True)
+    if st.button("▼", key="continue_from_story"):
         st.session_state.pending_story_node = None
+        # Clear story state
+        del st.session_state.current_story_content
+        del st.session_state.current_story_title
+        del st.session_state.story_text_shown
+        
         asyncio.run(generate_new_question())
         st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
     
     return True
 
 
 def render_interview():
-    """Render the Interview Loop with Four-Layer Sandwich UI and Otome Game Elements."""
+    """Render the Interview Loop with Advanced Visual Novel UI."""
     # Check if we should show a story node first
     if st.session_state.pending_story_node:
         if render_story_node():
@@ -688,98 +874,263 @@ def render_interview():
             st.rerun()
         return
 
-    # === 乙女游戏元素：好感度条 ===
-    success_rate = st.session_state.story_manager.get_success_rate()
-    affection_percentage = int(success_rate * 100)
-    
-    affection_label = "好感度" if st.session_state.language == "zh" else "Affection"
-    st.markdown(f"""
-    <div class="affection-meter">
-        <div class="affection-label">♡ {affection_label}: {affection_percentage}% ♡</div>
-        <div class="affection-bar">
-            <div class="affection-fill" style="width: {affection_percentage}%"></div>
+    # === Menu & Settings Buttons (Top Left) ===
+    st.markdown("""
+    <style>
+    .menu-buttons {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 9999;
+        display: flex;
+        gap: 10px;
+    }
+    .menu-btn {
+        width: 60px;
+        height: 60px;
+        background: #fff;
+        border: 4px solid #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    }
+    .menu-btn:hover {
+        background: #000;
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+    }
+    .menu-btn svg {
+        width: 30px;
+        height: 30px;
+    }
+    </style>
+    <div class="menu-buttons">
+        <div class="menu-btn" onclick="document.querySelector('[data-testid=stSidebar]').style.display = document.querySelector('[data-testid=stSidebar]').style.display === 'none' ? 'block' : 'none';">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+        </div>
+        <div class="menu-btn" onclick="document.querySelector('[data-testid=stSidebar]').style.display = document.querySelector('[data-testid=stSidebar]').style.display === 'none' ? 'block' : 'none';">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v6m0 6v6m4.22-13.22l-4.25 4.25m-2.83 2.83L4.22 17.78m13.56-13.56l-4.25 4.25m-2.83 2.83L5.78 18.22"/>
+            </svg>
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # === 乙女游戏元素：角色名牌 ===
+
+    # === Emperor's Satisfaction Progress Bar (Top Right) ===
+    satisfaction = st.session_state.satisfaction_score
+    st.markdown(f"""
+    <div style="position: fixed; top: 20px; right: 20px; z-index: 9999; background: rgba(255,255,255,0.95); border: 4px solid #000; padding: 15px 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
+        <div style="font-family: 'Noto Sans SC', sans-serif; font-weight: 900; font-size: 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+            <span>⚡ 帝皇的满意度</span>
+            <span style="margin-left: 15px;">{satisfaction}%</span>
+        </div>
+        <div style="width: 250px; height: 30px; border: 3px solid #000; background: #fff; position: relative; overflow: hidden;">
+            <div style="position: absolute; width: {satisfaction}%; height: 100%; background: repeating-linear-gradient(45deg, #000 0px, #000 10px, #fff 10px, #fff 20px); transition: width 0.5s ease;"></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # === 独立名字栏 (Nameplate) ===
     character_name = st.session_state.current_persona.name
     st.markdown(f"""
-    <div class="character-nameplate">{character_name}</div>
+    <div class="character-nameplate">
+        <span>{character_name}</span>
+    </div>
     """, unsafe_allow_html=True)
     
-    # === 对话框装饰容器 ===
-    st.markdown('<div class="dialogue-container">', unsafe_allow_html=True)
-
-    # 1. Crown Layer (The Lore)
-    lore = poly_q.get("lore_flavor", "")
+    # === 系统消息 (Technical Protocol) ===
     st.markdown(f"""
-    <div class="crown-box">
-        <span class="crown-icon">👑</span>
-        {lore}
+    <div class="system-protocol">
+        <div style="background: #ffffff; color: #000000; display: inline-block; padding: 2px 8px; font-weight: 900; font-size: 18px; margin-bottom: 8px; transform: skew(-10deg);">技术协议 // PROTOCOL</div>
+        <div style="font-size: 22px; line-height: 1.5;">{poly_q.get('original_question', '')}</div>
     </div>
     """, unsafe_allow_html=True)
 
-    # 2. Core Layer (The Question)
-    st.markdown(f"""
-    <div class="core-box">
-        <strong>⚡ {t("tech_q")}</strong><br>
-        {poly_q.get('original_question', '')}
-    </div>
-    """, unsafe_allow_html=True)
-
-    # 3. Hint Layer (Split View)
-    tech_hint = poly_q.get("tech_hint", "N/A")
-    eli5_hint = poly_q.get("eli5_hint", "N/A")
-    st.markdown(f"""
-    <div class="hint-container">
-        <div class="tech-hint">
-            {tech_hint}
-        </div>
-        <div class="eli5-hint">
-            {eli5_hint}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # 4. Gaze Layer (Encouragement)
-    encouragement = poly_q.get("encouragement", "")
-    if encouragement:
-        st.markdown(f"""
-        <div class="gaze-box">
-            {encouragement}
+    # === 角色台词 (Dialogue) ===
+    # Clean dialogue: Remove name prefix
+    raw_dialogue = poly_q.get('lore_flavor', '')
+    dialogue_content = raw_dialogue.replace(f"{character_name}：", "").replace(f"{character_name}:", "")
+    dialogue_content = dialogue_content.replace("人类帝皇：", "").replace("人类帝皇:", "")
+    
+    dialogue_container = st.container()
+    
+    # Check if this specific question's dialogue has been shown
+    # We use a composite key of question ID + 'shown'
+    q_key = f"q_{st.session_state.current_question.id}_shown"
+    
+    if q_key not in st.session_state:
+        stream_text(dialogue_content, dialogue_container)
+        st.session_state[q_key] = True
+    else:
+        dialogue_container.markdown(f"""
+        <div class="dialogue-text">
+            {dialogue_content}
         </div>
         """, unsafe_allow_html=True)
-    
-    # 关闭对话框装饰容器
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    # Answer Input
+    # Answer Input Area
     if not st.session_state.feedback_data:
-        user_answer = st.text_area(t("answer_placeholder"), height=150, key="answer_input")
-        if st.button(t("submit_answer")):
-            asyncio.run(submit_answer(user_answer))
-            st.rerun()
+        st.markdown("---")
+        # Custom Input Box Style matching reference
+        st.markdown("""
+        <style>
+        .stTextInput input {
+            border: 2px solid #000 !important;
+            background: #ffffff !important;
+            color: #000 !important;
+            padding: 15px !important;
+            font-size: 18px !important;
+            height: 56px !important;
+            box-sizing: border-box !important;
+        }
+        
+        .stButton button {
+            background: #000 !important;
+            color: #fff !important;
+            border: none !important;
+            height: 56px !important;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            padding: 0 30px !important;
+            margin-top: -2px !important; /* 上移对齐输入框 */
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            user_answer = st.text_input("Answer", key="answer_input", label_visibility="collapsed", placeholder="在此输入你的回答...")
+        with col2:
+            if st.button("提交回答", use_container_width=True):
+                asyncio.run(submit_answer(user_answer))
+                st.rerun()
+
+        # === 提示信息 (Hints) - Only show when no feedback ===
+        # Tech Hint (Professional)
+        if poly_q.get('tech_hint'):
+            st.markdown(f"""
+            <div style="margin-top: 20px; border-left: 4px solid #000; padding-left: 15px; color: #444; font-family: 'Noto Sans SC', sans-serif; font-size: 18px;">
+                <strong>💡 技术提示：</strong> {poly_q.get('tech_hint')}
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # ELI5 Hint (Warhammer 40k Servitor Style)
+        if poly_q.get('eli5_hint'):
+            st.markdown(f"""
+            <div style="margin-top: 10px; border-left: 4px solid #666; padding-left: 15px; color: #666; font-family: 'Noto Sans SC', sans-serif; font-size: 18px; font-style: italic;">
+                <strong>🤖 机仆注视：</strong> {poly_q.get('eli5_hint')}
+            </div>
+            """, unsafe_allow_html=True)
     else:
-        # Feedback Display (Tri-Fold Judgment)
+        # Feedback Display - Three-Fold Judgment
         fb = st.session_state.feedback_data
         verdict_data = fb.get("verdict", {})
         status = verdict_data.get("status", "partial")
-        color = "#4ade80" if status == "correct" else "#ef4444" if status == "incorrect" else "#ffa500"
         
-        st.markdown(f"""
-        <div class="feedback-box" style="border-left: 5px solid {color}">
-            <h3 style="color: {color}">【{status.upper()}】</h3>
-            <p style="font-size: 18px; font-style: italic; color: #ffecb3;">"{verdict_data.get('comment', '')}"</p>
-            <hr style="border-color: #444;">
-            <p><strong>📖 {t("std_ans")}</strong> {fb.get('standard_answer', '')}</p>
-            <p><strong>🍼 {t("eli5")}</strong> {fb.get('servitor_explanation', '')}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Visual Effects based on answer correctness
+        if status == "incorrect":
+            # Screen Shake Effect (Emperor's Anger)
+            st.markdown("""
+            <style>
+            @keyframes shake {
+                0%, 100% { transform: translateX(0); }
+                10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
+                20%, 40%, 60%, 80% { transform: translateX(10px); }
+            }
+            .stApp {
+                animation: shake 0.5s;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+        elif status == "correct":
+            # Fireworks Effect (Celebration)
+            st.markdown("""
+            <style>
+            @keyframes firework {
+                0% { transform: translate(0, 0) scale(0); opacity: 1; }
+                50% { opacity: 1; }
+                100% { transform: translate(var(--x), var(--y)) scale(1); opacity: 0; }
+            }
+            .fireworks {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                width: 100%;
+                height: 100%;
+                pointer-events: none;
+                z-index: 9998;
+            }
+            .firework {
+                position: absolute;
+                font-size: 40px;
+                animation: firework 1.5s ease-out forwards;
+            }
+            </style>
+            <div class="fireworks">
+                <div class="firework" style="--x: -200px; --y: -200px; animation-delay: 0s; left: 50%; top: 50%;">🎆</div>
+                <div class="firework" style="--x: 200px; --y: -200px; animation-delay: 0.2s; left: 50%; top: 50%;">✨</div>
+                <div class="firework" style="--x: -200px; --y: 200px; animation-delay: 0.4s; left: 50%; top: 50%;">💫</div>
+                <div class="firework" style="--x: 200px; --y: 200px; animation-delay: 0.6s; left: 50%; top: 50%;">🎇</div>
+                <div class="firework" style="--x: 0px; --y: -250px; animation-delay: 0.3s; left: 50%; top: 50%;">⭐</div>
+                <div class="firework" style="--x: 0px; --y: 250px; animation-delay: 0.5s; left: 50%; top: 50%;">🌟</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # 1. Emperor's Verdict (Character reaction)
+        verdict_comment = verdict_data.get('comment', '')
+        # Clean the verdict comment
+        character_name = st.session_state.current_persona.name
+        verdict_clean = verdict_comment.replace(f"{character_name}：", "").replace(f"{character_name}:", "")
+        verdict_clean = verdict_clean.replace("人类帝皇：", "").replace("人类帝皇:", "")
+        
+        fb_key = f"q_{st.session_state.current_question.id}_fb_shown"
+        verdict_container = st.container()
+        
+        if fb_key not in st.session_state:
+            stream_text(verdict_clean, verdict_container)
+            st.session_state[fb_key] = True
+        else:
+            verdict_container.markdown(f"""
+            <div class="dialogue-text">
+                {verdict_clean}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # 2. Standard Answer (Professional)
+        standard_answer = fb.get("standard_answer", "")
+        if standard_answer:
+            st.markdown(f"""
+            <div style="margin-top: 20px; border-left: 4px solid #000; padding-left: 15px; color: #444; font-family: 'Noto Sans SC', sans-serif; font-size: 18px;">
+                <strong>💡 标准答案：</strong> {standard_answer}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # 3. Servitor Explanation (ELI5)
+        servitor_explanation = fb.get("servitor_explanation", "")
+        if servitor_explanation:
+            st.markdown(f"""
+            <div style="margin-top: 10px; border-left: 4px solid #666; padding-left: 15px; color: #666; font-family: 'Noto Sans SC', sans-serif; font-size: 18px; font-style: italic;">
+                <strong>🤖 机仆解析：</strong> {servitor_explanation}
+            </div>
+            """, unsafe_allow_html=True)
 
-        if st.button(t("next_question")):
+        # Next Button for Interview
+        st.markdown('<div class="next-button-container">', unsafe_allow_html=True)
+        if st.button("▼", key="next_question_btn"):
             asyncio.run(generate_new_question())
             st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -805,11 +1156,20 @@ def main():
     
     # Main Content Area
     if st.session_state.stage == "config":
-        st.title(t("title"))
-        st.subheader(t("subtitle"))
-        st.info(t("config_info"))
+        # Title Screen Content
+        st.markdown("""
+        <div style="text-align: center;">
+            <div style="font-family: 'Arial Black', sans-serif; font-size: 80px; font-weight: 900; letter-spacing: 5px; line-height: 1.1; margin-bottom: 20px;">
+                THE INFINITE<br>INTERVIEW
+            </div>
+            <div style="font-family: 'Arial', sans-serif; font-size: 28px; letter-spacing: 15px; color: #000; margin-bottom: 60px; font-weight: bold;">
+                无限面试 · 帝皇审判
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        if st.button(t("start_session")):
+        # Centered Button (No columns needed with flexbox)
+        if st.button("接入思维阵列"):
             st.session_state.stage = "intro"
             st.rerun()
             
