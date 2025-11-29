@@ -136,10 +136,10 @@ Aegis-Isle 摒弃了简单的 System Prompt 拼接，采用了 **"Three-Tier Con
 
 ## 📸 Demo Gallery (演示)
 
-| **The Infrastructure** | **The Application** |
-|:---:|:---:|
-| ![Backend](./pre/backend_arch.png) | ![UI](./pre/interview_ui.jpg) |
-| *High-Performance RAG Pipeline* | *Immersive Persona-based Learning* |
+|  **The Application** |
+|:---:|
+|  ![UI](./pre/interview_ui.jpg) |
+|  *Immersive Persona-based Learning* |
 
 ---
 
