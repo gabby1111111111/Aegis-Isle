@@ -138,7 +138,7 @@ Aegis-Isle 摒弃了简单的 System Prompt 拼接，采用了 **"Three-Tier Con
 
 | **The Infrastructure** | **The Application** |
 |:---:|:---:|
-| ![Backend](./assets/backend_arch.png) | ![UI](./assets/interview_ui.png) |
+| ![Backend](./pre/backend_arch.png) | ![UI](./pre/interview_ui.jpg) |
 | *High-Performance RAG Pipeline* | *Immersive Persona-based Learning* |
 
 ---
