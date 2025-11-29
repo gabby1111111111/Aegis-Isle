@@ -212,7 +212,7 @@ class KnowledgeEngine:
 
     async def ingest_data(self, text: str, jd_context: Optional[str] = None) -> List[Question]:
         """
-        Generate interview questions from text using LLM.
+        Generate interview questions from text using LLM with chunking.
 
         Args:
             text: Source text (study material, documentation, etc.)
@@ -226,9 +226,18 @@ class KnowledgeEngine:
         """
         try:
             from ..rag.generator import LLMGenerator, GenerationConfig
+            from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-            # Prepare prompt for question generation
-            prompt = self._build_question_generation_prompt(text, jd_context)
+            # Split text into chunks
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=2000,
+                chunk_overlap=200,
+                separators=["\n\n", "\n", " ", ""]
+            )
+            chunks = text_splitter.split_text(text)
+            total_chunks = len(chunks)
+            
+            logger.info(f"📚 Splitting text into {total_chunks} chunks for processing...")
 
             # Initialize text generator
             config = GenerationConfig(
@@ -236,29 +245,62 @@ class KnowledgeEngine:
                 max_tokens=2000,
                 temperature=0.7
             )
-
             generator = LLMGenerator(config, provider=settings.llm_provider)
 
-            # Generate questions
-            logger.info("Generating interview questions from text...")
-            result = await generator.generate(prompt)
+            # Process each chunk
+            all_questions = []
+            for i, chunk in enumerate(chunks, 1):
+                logger.info(f"🔄 Processing Chunk {i}/{total_chunks}...")
+                
+                # Build prompt for this chunk
+                prompt = self._build_question_generation_prompt(chunk, jd_context)
+                
+                # Generate questions for this chunk
+                result = await generator.generate(prompt)
+                
+                # Parse questions
+                chunk_questions = self._parse_generated_questions(result.generated_text, jd_context)
+                
+                logger.info(f"✅ Processed Chunk {i}/{total_chunks}, found {len(chunk_questions)} questions")
+                
+                # Accumulate
+                all_questions.extend(chunk_questions)
 
-            # Parse generated questions
-            questions = self._parse_generated_questions(result.generated_text, jd_context)
+            # Deduplicate questions
+            logger.info(f"🔍 Deduplicating {len(all_questions)} questions...")
+            deduplicated = self._deduplicate_questions(all_questions)
+            logger.info(f"✨ Final count: {len(deduplicated)} unique questions")
 
             # Add to database
-            for question in questions:
+            for question in deduplicated:
                 self.questions[question.id] = question
 
-            # Save database
             self.save_database()
+            logger.info(f"💾 Saved {len(deduplicated)} questions to database")
 
-            logger.info(f"Generated and added {len(questions)} questions to database")
-            return questions
+            return deduplicated
 
         except Exception as e:
             logger.error(f"Failed to ingest data: {e}")
             raise
+
+    def _deduplicate_questions(self, questions: List[Question]) -> List[Question]:
+        """Remove duplicate questions based on content similarity."""
+        unique_questions = []
+        seen_contents = set()
+        
+        for q in questions:
+            # Normalize content for comparison
+            normalized = q.content.lower().strip()
+            
+            # Check for exact duplicates
+            if normalized not in seen_contents:
+                seen_contents.add(normalized)
+                unique_questions.append(q)
+            else:
+                logger.debug(f"Skipping duplicate: {q.content[:50]}...")
+        
+        return unique_questions
 
     def _build_question_generation_prompt(self, text: str, jd_context: Optional[str] = None) -> str:
         """Build prompt for LLM question generation."""
@@ -276,7 +318,7 @@ Focus questions on skills and requirements mentioned in this job description.
         prompt = f"""Based on the following text, generate relevant interview questions that could be asked about this topic.
 
 Source Text:
-{text[:2000]}  # Limit input text to prevent token overflow
+{text}
 {context_section}
 
 Please generate 5-10 interview questions in the following JSON format:
@@ -367,18 +409,16 @@ Return only the JSON format, no additional text."""
 
         except Exception as e:
             logger.error(f"Failed to parse LLM-generated questions: {e}")
-            # Return empty list rather than crash
-            return []
-
         return questions
 
-    def get_next_question(self) -> Optional[Question]:
+    def get_next_question(self, exclude_ids: List[str] = None, preferred_difficulty: int = None) -> Optional[Question]:
         """
-        Get next question based on spaced repetition algorithm.
+        Get next question with comprehensive balancing.
 
-        Priority:
-        1. Questions due for review (next_review <= now)
-        2. New questions (review_box == 0), sorted by difficulty (easy to hard)
+        Balances three factors:
+        1. Forgetting curve (遗忘曲线) - prioritize due questions
+        2. Repetition limit - maximum 5 times per question
+        3. Success rate - high success questions need less repetition
 
         Returns:
             Next Question object or None if no questions available
@@ -386,35 +426,113 @@ Return only the JSON format, no additional text."""
         if not self.questions:
             return None
 
+        exclude_ids = exclude_ids or []
         now = datetime.utcnow()
+
+        # Filter out excluded questions
+        available_questions = {
+            qid: q for qid, q in self.questions.items()
+            if qid not in exclude_ids
+        }
+
+        if not available_questions:
+            logger.warning("All questions have been answered recently!")
+            return None
+
+        # Hard limit: 5 repetitions maximum
+        MAX_REPETITIONS = 5
 
         # Get questions due for review
         due_questions = [
-            q for q in self.questions.values()
+            q for q in available_questions.values()
             if q.next_review_datetime <= now and q.review_box > ReviewBox.NEW
         ]
 
         if due_questions:
-            # Sort by review urgency (oldest due first)
-            due_questions.sort(key=lambda q: q.next_review_datetime)
-            logger.debug(f"Selected review question: {due_questions[0].content[:50]}...")
-            return due_questions[0]
+            # Filter out questions that exceeded 5 repetitions
+            filtered_due = [q for q in due_questions if q.attempts < MAX_REPETITIONS]
+            
+            if filtered_due:
+                # Score each question based on multiple factors
+                scored_questions = []
+                for q in filtered_due:
+                    score = self._calculate_question_priority(q, now)
+                    scored_questions.append((score, q))
+                
+                # Sort by score (lower is higher priority)
+                scored_questions.sort(key=lambda x: x[0])
+                selected = scored_questions[0][1]
+                
+                logger.debug(
+                    f"Selected review question (Box {selected.review_box}, "
+                    f"attempt {selected.attempts + 1}/{MAX_REPETITIONS}, "
+                    f"success rate: {selected.success_rate:.1%}): {selected.content[:50]}..."
+                )
+                return selected
+            else:
+                # All due questions exceeded 5 repetitions
+                logger.warning("All due questions exceeded 5 repetitions, prioritizing new questions...")
+                # Fall through to new questions
 
         # Get new questions (never reviewed)
         new_questions = [
-            q for q in self.questions.values()
-            if q.review_box == ReviewBox.NEW
+            q for q in available_questions.values()
+            if q.review_box == ReviewBox.NEW and q.attempts < MAX_REPETITIONS
         ]
 
         if new_questions:
-            # Sort by difficulty (easy to hard)
-            new_questions.sort(key=lambda q: (q.difficulty, q.created_at))
-            logger.debug(f"Selected new question: {new_questions[0].content[:50]}...")
+            # Filter by preferred difficulty if specified
+            if preferred_difficulty:
+                difficulty_filtered = [q for q in new_questions if q.difficulty == preferred_difficulty]
+                if difficulty_filtered:
+                    new_questions = difficulty_filtered
+            
+            # Sort by: 1) difficulty (easy to hard), 2) fewer attempts, 3) creation date
+            new_questions.sort(key=lambda q: (q.difficulty, q.attempts, q.created_at))
+            logger.debug(f"Selected new question (attempt 1/{MAX_REPETITIONS}): {new_questions[0].content[:50]}...")
             return new_questions[0]
 
-        # No questions available (all questions are scheduled for future review)
-        logger.info("No questions currently available for review")
+        # Last resort: if all questions exceeded limit, return None
+        logger.info("No questions available - all exceeded 5 repetitions or are scheduled for future")
         return None
+    
+    def _calculate_question_priority(self, question: Question, current_time: datetime) -> float:
+        """
+        Calculate priority score for a question (lower = higher priority).
+        
+        Factors:
+        1. Forgetting curve urgency (最重要)
+        2. Repetition count penalty
+        3. Success rate bonus (high success = less urgent)
+        
+        Returns:
+            Priority score (lower is better)
+        """
+        # Factor 1: Urgency based on overdue time
+        overdue_hours = (current_time - question.next_review_datetime).total_seconds() / 3600
+        urgency_score = -overdue_hours  # Negative = more overdue = lower score = higher priority
+        
+        # Factor 2: Repetition penalty (more repetitions = higher score = lower priority)
+        repetition_penalty = question.attempts * 10  # Each repetition adds 10 points
+        
+        # Factor 3: Success rate bonus
+        # High success (>80%) = already mastered = lower priority
+        # Low success (<50%) = needs practice = higher priority (but capped by repetition limit)
+        success_rate = question.success_rate
+        if success_rate >= 0.8:
+            success_bonus = 20  # Well mastered, deprioritize
+        elif success_rate >= 0.5:
+            success_bonus = 0  # Moderate, neutral
+        else:
+            success_bonus = -15  # Struggling, prioritize (but not too much)
+        
+        # Combine factors
+        # Urgency is most important (weight 1.0)
+        # Repetition penalty is secondary (weight 1.0)
+        # Success bonus is tertiary (weight 1.0)
+        total_score = urgency_score + repetition_penalty + success_bonus
+        
+        return total_score
 
     def update_progress(self, question_id: str, is_correct: bool) -> bool:
         """

@@ -11,15 +11,27 @@ A comprehensive interview preparation system with:
 
 from .knowledge_engine import KnowledgeEngine, Question
 from .persona_manager import PersonaManager, Persona
-from .graph import (
-    InterviewState,
-    app,
-    build_interview_graph,
-    generate_node,
-    evaluate_node,
-    tutor_node,
-    mentor_node,
-)
+from .generator import Generator
+try:
+    from .graph import (
+        InterviewState,
+        app,
+        build_interview_graph,
+        generate_node,
+        evaluate_node,
+        tutor_node,
+        mentor_node,
+    )
+except ImportError:
+    # LangGraph not installed or graph.py has errors
+    # Define dummies or just pass if not used
+    InterviewState = None
+    app = None
+    build_interview_graph = None
+    generate_node = None
+    evaluate_node = None
+    tutor_node = None
+    mentor_node = None
 
 __all__ = [
     # Knowledge Engine
@@ -35,5 +47,8 @@ __all__ = [
     "generate_node",
     "evaluate_node",
     "tutor_node",
+    "tutor_node",
     "mentor_node",
+    # Generator
+    "Generator",
 ]

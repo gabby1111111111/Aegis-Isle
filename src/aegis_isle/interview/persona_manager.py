@@ -8,8 +8,8 @@ Provides default personas for different interview roles.
 import json
 import base64
 from pathlib import Path
-from typing import Optional, Dict, Any
-from dataclasses import dataclass
+from typing import Optional, Dict, Any, List
+from dataclasses import dataclass, field
 from PIL import Image
 
 from ..core.logging import logger
@@ -25,8 +25,10 @@ class Persona:
         role: Interview role (Interviewer, Tutor, Mentor)
         description: Character background and description
         personality: Personality traits and behavior patterns
-        first_message: Initial greeting message
+        first_message: Initial greeting message (Cinematic Intro)
         example_messages: Example conversation snippets
+        scenario: The current situation/scene
+        character_book: World info / lore entries
         avatar_path: Optional path to avatar image
     """
     name: str
@@ -35,25 +37,52 @@ class Persona:
     personality: str
     first_message: str
     example_messages: str
+    scenario: str = ""
+    character_book: Optional[Dict[str, Any]] = None
     avatar_path: Optional[str] = None
 
     def get_system_prompt(self) -> str:
-        """Generate system prompt for LLM based on persona attributes."""
-        return f"""You are {self.name}, a {self.role}.
+        """
+        Generate a powerful system prompt for the LLM instructing it to act
+        as an Interviewer within the specific World.
+        """
+        # Format World Info if available
+        world_info_text = ""
+        if self.character_book and 'entries' in self.character_book:
+            entries = self.character_book['entries']
+            if entries:
+                world_info_text = "World Info / Lore:\n"
+                # Fix: iterate over values if entries is a dict, otherwise iterate directly
+                entries_list = entries.values() if isinstance(entries, dict) else entries
+                for entry in entries_list:
+                    if isinstance(entry, dict):  # Safety check
+                        keys = ", ".join(entry.get('keys', []))
+                        content = entry.get('content', '')
+                        if content:
+                            world_info_text += f"- [{keys}]: {content}\n"
+                world_info_text += "\n"
 
-Background: {self.description}
+        return f"""You are {self.name}, acting as a {self.role}.
 
-Personality: {self.personality}
+[Character Description]
+{self.description}
 
-Your role is to help the user prepare for interviews by:
-- Asking relevant questions based on their knowledge level
-- Providing constructive feedback on their answers
-- Maintaining your character's personality and speaking style
+[Personality]
+{self.personality}
 
-Example conversation style:
+[Scenario / Current Situation]
+{self.scenario}
+
+{world_info_text}[Roleplay Instructions]
+Your role is to conduct a technical interview, but you MUST stay completely in character.
+- Adopt the tone, mannerisms, and worldview of {self.name}.
+- If the world is fantasy/sci-fi, frame technical concepts using analogies from that world if appropriate, or treat the interview as a test of skill/magic/competence within that setting.
+- Do NOT break character.
+- Be {self.role} first, and a technical evaluator second.
+
+[Example Dialogue]
 {self.example_messages}
-
-Remember to stay in character and be helpful while maintaining your unique personality."""
+"""
 
 
 class PersonaManager:
@@ -106,7 +135,8 @@ Sukuna: "Hmph. Finally, a competent answer. Continue."
 
 User: "I'm not sure about this one..."
 Sukuna: "Uncertainty is weakness. Think harder or admit defeat."
-"""
+""",
+            scenario="Sukuna sits on his throne of skulls, looking down at the candidate."
         )
 
         # Gojo - Playful Tutor
@@ -129,7 +159,8 @@ Gojo: "Easy! A stack is like a stack of pancakes - you eat from the top (LIFO). 
 
 User: "This is hard..."
 Gojo: "Everything seems hard until you understand it! Let's tackle this together. You've got this!"
-"""
+""",
+            scenario="Gojo is lounging in a classroom chair, spinning a pen."
         )
 
         # Nanami - Encouraging Mentor
@@ -153,7 +184,8 @@ Nanami: "Absolutely not. That's a recipe for burnout. Focus on mastering fundame
 
 User: "I'm ready for the next challenge!"
 Nanami: "Good attitude. But let's make sure you've truly mastered this concept first. A strong foundation is crucial for long-term success."
-"""
+""",
+            scenario="Nanami is reviewing documents at his desk, looking up to address the candidate."
         )
 
         # Add default personas to registry
@@ -269,6 +301,8 @@ Nanami: "Good attitude. But let's make sure you've truly mastered this concept f
         - personality: Personality traits (optional)
         - first_mes: First message (optional)
         - mes_example: Example messages (optional)
+        - scenario: Scenario (optional)
+        - character_book: World info (optional)
         - data: Alternative location for character data (nested format)
         """
         # Handle nested 'data' format
@@ -278,16 +312,25 @@ Nanami: "Good attitude. But let's make sure you've truly mastered this concept f
         # Extract required fields
         name = data.get('name', '').strip()
         if not name:
-            raise ValueError("Character card missing required 'name' field")
-
-        description = data.get('description', data.get('desc', '')).strip()
-        if not description:
-            raise ValueError(f"Character card for '{name}' missing 'description' field")
+            raise ValueError("角色卡缺少必需的 'name' 字段 (Character card missing required 'name' field)")
 
         # Extract optional fields with defaults
+        # Description is now optional - fallback to personality or a generic default
+        description = data.get('description', data.get('desc', '')).strip()
         personality = data.get('personality', '').strip()
+        
+        # If no description, use personality, or a generic fallback
+        if not description:
+            if personality:
+                description = f"性格: {personality}" if personality else "A mysterious character."
+            else:
+                description = "一个神秘的角色。(A mysterious character.)"
+                logger.warning(f"Character '{name}' has no description or personality. Using default.")
+
         first_message = data.get('first_mes', data.get('greeting', '')).strip()
         example_messages = data.get('mes_example', data.get('example_dialogue', '')).strip()
+        scenario = data.get('scenario', '').strip()
+        character_book = data.get('character_book', None)
 
         # Determine role based on personality or description
         role = self._infer_role(name, description, personality)
@@ -300,6 +343,8 @@ Nanami: "Good attitude. But let's make sure you've truly mastered this concept f
             personality=personality or "Professional and helpful",
             first_message=first_message or f"Hello! I'm {name}. Let's prepare for your interview!",
             example_messages=example_messages or "No example dialogue provided.",
+            scenario=scenario,
+            character_book=character_book,
             avatar_path=source_path if source_path.endswith('.png') else None
         )
 
