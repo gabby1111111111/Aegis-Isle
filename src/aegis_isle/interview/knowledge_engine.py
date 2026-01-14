@@ -210,13 +210,16 @@ class KnowledgeEngine:
         except Exception as e:
             logger.error(f"Failed to save question database: {e}")
 
-    async def ingest_data(self, text: str, jd_context: Optional[str] = None) -> List[Question]:
+    async def ingest_data(self, text: str, jd_context: Optional[str] = None, use_cache: bool = True, language: str = "zh") -> List[Question]:
         """
         Generate interview questions from text using LLM with chunking.
+        Supports parallel processing and caching.
 
         Args:
             text: Source text (study material, documentation, etc.)
             jd_context: Optional job description for contextual questions
+            use_cache: Whether to use cached questions if available
+            language: Language code for questions (zh/en/jp)
 
         Returns:
             List of generated Question objects
@@ -225,6 +228,28 @@ class KnowledgeEngine:
             Exception: If LLM generation fails
         """
         try:
+            # Check cache first
+            import hashlib
+            content_hash = hashlib.md5((text + (jd_context or "")).encode()).hexdigest()
+            cache_path = Path(f"data/ingestion_cache_{content_hash}.json")
+            
+            if use_cache and cache_path.exists():
+                logger.info(f"📦 Found cached ingestion data: {cache_path}")
+                try:
+                    with open(cache_path, 'r', encoding='utf-8') as f:
+                        cached_data = json.load(f)
+                        questions = [Question(**q) for q in cached_data]
+                        
+                    # Add to database
+                    for question in questions:
+                        self.questions[question.id] = question
+                    self.save_database()
+                    
+                    logger.info(f"✅ Loaded {len(questions)} questions from cache")
+                    return questions
+                except Exception as e:
+                    logger.warning(f"Failed to load cache: {e}, proceeding with generation")
+
             from ..rag.generator import LLMGenerator, GenerationConfig
             from langchain.text_splitter import RecursiveCharacterTextSplitter
 
@@ -247,29 +272,49 @@ class KnowledgeEngine:
             )
             generator = LLMGenerator(config, provider=settings.llm_provider)
 
-            # Process each chunk
-            all_questions = []
-            for i, chunk in enumerate(chunks, 1):
-                logger.info(f"🔄 Processing Chunk {i}/{total_chunks}...")
-                
-                # Build prompt for this chunk
-                prompt = self._build_question_generation_prompt(chunk, jd_context)
-                
-                # Generate questions for this chunk
-                result = await generator.generate(prompt)
-                
-                # Parse questions
-                chunk_questions = self._parse_generated_questions(result.generated_text, jd_context)
-                
-                logger.info(f"✅ Processed Chunk {i}/{total_chunks}, found {len(chunk_questions)} questions")
-                
-                # Accumulate
-                all_questions.extend(chunk_questions)
+            # Process chunks in parallel with semaphore
+            semaphore = asyncio.Semaphore(10) # Limit concurrency to 10
+            
+            async def process_chunk(i, chunk):
+                async with semaphore:
+                    logger.info(f"🔄 Processing Chunk {i}/{total_chunks}...")
+                    try:
+                        # Build prompt for this chunk
+                        prompt = self._build_question_generation_prompt(chunk, jd_context, language)
+                        
+                        # Generate questions for this chunk
+                        result = await generator.generate(prompt)
+                        
+                        # Parse questions
+                        chunk_questions = self._parse_generated_questions(result.generated_text, jd_context)
+                        
+                        logger.info(f"✅ Processed Chunk {i}/{total_chunks}, found {len(chunk_questions)} questions")
+                        return chunk_questions
+                    except Exception as e:
+                        logger.error(f"❌ Failed to process chunk {i}: {e}")
+                        return []
+
+            # Create tasks
+            tasks = [process_chunk(i, chunk) for i, chunk in enumerate(chunks, 1)]
+            
+            # Run parallel execution
+            results = await asyncio.gather(*tasks)
+            
+            # Flatten results
+            all_questions = [q for sublist in results for q in sublist]
 
             # Deduplicate questions
             logger.info(f"🔍 Deduplicating {len(all_questions)} questions...")
             deduplicated = self._deduplicate_questions(all_questions)
             logger.info(f"✨ Final count: {len(deduplicated)} unique questions")
+
+            # Save to cache
+            try:
+                with open(cache_path, 'w', encoding='utf-8') as f:
+                    json.dump([q.dict() for q in deduplicated], f, indent=2, ensure_ascii=False)
+                logger.info(f"💾 Saved ingestion cache to {cache_path}")
+            except Exception as e:
+                logger.warning(f"Failed to save cache: {e}")
 
             # Add to database
             for question in deduplicated:
@@ -302,20 +347,53 @@ class KnowledgeEngine:
         
         return unique_questions
 
-    def _build_question_generation_prompt(self, text: str, jd_context: Optional[str] = None) -> str:
+    def _build_question_generation_prompt(self, text: str, jd_context: Optional[str] = None, language: str = "zh") -> str:
         """Build prompt for LLM question generation."""
+        
+        lang_instructions = {
+            "zh": {
+                "instruction": "请用简体中文生成问题和答案",
+                "example_q": "什么是二分查找的时间复杂度？",
+                "example_a": "O(log n) - 因为每次迭代会排除一半的搜索空间",
+                "guidelines": """指导方针：
+1. 难度级别：1=非常简单，2=简单，3=中等，4=困难，5=非常困难
+2. 问题应具体且可回答
+3. 包含多样化的难度级别（主要是2-4级）
+4. 提供简洁但准确的answer_key
+5. 使用相关的categories和tags
+6. 专注于实用知识和理解
+7. 问题应符合实际面试场景"""
+            },
+            "en": {
+                "instruction": "Generate questions and answers in English",
+                "example_q": "What is the time complexity of binary search?",
+                "example_a": "O(log n) - because we eliminate half the search space in each iteration",
+                "guidelines": """Guidelines:
+1. Difficulty scale: 1=Very Easy, 2=Easy, 3=Medium, 4=Hard, 5=Very Hard
+2. Questions should be specific and answerable
+3. Include diverse difficulty levels (mix of 2-4 mostly)
+4. Provide concise but accurate answer_key
+5. Use relevant categories and tags
+6. Focus on practical knowledge and understanding
+7. Make questions realistic for actual interviews"""
+            }
+        }
+        
+        lang_cfg = lang_instructions.get(language, lang_instructions["zh"])
 
         context_section = ""
         if jd_context:
             context_section = f"""
 
 Job Description Context:
-{jd_context[:1500]}  # Limit context to prevent token overflow
+{jd_context[:1500]}
 
 Focus questions on skills and requirements mentioned in this job description.
 """
 
-        prompt = f"""Based on the following text, generate relevant interview questions that could be asked about this topic.
+        prompt = f"""{lang_cfg['instruction']}
+
+Based on the following text, generate relevant interview questions that could be asked about this topic.
 
 Source Text:
 {text}
@@ -327,31 +405,17 @@ Please generate 5-10 interview questions in the following JSON format:
 {{
   "questions": [
     {{
-      "content": "What is the time complexity of binary search?",
-      "answer_key": "O(log n) - because we eliminate half the search space in each iteration",
+      "content": "{lang_cfg['example_q']}",
+      "answer_key": "{lang_cfg['example_a']}",
       "difficulty": 3,
       "category": "algorithms",
       "tags": ["binary_search", "time_complexity", "algorithms"]
-    }},
-    {{
-      "content": "Explain the difference between REST and GraphQL APIs",
-      "answer_key": "REST uses multiple endpoints with HTTP verbs; GraphQL uses single endpoint with query language for flexible data fetching",
-      "difficulty": 4,
-      "category": "api_design",
-      "tags": ["rest", "graphql", "api", "web_development"]
     }}
   ]
 }}
 ```
 
-Guidelines:
-1. Difficulty scale: 1=Very Easy, 2=Easy, 3=Medium, 4=Hard, 5=Very Hard
-2. Questions should be specific and answerable
-3. Include diverse difficulty levels (mix of 2-4 mostly)
-4. Provide concise but accurate answer_key
-5. Use relevant categories and tags
-6. Focus on practical knowledge and understanding
-7. Make questions realistic for actual interviews
+{lang_cfg['guidelines']}
 
 Return only the JSON format, no additional text."""
 

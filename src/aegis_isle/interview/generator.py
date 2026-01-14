@@ -59,10 +59,22 @@ class Generator:
         
         # Extract world lore for ELI5
         world_lore = ""
-        if persona.character_book and 'entries' in persona.character_book:
-            # Get first 3 lore entries
-            entries = list(persona.character_book['entries'].values())[:3]
-            world_lore = " ".join([e.get('content', '') for e in entries if 'content' in e])[:500]
+        if persona.character_book and isinstance(persona.character_book, dict) and 'entries' in persona.character_book:
+            try:
+                # Get first 3 lore entries (handle both list and dict formats)
+                entries_data = persona.character_book['entries']
+                
+                if hasattr(entries_data, 'values'):
+                    entries = list(entries_data.values())[:3]
+                elif isinstance(entries_data, list):
+                    entries = entries_data[:3]
+                else:
+                    entries = []
+                    
+                world_lore = " ".join([e.get('content', '') for e in entries if isinstance(e, dict) and 'content' in e])[:500]
+            except Exception as e:
+                print(f"Error processing character_book: {e}")
+                world_lore = ""
 
         user_message = f"""YOU ARE THE SCENARIO ENGINE. You are NOT the character.
 

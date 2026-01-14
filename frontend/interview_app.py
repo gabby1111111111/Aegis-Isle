@@ -454,13 +454,33 @@ def initialize_session_state():
         st.session_state.language = "zh"  # Default to Chinese
 
     if "knowledge_engine" not in st.session_state:
+        from aegis_isle.interview.knowledge_engine import KnowledgeEngine
         st.session_state.knowledge_engine = KnowledgeEngine()
+    else:
+        # Force reload knowledge_engine module to pick up hotfixes
+        import importlib
+        import sys
+        if 'aegis_isle.interview.knowledge_engine' in sys.modules:
+            importlib.reload(sys.modules['aegis_isle.interview.knowledge_engine'])
+            from aegis_isle.interview.knowledge_engine import KnowledgeEngine
+            st.session_state.knowledge_engine = KnowledgeEngine()
+            print("🔄 KnowledgeEngine module reloaded and instance recreated.")
 
     if "persona_manager" not in st.session_state:
         st.session_state.persona_manager = PersonaManager()
 
     if "generator" not in st.session_state:
+        from aegis_isle.interview.generator import Generator
         st.session_state.generator = Generator()
+    else:
+        # Force reload generator module to pick up hotfixes
+        import importlib
+        import sys
+        if 'aegis_isle.interview.generator' in sys.modules:
+            importlib.reload(sys.modules['aegis_isle.interview.generator'])
+            from aegis_isle.interview.generator import Generator
+            st.session_state.generator = Generator()
+            print("🔄 Generator module reloaded and instance recreated.")
     
     if "story_manager" not in st.session_state:
         st.session_state.story_manager = StoryManager()
@@ -640,6 +660,80 @@ def load_emperor_test():
         st.error(f"加载失败: {e}")
         return False
 
+async def load_default_scenario():
+    """Load default scenario files (JD, KB, Persona)."""
+    from pathlib import Path
+    import json
+    from aegis_isle.interview.persona_manager import Persona
+
+    default_dir = Path("default")
+    jd_path = default_dir / "jd.txt"
+    kb_path = default_dir / "llm.md"
+    card_path = default_dir / "bigE.json"
+
+    if not (jd_path.exists() and kb_path.exists() and card_path.exists()):
+        st.error("Default files missing in 'default/' directory.")
+        return False
+
+    try:
+        with st.spinner("Loading default scenario..."):
+            # 1. Load JD
+            with open(jd_path, "r", encoding="utf-8") as f:
+                st.session_state.jd_context = f.read()
+            
+            # 2. Load Knowledge Base
+            with open(kb_path, "r", encoding="utf-8") as f:
+                kb_content = f.read()
+                # Clear existing questions to ensure clean slate
+                st.session_state.knowledge_engine.questions = {}
+                questions = await st.session_state.knowledge_engine.ingest_data(kb_content, st.session_state.jd_context, language=st.session_state.language)
+            
+            # 3. Load Persona
+            with open(card_path, "r", encoding="utf-8") as f:
+                card_data = json.load(f)
+                # Handle SillyTavern card format if needed, or simple JSON
+                # Assuming bigE.json is a simple JSON or compatible format
+                # If it's a SillyTavern card, we might need more complex parsing logic
+                # For now, let's assume it matches the Persona structure or use the manager
+                
+                # Check if it's a V2 card (spec_version) or simple dict
+                if "spec" in card_data and "data" in card_data: # V2
+                     data = card_data["data"]
+                     persona = Persona(
+                        name=data.get("name", "Unknown"),
+                        role="Interviewer", # Default
+                        description=data.get("description", ""),
+                        personality=data.get("personality", ""),
+                        first_message=data.get("first_mes", ""),
+                        example_messages=data.get("mes_example", ""),
+                        scenario=data.get("scenario", ""),
+                        character_book=data.get("character_book", {}),
+                        avatar_path=None
+                    )
+                else: # Simple or V1
+                    persona = Persona(
+                        name=card_data.get("name", "Unknown"),
+                        role="Interviewer",
+                        description=card_data.get("description", ""),
+                        personality=card_data.get("personality", ""),
+                        first_message=card_data.get("first_mes", ""),
+                        example_messages=card_data.get("mes_example", ""),
+                        scenario=card_data.get("scenario", ""),
+                        character_book=card_data.get("character_book", {}),
+                        avatar_path=None
+                    )
+            
+            st.session_state.current_persona = persona
+            
+            st.success(f"Loaded Default Scenario! Generated {len(questions)} questions.")
+            st.session_state.stage = "intro"
+            st.rerun()
+            return True
+
+    except Exception as e:
+        st.error(f"Failed to load default scenario: {e}")
+        return False
+
 
 # ============================================================================
 # UI Components
@@ -648,7 +742,13 @@ def load_emperor_test():
 def render_sidebar():
     """Render configuration sidebar."""
     with st.sidebar:
-        st.header(t("sidebar_config"))
+        st.title(t("config_title"))
+        
+        # === Default Scenario Button ===
+        if st.button("🚀 加载默认剧本 (Load Default)", type="primary"):
+            asyncio.run(load_default_scenario())
+        
+        st.divider()
         
         # Language Selector
         selected_lang = st.selectbox(
@@ -874,56 +974,9 @@ def render_interview():
             st.rerun()
         return
 
-    # === Menu & Settings Buttons (Top Left) ===
-    st.markdown("""
-    <style>
-    .menu-buttons {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 9999;
-        display: flex;
-        gap: 10px;
-    }
-    .menu-btn {
-        width: 60px;
-        height: 60px;
-        background: #fff;
-        border: 4px solid #000;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    }
-    .menu-btn:hover {
-        background: #000;
-        color: #fff;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 15px rgba(0,0,0,0.4);
-    }
-    .menu-btn svg {
-        width: 30px;
-        height: 30px;
-    }
-    </style>
-    <div class="menu-buttons">
-        <div class="menu-btn" onclick="document.querySelector('[data-testid=stSidebar]').style.display = document.querySelector('[data-testid=stSidebar]').style.display === 'none' ? 'block' : 'none';">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <line x1="3" y1="12" x2="21" y2="12"/>
-                <line x1="3" y1="18" x2="21" y2="18"/>
-            </svg>
-        </div>
-        <div class="menu-btn" onclick="document.querySelector('[data-testid=stSidebar]').style.display = document.querySelector('[data-testid=stSidebar]').style.display === 'none' ? 'block' : 'none';">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <circle cx="12" cy="12" r="3"/>
-                <path d="M12 1v6m0 6v6m4.22-13.22l-4.25 4.25m-2.83 2.83L4.22 17.78m13.56-13.56l-4.25 4.25m-2.83 2.83L5.78 18.22"/>
-            </svg>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # === Menu & Settings Buttons (Top Left) - DISABLED ===
+    # (Removed to fix syntax error - can be re-added with proper JavaScript injection later)
+
 
     # === Emperor's Satisfaction Progress Bar (Top Right) ===
     satisfaction = st.session_state.satisfaction_score
