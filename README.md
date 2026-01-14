@@ -138,8 +138,8 @@ Aegis-Isle 摒弃了简单的 System Prompt 拼接，采用了 **"Three-Tier Con
 
 |  **The Application** |
 |:---:|
-|  ![UI](./pre/interview_ui.jpg) |
-|  *Immersive Persona-based Learning* |
+|  ![UI](./pre/interview_ui_v0.jpg) |
+|  *Immersive Persona-based Learning* | 
 
 ---
 
