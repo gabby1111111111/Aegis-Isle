@@ -61,6 +61,16 @@ class BaseGenerator(ABC):
         """Generate text with provided context chunks."""
         pass
 
+    @abstractmethod
+    async def generate_stream(
+        self,
+        prompt: str,
+        retrieval_context: Optional[EnhancedQueryResult] = None,
+        **kwargs
+    ):
+        """Generate text stream based on prompt and optional context."""
+        pass
+
 
 class LLMGenerator(BaseGenerator):
     """LLM-based text generator supporting multiple providers."""
@@ -143,6 +153,64 @@ class LLMGenerator(BaseGenerator):
                 generation_time=time.time() - start_time,
                 metadata={"error": str(e)}
             )
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        retrieval_context: Optional[EnhancedQueryResult] = None,
+        **kwargs
+    ):
+        """Stream text generation with optional retrieval context."""
+        # Build enhanced prompt if context is provided
+        if retrieval_context and retrieval_context.results:
+            enhanced_prompt = self._build_context_prompt(prompt, retrieval_context)
+        else:
+            enhanced_prompt = prompt
+
+        # Merge config with kwargs
+        generation_config = {
+            "model": kwargs.get("model", self.config.model),
+            "max_tokens": kwargs.get("max_tokens", self.config.max_tokens),
+            "temperature": kwargs.get("temperature", self.config.temperature),
+            "top_p": kwargs.get("top_p", self.config.top_p),
+            "presence_penalty": kwargs.get("presence_penalty", self.config.presence_penalty),
+            "frequency_penalty": kwargs.get("frequency_penalty", self.config.frequency_penalty),
+            "stream": True,
+        }
+
+        if self.config.stop_sequences:
+            generation_config["stop"] = self.config.stop_sequences
+
+        # We do not catch exceptions here to let the caller handle them
+        logger.info(f"Calling LLM with provider={self.provider}, model={generation_config.get('model')}")
+        logger.debug(f"Enhanced prompt: {enhanced_prompt[:200]}...")
+        logger.debug(f"Generation config: {generation_config}")
+        
+        if self.provider == "openai":
+            stream = await self._client.chat.completions.create(
+                messages=[{"role": "user", "content": enhanced_prompt}],
+                **generation_config
+            )
+            async for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+        elif self.provider == "anthropic":
+            # Anthropic streaming implementation
+            kwargs_copy = generation_config.copy()
+            kwargs_copy.pop("stream", None) # Remove stream arg as we use stream() method
+            # Adjust parameter names
+            if "model" in kwargs_copy:
+                 kwargs_copy["model"] = kwargs_copy["model"].replace("gpt", "claude")
+            
+            async with self._client.messages.stream(
+                messages=[{"role": "user", "content": enhanced_prompt}],
+                **kwargs_copy
+            ) as stream:
+                async for text in stream.text_stream:
+                    yield text
+        else:
+             raise ValueError(f"Streaming not supported for provider: {self.provider}")
 
     async def generate_with_context(
         self,

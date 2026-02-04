@@ -16,7 +16,9 @@ from .routers import (
     agents_router,
     health_router,
     admin_router,
-    auth_router
+    admin_router,
+    auth_router,
+    openai_compat
 )
 
 
@@ -98,6 +100,13 @@ def create_app() -> FastAPI:
         auth_router,
         prefix="/api/v1",
         tags=["authentication"]
+    )
+
+    # OpenAI Compatible API
+    app.include_router(
+        openai_compat.router,
+        prefix="/v1",
+        tags=["openai"]
     )
 
     app.include_router(

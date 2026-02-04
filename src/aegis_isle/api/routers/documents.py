@@ -133,7 +133,7 @@ async def add_text_content(
 
         metadata = request.metadata or {}
         metadata.update({
-            "source": "text_input",
+            # 'source' 已在 DocumentMetadata 构造函数中设置，这里不再重复
             "content_length": len(request.content),
             "request_id": request_id
         })

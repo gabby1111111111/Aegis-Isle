@@ -24,7 +24,7 @@ class Settings(BaseSettings):
 
     # API Configuration
     api_host: str = Field(default="0.0.0.0", env="API_HOST")
-    api_port: int = Field(default=8000, env="API_PORT")
+    api_port: int = Field(default=8001, env="API_PORT")
     api_reload: bool = Field(default=True, env="API_RELOAD")
 
     # Database Configuration

@@ -78,17 +78,22 @@ class RAGPipeline:
 
         logger.info("RAG Pipeline initialized successfully")
 
-    def _initialize_retriever(self) -> BaseRetriever:
+    def _initialize_retriever(self) -> Optional[BaseRetriever]:
         """Initialize the retriever based on configuration."""
-        vector_retriever = VectorRetriever(
-            embedding_model=self.config.embedding_model,
-            vector_db_type=self.config.vector_db_type
-        )
+        try:
+            vector_retriever = VectorRetriever(
+                embedding_model=self.config.embedding_model,
+                vector_db_type=self.config.vector_db_type
+            )
 
-        if self.config.retrieval_strategy == "hybrid":
-            return HybridRetriever(vector_retriever)
-        else:
-            return vector_retriever
+            if self.config.retrieval_strategy == "hybrid":
+                return HybridRetriever(vector_retriever)
+            else:
+                return vector_retriever
+        
+        except Exception as e:
+            logger.warning(f"Failed to initialize retriever, falling back to pure LLM mode: {e}")
+            return None
 
     async def add_document(
         self,
@@ -258,6 +263,66 @@ class RAGPipeline:
                 total_time=time.time() - start_time,
                 metadata={"error": str(e)}
             )
+
+    async def query_stream(
+        self,
+        query: str,
+        max_docs: Optional[int] = None,
+        **kwargs
+    ):
+        """Perform a streaming RAG query."""
+        import json
+        
+        logger.info(f"Processing stream query: {query}")
+
+        max_docs = max_docs or self.config.max_retrieved_docs
+        retrieval_result = None
+
+        # 1. Retrieve relevant documents (Only if retriever is available)
+        if self.retriever:
+            try:
+                retrieval_result = await self.retriever.search(
+                    query,
+                    limit=max_docs,
+                    score_threshold=self.config.similarity_threshold,
+                    **kwargs
+                )
+            except Exception as e:
+                logger.error(f"Retrieval failed during stream: {e}")
+                retrieval_result = None
+        else:
+            logger.info("Retriever not available, skipping retrieval step.")
+
+        # 2. Check retrieval results and fallback
+        if not retrieval_result or not retrieval_result.results:
+            if self.retriever:
+                logger.warning("No relevant documents found. Proceeding without context.")
+            retrieval_result = None
+        else:
+            # 3. Yield metadata block
+            top_sources = [
+                {
+                    "source": res.chunk.document_id,
+                    "score": round(res.score, 4),
+                    "content_preview": res.chunk.content[:100] + "..." if res.chunk.content else ""
+                }
+                for res in retrieval_result.results[:3]
+            ]
+
+            metadata_packet = {
+                "type": "metadata",
+                "count": len(retrieval_result.results),
+                "sources": top_sources
+            }
+            yield json.dumps(metadata_packet)
+
+        # 4. Generate streaming response
+        async for chunk in self.generator.generate_stream(
+            query,
+            retrieval_context=retrieval_result,
+            **kwargs
+        ):
+            yield chunk
 
     async def batch_query(
         self,
