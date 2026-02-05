@@ -76,7 +76,7 @@ def safe_print(text):
         ascii_text = text.encode('ascii', 'ignore').decode('ascii')
         print(ascii_text)
 
-def start_server(mode="full", host="0.0.0.0", port=8000, reload=True):
+def start_server(mode="full", host="0.0.0.0", port=8002, reload=True):
     """启动开发服务器"""
 
     safe_print("=================================================")
@@ -109,8 +109,8 @@ def start_server(mode="full", host="0.0.0.0", port=8000, reload=True):
         safe_print("📝 注意: 完整版本包含RAG、Agent、Tools等所有功能")
 
     safe_print(f"🌐 服务器地址: http://{host}:{port}")
-    safe_print("📖 API文档: http://localhost:8000/docs")
-    safe_print("📚 ReDoc: http://localhost:8000/redoc")
+    safe_print("📖 API文档: http://localhost:8002/docs")
+    safe_print("📚 ReDoc: http://localhost:8002/redoc")
     safe_print("")
     safe_print("👥 默认账户:")
     safe_print("   - 管理员: admin / admin123")
@@ -153,7 +153,7 @@ def main():
         help="启动模式: full(完整版) 或 auth(简化认证版，默认)"
     )
     parser.add_argument("--host", default="0.0.0.0", help="绑定主机 (默认: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=8000, help="端口号 (默认: 8000)")
+    parser.add_argument("--port", type=int, default=8002, help="端口号 (默认: 8002)")
     parser.add_argument("--no-reload", action="store_true", help="禁用自动重载")
 
     args = parser.parse_args()
