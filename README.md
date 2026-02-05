@@ -19,7 +19,8 @@
 ### 1. 🧬 Advanced Agent Orchestration (智能体编排)
 - **LangGraph Integration**: 从线性工作流升级为**有向循环图 (StateGraph)** 架构，实现了复杂的循环逻辑（如：研究->反思->重写）和持久化状态管理。
 - **Semantic Routing (语义路由)**: 基于 LLM 的意图识别路由器，动态分发任务至 Researcher, Analyst, 或 Coder 智能体，支持从关键字匹配自动降级。
-- **Self-Corrective RAG**: 内置自我修正机制，当检索内容相关性不足时自动触发 Query Rewriting (查询重写)。
+- **Fault Tolerance (容错降级)**: 采用健壮的降级策略，确保系统在部分组件（如 LLM 路由）失败时自动回退至规则引擎，保障核心业务可用性。
+- **Context Injection Middleware**: 设计并实现了上下文注入中间件，在严格保持 SillyTavern 角色人设（Persona-Keeping）的同时，无缝注入 RAG 知识库内容。
 
 ### 2. 🔐 Enterprise Governance & Security (企业级治理)
 - **Fine-Grained RBAC**: 三层角色权限体系 (User/Admin/SuperAdmin)，支持细粒度的 API 访问控制。
@@ -28,12 +29,13 @@
 
 ### 3. 🧠 Hybrid RAG Engine (混合检索引擎)
 - **Multi-Stage Retrieval**: 结合 **Dense Vector** (语义) 与 **BM25** (关键词) 的混合检索策略。
+- **Vector Engine**: 集成 **FAISS** 向量数据库，实现文档检索和语义搜索（相关度阈值 > 0.34），精准过滤噪声。
 - **Re-ranking**: 集成 Cross-Encoder 重排序模型，显著降低 "Lost in the Middle" 现象，提升长尾知识召回率。
 - **Dynamic Ingestion**: 支持 PDF/MD/Image 实时解析与向量化，自动处理元数据注入。
 
 ### 4. ⚡ High-Performance Architecture (高性能架构)
-- **Headless Backend**: 前后端完全解耦，通过 RESTful API 提供服务，支持 Streamlit, Web, 或第三方客户端 (如 SillyTavern) 接入。
-- **Streaming API**: 兼容 OpenAI 协议的 `/v1/chat/completions` 流式响应接口，实现打字机效果 (First Token Latency < 500ms)。
+- **Headless Backend**: 前后端完全解耦，通过 RESTful API 提供服务，完美支持 **SillyTavern** 等第三方客户端接入。
+- **Streaming API**: 深度兼容 OpenAI 协议的 `/v1/chat/completions` 接口，支持 **SSE (Server-Sent Events)** 格式实时响应，实现流畅的打字机体验。
 - **Dockerized**: 完整的容器化部署方案，包含 Prometheus + Grafana 监控预配置。
 
 ---
@@ -83,9 +85,9 @@ graph TD
 
 ## 🛠️ Tech Stack (技术栈)
 
-- **Core Framework**: Python 3.11, FastAPI, Pydantic v2
-- **AI Orchestration**: LangChain, LangGraph, OpenAI SDK
-- **Vector Database**: Qdrant (Production), FAISS (Local/Edge)
+- **Core Framework**: Python 3.11, FastAPI, Async/Await
+- **AI Orchestration**: LangGraph, LangChain, OpenAI API
+- **Vector Database**: FAISS, Qdrant
 - **Security**: Python-JOSE (JWT), Passlib (Bcrypt)
 - **Observability**: Structlog, Loguru, Promenade (Metrics)
 - **Deployment**: Docker Compose, Shell Scripts
