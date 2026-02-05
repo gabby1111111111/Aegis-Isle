@@ -17,6 +17,8 @@ from ...core.logging import logger
 from ...core.state.manager import StateManager
 from ...core.state.context_injection import inject_state_context, get_user_id_from_request
 from ...core.state.background_updater import update_user_state
+from ...core.state.snapshot import SnapshotManager
+
 
 router = APIRouter()
 
@@ -239,6 +241,181 @@ async def get_user_state_debug(user_id: str):
         return JSONResponse(
             status_code=500,
             content={"error": str(e)}
+        )
+
+
+@router.get("/v1/state/{user_id}/snapshots")
+async def list_user_snapshots(user_id: str, limit: int = 10):
+    """
+    列出用户的所有快照
+    
+    Args:
+        user_id: 用户 ID
+        limit: 返回数量限制
+        
+    Returns:
+        快照列表(JSON 格式)
+        
+    Example:
+        GET /v1/state/test_user/snapshots?limit=5
+    """
+    try:
+        snapshot_manager = SnapshotManager()
+        snapshots = await snapshot_manager.list_snapshots(user_id, limit=limit)
+        
+        return JSONResponse({
+            "success": True,
+            "user_id": user_id,
+            "snapshot_count": len(snapshots),
+            "snapshots": [
+                {
+                    "snapshot_id": snap.snapshot_id,
+                    "timestamp": snap.timestamp.isoformat(),
+                    "version": snap.version,
+                    "change_summary": snap.change_summary,
+                    "file_path": snap.file_path
+                }
+                for snap in snapshots
+            ]
+        })
+    except Exception as e:
+        logger.error(f"[API] 获取快照列表失败: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
+        )
+
+
+@router.post("/v1/state/{user_id}/rollback")
+async def rollback_user_state(
+    user_id: str,
+    request: Request
+):
+    """
+    回滚用户状态到指定快照
+    
+    Args:
+        user_id: 用户 ID
+        request: 包含 snapshot_id 的 JSON 请求
+        
+    Request Body:
+        {
+            "snapshot_id": "snap_20260206_120000"
+        }
+        
+    Returns:
+        回滚结果
+        
+    Example:
+        POST /v1/state/test_user/rollback
+        Body: {"snapshot_id": "snap_20260206_120000"}
+    """
+    try:
+        body = await request.json()
+        snapshot_id = body.get("snapshot_id")
+        
+        if not snapshot_id:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "snapshot_id is required"
+                }
+            )
+        
+        snapshot_manager = SnapshotManager()
+        
+        # 回滚到快照
+        restored_state = await snapshot_manager.rollback_to_snapshot(
+            user_id, 
+            snapshot_id
+        )
+        
+        if not restored_state:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "success": False,
+                    "error": f"Snapshot {snapshot_id} not found or rollback failed"
+                }
+            )
+        
+        # 保存回滚后的状态
+        state_manager = StateManager()
+        success = await state_manager.save_state(restored_state)
+        
+        if success:
+            logger.info(f"[API] 用户 {user_id} 已回滚到快照 {snapshot_id}")
+            
+            return JSONResponse({
+                "success": True,
+                "user_id": user_id,
+                "snapshot_id": snapshot_id,
+                "restored_version": restored_state.version,
+                "message": f"Successfully rolled back to snapshot {snapshot_id}"
+            })
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": "Failed to save rolled back state"
+                }
+            )
+        
+    except Exception as e:
+        logger.error(f"[API] 回滚失败: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
+        )
+
+
+@router.delete("/v1/state/{user_id}")
+async def delete_user_state(user_id: str):
+    """
+    删除用户状态(调试用)
+    
+    Args:
+        user_id: 用户 ID
+        
+    Returns:
+        删除结果
+    """
+    try:
+        state_manager = StateManager()
+        success = state_manager.delete(user_id, create_backup=True)
+        
+        if success:
+            return JSONResponse({
+                "success": True,
+                "message": f"User {user_id} state deleted (backup created)"
+            })
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": "Failed to delete state"
+                }
+            )
+    except Exception as e:
+        logger.error(f"[API] 删除状态失败: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
         )
 
 

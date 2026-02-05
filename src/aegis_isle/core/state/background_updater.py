@@ -12,6 +12,8 @@ from typing import Optional
 from ...core.logging import logger
 from .manager import StateManager
 from .extractor import StateExtractor
+from .snapshot import SnapshotManager
+
 
 
 async def update_user_state(
@@ -20,7 +22,7 @@ async def update_user_state(
     user_message: Optional[str] = None
 ) -> bool:
     """
-    后台异步更新用户状态
+    后台异步更新用户状态(集成快照)
     
     Args:
         user_id: 用户唯一标识
@@ -33,9 +35,10 @@ async def update_user_state(
     Workflow:
         1. 提取状态变更指令
         2. 加载当前用户状态
+        2.5. 创建快照(更新前)
         3. 应用编辑指令
         4. 保存更新后的状态
-        5. 记录详细日志
+        5. 清理旧快照
     """
     try:
         logger.info(f"[StateUpdate] 开始处理用户 {user_id} 的状态更新")
@@ -60,6 +63,16 @@ async def update_user_state(
         user_state = await state_manager.load_state(user_id)
         logger.debug(f"[StateUpdate] 已加载用户状态,版本: {user_state.version}")
         
+        # 🆕 Step 2.5: 创建快照(更新前)
+        snapshot_manager = SnapshotManager()
+        change_summary = f"{len(commands)} 个变更: " + ", ".join(
+            f"{cmd.edit_type.value} {cmd.sheet_name}" for cmd in commands
+        )
+        
+        snapshot = await snapshot_manager.create_snapshot(user_state, change_summary)
+        if snapshot:
+            logger.info(f"[Snapshot] 已创建快照 {snapshot.snapshot_id}")
+        
         # Step 3: 应用编辑指令
         updated_state = await state_manager.apply_edits(user_state, commands)
         
@@ -78,6 +91,11 @@ async def update_user_state(
                 elif cmd.edit_type.value == "delete":
                     logger.info(f"  - 删除自 {cmd.sheet_name}: {cmd.condition.get('value', 'N/A')}")
             
+            # 🆕 Step 5: 清理旧快照
+            deleted = await snapshot_manager.cleanup_old_snapshots(user_id, keep_count=10)
+            if deleted > 0:
+                logger.info(f"[Snapshot] 清理了 {deleted} 个旧快照")
+            
             return True
         else:
             logger.error(f"[StateUpdate] ❌ 用户 {user_id} 状态保存失败")
@@ -88,6 +106,7 @@ async def update_user_state(
         import traceback
         traceback.print_exc()
         return False
+
 
 
 async def update_user_state_with_retry(

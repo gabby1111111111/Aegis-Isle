@@ -10,6 +10,16 @@ from pydantic import BaseModel, Field
 from enum import Enum
 
 
+# 表格图标映射
+SHEET_ICONS = {
+    "全局数据表": "🌍",
+    "主角信息": "👤",
+    "背包物品表": "🎒",
+    "任务与事件表": "📋",
+}
+
+
+
 class EditType(str, Enum):
     """Types of table edit operations."""
     INSERT = "insert"
@@ -90,30 +100,74 @@ class Sheet(BaseModel):
         self.content.append(row)
 
     def to_markdown(self) -> str:
-        """Convert sheet to markdown table format for LLM context injection."""
-        if not self.content or len(self.content) == 0:
-            return f"## {self.name}\n(Empty)\n"
+        """
+        生成美化的 Markdown 表格
         
-        lines = [f"## {self.name}\n"]
+        改进:
+        - 添加 Emoji 图标
+        - 表格对齐
+        - 数字 ID 替代 null
+        - 空表显示提示
+        """
+        # 获取图标
+        icon = SHEET_ICONS.get(self.name, "📄")
+        lines = [f"## {icon} {self.name}\n"]
+        
+        # 检查是否为空表
+        if not self.content or len(self.content) == 0:
+            lines.append("*暂无数据*\n")
+            return "\n".join(lines)
+        
         header = self.get_header()
         rows = self.get_rows()
         
         if not header:
-            return f"## {self.name}\n(No header defined)\n"
+            lines.append("*表结构未定义*\n")
+            return "\n".join(lines)
         
-        # Header
-        lines.append("| " + " | ".join(header) + " |")
-        lines.append("| " + " | ".join(["---"] * len(header)) + " |")
+        # 如果没有数据行
+        if not rows:
+            # 显示表头
+            header_display = ["ID" if h is None or str(h).lower() == "none" else h for h in header]
+            lines.append("| " + " | ".join(header_display) + " |")
+            lines.append("| " + " | ".join([":---:" for _ in header]) + " |")
+            lines.append("| " + " | ".join(["..." for _ in header]) + " |")
+            lines.append("\n*暂无数据*\n")
+            return "\n".join(lines)
         
-        # Rows
-        for row in rows:
-            row_str = [str(cell) if cell is not None else "" for cell in row]
-            # Pad row to match header length
-            while len(row_str) < len(header):
-                row_str.append("")
-            lines.append("| " + " | ".join(row_str[:len(header)]) + " |")
+        # 构建表头(将 None 替换为 ID)
+        header_display = ["ID" if h is None or str(h).lower() == "none" else h for h in header]
+        lines.append("| " + " | ".join(header_display) + " |")
+        
+        # 构建对齐符号
+        # ID 列居中,其他列左对齐
+        alignments = []
+        for i, h in enumerate(header_display):
+            if h == "ID" or "数量" in h:
+                alignments.append(":---:")  # 居中
+            else:
+                alignments.append(":---")   # 左对齐
+        
+        lines.append("| " + " | ".join(alignments) + " |")
+        
+        # 构建数据行
+        for idx, row in enumerate(rows, start=1):
+            row_display = []
+            for i, cell in enumerate(row):
+                # 第一列(null)替换为数字 ID
+                if i == 0 and (cell is None or str(cell).lower() == "none"):
+                    row_display.append(str(idx))
+                else:
+                    row_display.append(str(cell) if cell is not None else "")
+            
+            # 补齐列数
+            while len(row_display) < len(header_display):
+                row_display.append("")
+            
+            lines.append("| " + " | ".join(row_display[:len(header_display)]) + " |")
         
         return "\n".join(lines) + "\n"
+
 
 
 class UserState(BaseModel):
