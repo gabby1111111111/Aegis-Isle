@@ -35,8 +35,8 @@ async def lifespan(app: FastAPI):
         app.state.rag_pipeline = pipeline
         logger.info("RAG pipeline initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize RAG pipeline: {e}")
-        raise
+        logger.warning(f"Failed to initialize RAG pipeline: {e}")
+        app.state.rag_pipeline = None
 
     # Initialize agent orchestrator
     try:
@@ -54,8 +54,9 @@ async def lifespan(app: FastAPI):
         app.state.agent_orchestrator = orchestrator
         logger.info("Agent orchestrator initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize agent orchestrator: {e}")
-        raise
+        logger.warning(f"Failed to initialize agent orchestrator: {e}")
+        app.state.agent_router = None
+        app.state.agent_orchestrator = None
 
     logger.info("AegisIsle API server started successfully")
 
