@@ -119,5 +119,15 @@ service-account.json
 data/state/
 data/snapshots/
 
+# Auto-generated ingestion cache
+data/ingestion_cache_*.json
+
+# Test data / media
+data/emperor_*.json
+data/emperor_*.jpg
+data/emperor_*.png
+data/interview_db.json
+
 # Temp files
 run_log.txt
+*.tmp
