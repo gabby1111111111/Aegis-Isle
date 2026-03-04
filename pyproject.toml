@@ -25,6 +25,7 @@ dependencies = [
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
+    "pillow>=10.1.0",
     "openai>=1.3.0",
     "anthropic>=0.7.0",
     "langchain>=0.0.335",
@@ -50,7 +51,6 @@ dev = [
     "aiohttp>=3.9.0",
 ]
 multimodal = [
-    "pillow>=10.1.0",
     "pytesseract>=0.3.10",
     "easyocr>=1.7.0",
     "opencv-python>=4.8.1.78",
