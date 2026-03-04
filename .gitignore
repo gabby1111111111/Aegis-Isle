@@ -114,3 +114,10 @@ tmp/
 secrets.yaml
 credentials.json
 service-account.json
+
+# Shujuku state & snapshots (user data, not for version control)
+data/state/
+data/snapshots/
+
+# Temp files
+run_log.txt

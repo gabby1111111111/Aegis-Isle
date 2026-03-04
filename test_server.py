@@ -1,13 +1,22 @@
 """
-简化测试服务器 - 仅用于状态管理测试
-跳过 RAG pipeline 初始化
+Aegis-Isle 测试服务器 (v2.0 - 含可观测性)
+
+功能:
+- OpenAI 兼容的 /v1/chat/completions 端点
+- Shujuku 状态管理 (背包/任务/全局)
+- 🆕 Token 使用统计 (tiktoken 实时计数)
+- 🆕 P50/P95/P99 延迟监控
+- 🆕 LLM 调用审计日志 (ELK 兼容)
+- 🆕 /api/v1/metrics/* Dashboard API
 """
 
 from fastapi import FastAPI, Request, BackgroundTasks
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 import json
+import time
+import uuid
 
 # 导入状态管理模块
 import sys
@@ -18,14 +27,18 @@ from aegis_isle.core.state.manager import StateManager
 from aegis_isle.core.state.context_injection import inject_state_context, get_user_id_from_request
 from aegis_isle.core.state.background_updater import update_user_state
 from aegis_isle.core.state.snapshot import SnapshotManager
-from aegis_isle.core.logging import logger
+from aegis_isle.core.logging import logger, audit_logger
+from aegis_isle.core.metrics import (
+    token_metrics, TokenRecord,
+    estimate_tokens, estimate_messages_tokens,
+)
 
 
 # 创建应用
 app = FastAPI(
     title="Aegis-Isle State Management Test Server",
-    description="简化测试服务器 - 仅用于状态管理功能测试",
-    version="0.1.0-test"
+    description="测试服务器 v2.0 - 含状态管理 + 可观测性",
+    version="0.2.0"
 )
 
 # CORS
@@ -41,29 +54,33 @@ app.add_middleware(
 async def startup_event():
     logger.info("🚀 Server Startup: Listing Routes")
     for route in app.routes:
-        logger.info(f"📍 Route: {route.path} {route.methods}")
+        methods = getattr(route, 'methods', None)
+        if methods:
+            logger.info(f"📍 Route: {route.path} {methods}")
 
 
 
 # ============================================
-# 模拟 LLM 调用
+# LLM 调用 (流式 + tiktoken 计数)
 # ============================================
 
 async def call_llm_streaming(messages: list, model: str = "Qwen/Qwen2.5-7B-Instruct"):
     """
-    调用真实的 LLM API(流式)
+    调用真实的 LLM API(流式)，同时用 tiktoken 累计 token 数。
+    
+    Yields:
+        str: 每个文本 chunk
+    
+    Note:
+        调用者通过 generator.prompt_tokens / generator.completion_tokens
+        获取本次调用的 token 统计（在遍历完成后可用）
     """
     from openai import AsyncOpenAI
-    from aegis_isle.core.config import settings
-    
-    # 强制使用 SiliconFlow 配置
-    # API Key: sk-enrrsvuvlvaztjmzilcxnofmowvttxsxydbosovlknmgqhar
-    # Base URL: https://api.siliconflow.cn/v1
     
     logger.info(f"[LLM] 调用真实 API: model={model}, messages={len(messages)}")
     logger.debug(f"[LLM] Payload Messages: {json.dumps(messages, ensure_ascii=False)}")
     
-    # 强制覆盖模型名称，因为 SillyTavern 可能会传 gpt-4
+    # 强制覆盖模型名称
     target_model = "Qwen/Qwen2.5-7B-Instruct"
     
     # 清理 messages (移除 name 字段，防止 400 错误)
@@ -72,10 +89,20 @@ async def call_llm_streaming(messages: list, model: str = "Qwen/Qwen2.5-7B-Instr
         new_msg = {"role": msg["role"], "content": msg["content"]}
         sanitized_messages.append(new_msg)
     
-    client = AsyncOpenAI(
-        api_key="sk-enrrsvuvlvaztjmzilcxnofmowvttxsxydbosovlknmgqhar",
-        base_url="https://api.siliconflow.cn/v1"
-    )
+    # 🆕 用 tiktoken 估算 prompt tokens
+    prompt_tokens = estimate_messages_tokens(sanitized_messages, target_model)
+    
+    import os
+    api_key = os.environ.get("OPENAI_API_KEY")
+    base_url = os.environ.get("OPENAI_BASE_URL", "https://api.siliconflow.cn/v1")
+
+    if not api_key:
+        logger.error("[LLM] OPENAI_API_KEY 未设置，请在 .env 中配置")
+        yield "[错误: 未配置 API Key]"
+        return
+
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    completion_text = ""
     
     try:
         # 调用流式 API
@@ -87,14 +114,21 @@ async def call_llm_streaming(messages: list, model: str = "Qwen/Qwen2.5-7B-Instr
             temperature=0.7
         )
         
-        # 流式返回
+        # 流式返回，同时累积完整文本用于 token 计数
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+                text = chunk.choices[0].delta.content
+                completion_text += text
+                yield text
                 
     except Exception as e:
         logger.error(f"[LLM] API 调用失败: {e}")
         yield f"\n\n[错误: API 调用失败 - {str(e)}]"
+    
+    # 🆕 流式结束后，用 tiktoken 估算 completion tokens
+    # 通过 generator 属性暴露给调用者
+    call_llm_streaming._last_prompt_tokens = prompt_tokens
+    call_llm_streaming._last_completion_tokens = estimate_tokens(completion_text, target_model)
 
 
 # ============================================
@@ -103,9 +137,12 @@ async def call_llm_streaming(messages: list, model: str = "Qwen/Qwen2.5-7B-Instr
 
 @app.post("/v1/chat/completions")
 async def chat_completions(request: Request, background_tasks: BackgroundTasks):
-    """OpenAI 兼容的聊天接口"""
-    logger.info("🎯 Endpoint hit: /v1/chat/completions")
-    print("🎯 Endpoint hit: /v1/chat/completions")
+    """OpenAI 兼容的聊天接口 (含 Token 统计 + 审计日志)"""
+    request_id = str(uuid.uuid4())[:8]
+    start_time = time.time()
+    
+    logger.info(f"🎯 [{request_id}] Endpoint hit: /v1/chat/completions")
+    
     try:
         body = await request.json()
 
@@ -113,9 +150,10 @@ async def chat_completions(request: Request, background_tasks: BackgroundTasks):
         stream = body.get("stream", False)
         model = body.get("model", "gpt-4")
         
-        # 获取用户 ID
+        # 获取用户 ID 和角色卡信息
         user_id = get_user_id_from_request(body)
-        logger.info(f"[API] 用户 {user_id} 发起对话请求")
+        character_card_id = body.get("character", {}).get("name", None) if isinstance(body.get("character"), dict) else None
+        logger.info(f"[API] [{request_id}] 用户 {user_id} 发起对话请求")
         
         # 注入状态上下文
         state_manager = StateManager()
@@ -123,6 +161,9 @@ async def chat_completions(request: Request, background_tasks: BackgroundTasks):
         state_context = state_manager.get_context_string(user_state)
         
         messages_with_state = inject_state_context(messages, state_context)
+        
+        # 实际使用的模型
+        target_model = "Qwen/Qwen2.5-7B-Instruct"
         
         if stream:
             # 流式响应
@@ -134,9 +175,9 @@ async def chat_completions(request: Request, background_tasks: BackgroundTasks):
                     
                     # SSE 格式
                     data = {
-                        "id": "chatcmpl-test",
+                        "id": f"chatcmpl-{request_id}",
                         "object": "chat.completion.chunk",
-                        "created": 1234567890,
+                        "created": int(time.time()),
                         "model": model,
                         "choices": [{
                             "index": 0,
@@ -146,6 +187,21 @@ async def chat_completions(request: Request, background_tasks: BackgroundTasks):
                     }
                     
                     yield f"data: {json.dumps(data)}\n\n"
+                
+                # 🆕 流式结束：记录 Token 统计和审计日志
+                latency_ms = (time.time() - start_time) * 1000
+                prompt_tokens = getattr(call_llm_streaming, '_last_prompt_tokens', 0)
+                completion_tokens = getattr(call_llm_streaming, '_last_completion_tokens', 0)
+                
+                _record_observability(
+                    request_id=request_id,
+                    user_id=user_id,
+                    model=target_model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    latency_ms=latency_ms,
+                    character_card_id=character_card_id,
+                )
                 
                 # 后台更新状态
                 background_tasks.add_task(
@@ -166,6 +222,21 @@ async def chat_completions(request: Request, background_tasks: BackgroundTasks):
             async for chunk in call_llm_streaming(messages_with_state, model):
                 full_response += chunk
             
+            latency_ms = (time.time() - start_time) * 1000
+            prompt_tokens = getattr(call_llm_streaming, '_last_prompt_tokens', 0)
+            completion_tokens = getattr(call_llm_streaming, '_last_completion_tokens', 0)
+            
+            # 🆕 记录 Token 统计和审计日志
+            _record_observability(
+                request_id=request_id,
+                user_id=user_id,
+                model=target_model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                latency_ms=latency_ms,
+                character_card_id=character_card_id,
+            )
+            
             # 后台更新状态
             background_tasks.add_task(
                 update_user_state,
@@ -175,9 +246,9 @@ async def chat_completions(request: Request, background_tasks: BackgroundTasks):
             )
             
             return JSONResponse({
-                "id": "chatcmpl-test",
+                "id": f"chatcmpl-{request_id}",
                 "object": "chat.completion",
-                "created": 1234567890,
+                "created": int(time.time()),
                 "model": model,
                 "choices": [{
                     "index": 0,
@@ -188,21 +259,113 @@ async def chat_completions(request: Request, background_tasks: BackgroundTasks):
                     "finish_reason": "stop"
                 }],
                 "usage": {
-                    "prompt_tokens": 100,
-                    "completion_tokens": 50,
-                    "total_tokens": 150
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": prompt_tokens + completion_tokens,
                 }
             })
             
     except Exception as e:
-        logger.error(f"[API] 请求处理失败: {e}")
+        latency_ms = (time.time() - start_time) * 1000
+        logger.error(f"[API] [{request_id}] 请求处理失败: {e}")
         import traceback
         traceback.print_exc()
+        
+        # 🆕 记录失败的审计日志
+        audit_logger.log_llm_call(
+            model="unknown",
+            prompt_tokens=0,
+            completion_tokens=0,
+            latency_ms=latency_ms,
+            user_id="unknown",
+            request_id=request_id,
+            outcome="error",
+            error_message=str(e),
+        )
         
         return JSONResponse(
             status_code=500,
             content={"error": {"message": str(e), "type": "internal_error"}}
         )
+
+
+def _record_observability(
+    request_id: str,
+    user_id: str,
+    model: str,
+    prompt_tokens: int,
+    completion_tokens: int,
+    latency_ms: float,
+    character_card_id: str = None,
+) -> None:
+    """
+    统一记录 Token 统计 + 审计日志。
+    
+    在每次 LLM 调用完成后调用，同时更新:
+    1. TokenMetrics 统计面板
+    2. AuditLogger 审计日志 (ELK 兼容)
+    """
+    # 1. Token 统计
+    record = TokenRecord(
+        request_id=request_id,
+        model=model,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=prompt_tokens + completion_tokens,
+        latency_ms=latency_ms,
+        user_id=user_id,
+    )
+    token_metrics.record(record)
+    
+    # 2. 审计日志
+    audit_logger.log_llm_call(
+        model=model,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        latency_ms=latency_ms,
+        user_id=user_id,
+        request_id=request_id,
+        character_card_id=character_card_id,
+        cost_usd=record.cost_usd,
+    )
+
+
+# ============================================
+# 🆕 Metrics Dashboard API
+# ============================================
+
+@app.get("/api/v1/metrics/dashboard")
+async def metrics_dashboard():
+    """
+    实时 Token 统计面板。
+    
+    返回 Token 消耗、费用、延迟分位数和模型分布。
+    """
+    return JSONResponse(token_metrics.get_dashboard())
+
+
+@app.get("/api/v1/metrics/token-usage")
+async def metrics_token_usage(limit: int = 20):
+    """最近的 Token 使用记录列表。"""
+    return JSONResponse(token_metrics.get_recent_records(limit=limit))
+
+
+@app.get("/api/v1/metrics/export")
+async def metrics_export():
+    """导出所有 Token 统计为 CSV 文件。"""
+    csv_content = token_metrics.export_csv()
+    return PlainTextResponse(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=token_usage.csv"}
+    )
+
+
+@app.post("/api/v1/metrics/reset")
+async def metrics_reset():
+    """重置所有统计数据。"""
+    token_metrics.reset()
+    return JSONResponse({"message": "Metrics reset successfully"})
 
 
 # ============================================
@@ -318,12 +481,16 @@ async def root():
     """根端点"""
     return {
         "message": "Aegis-Isle State Management Test Server",
-        "version": "0.1.0-test",
+        "version": "0.2.0",
+        "features": ["stateful-agent", "token-metrics", "audit-logging", "latency-monitoring"],
         "endpoints": {
             "chat": "/v1/chat/completions",
             "state": "/v1/state/{user_id}",
             "snapshots": "/v1/state/{user_id}/snapshots",
-            "rollback": "/v1/state/{user_id}/rollback"
+            "rollback": "/v1/state/{user_id}/rollback",
+            "metrics_dashboard": "/api/v1/metrics/dashboard",
+            "metrics_token_usage": "/api/v1/metrics/token-usage",
+            "metrics_export": "/api/v1/metrics/export",
         }
     }
 
@@ -331,13 +498,20 @@ async def root():
 @app.get("/health")
 async def health():
     """健康检查"""
-    return {"status": "ok", "service": "state-management-test"}
+    dashboard = token_metrics.get_dashboard()
+    return {
+        "status": "ok",
+        "service": "aegis-isle-v0.2.0",
+        "total_llm_calls": dashboard["requests"]["total"],
+        "total_tokens_used": dashboard["token_usage"]["total_tokens"],
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 启动 Aegis-Isle 状态管理测试服务器...")
+    print("🚀 启动 Aegis-Isle 服务器 v0.2.0 (含可观测性)...")
     print("📍 地址: http://localhost:8001")
     print("📖 API 文档: http://localhost:8001/docs")
+    print("📊 Metrics: http://localhost:8001/api/v1/metrics/dashboard")
     print("")
     uvicorn.run(app, host="0.0.0.0", port=8001)

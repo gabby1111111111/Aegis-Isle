@@ -1,10 +1,11 @@
 """
-OpenAI 兼容接口(集成状态管理)
+OpenAI 兼容接口 (集成状态管理 + 真实 SiliconFlow LLM)
 
 修改点:
 1. 引入 BackgroundTasks
 2. 集成 context_injection
 3. 集成 background_updater
+4. 🆕 接入真实 SiliconFlow API (替换 Mock)
 """
 
 from fastapi import APIRouter, Request, BackgroundTasks
@@ -12,8 +13,11 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from typing import AsyncGenerator
 import json
 import asyncio
+import time
+import uuid
 
 from ...core.logging import logger
+from ...core.config import settings
 from ...core.state.manager import StateManager
 from ...core.state.context_injection import inject_state_context, get_user_id_from_request
 from ...core.state.background_updater import update_user_state
@@ -22,9 +26,12 @@ from ...core.state.snapshot import SnapshotManager
 
 router = APIRouter()
 
+# 企业版强制使用的模型 (可通过 .env 的 DEFAULT_LLM_MODEL 覆盖)
+TARGET_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+
 
 # ============================================
-# 模拟 LLM 调用(示例实现)
+# 真实 LLM 调用 (SiliconFlow API)
 # ============================================
 
 async def call_llm_streaming(
@@ -32,34 +39,56 @@ async def call_llm_streaming(
     model: str = "gpt-4"
 ) -> AsyncGenerator[str, None]:
     """
-    调用 LLM API(流式)
-    
-    Note: 这是示例实现,实际应替换为真实 API 调用
-    """
-    # TODO: 替换为真实的 LLM API
-    logger.info(f"调用 LLM: model={model}, messages={len(messages)}")
-    
-    # 模拟响应
-    mock_response = """<thought>
-用户说"我捡到了一把剑",需要添加到背包。
-</thought>
-<content>
-<tableEdit type="insert" sheet="背包物品表" row='[null, "长剑", "1", "攻击力+5", "武器"]' />
-</content>
+    调用真实的 SiliconFlow LLM API (流式)
 
-太好了！你捡到了一把长剑。"""
-    
-    # 模拟流式返回
-    for char in mock_response:
-        await asyncio.sleep(0.01)
-        yield char
+    从 settings 读取 API Key 和 Base URL:
+      - OPENAI_API_KEY  → SiliconFlow API Key
+      - OPENAI_BASE_URL → https://api.siliconflow.cn/v1
+
+    强制覆盖模型为 TARGET_MODEL，兼容 SillyTavern 传来的任意模型名。
+    """
+    from openai import AsyncOpenAI
+
+    logger.info(f"[LLM] 调用 SiliconFlow API: model={model}, messages={len(messages)}")
+
+    # 清理 messages，移除 SillyTavern 可能附带的 name 字段（会导致 400）
+    sanitized_messages = [
+        {"role": msg["role"], "content": msg.get("content", "")}
+        for msg in messages
+    ]
+
+    # 从 settings 读取（来自 .env 的 OPENAI_API_KEY / OPENAI_BASE_URL）
+    api_key = settings.openai_api_key
+    base_url = settings.openai_base_url or "https://api.siliconflow.cn/v1"
+
+    if not api_key:
+        logger.error("[LLM] OPENAI_API_KEY 未配置，请在 .env 文件中设置")
+        yield "[错误: 未配置 API Key，请在 .env 中设置 OPENAI_API_KEY]"
+        return
+
+    try:
+        stream = await client.chat.completions.create(
+            model=TARGET_MODEL,
+            messages=sanitized_messages,
+            stream=True,
+            max_tokens=2000,
+            temperature=settings.temperature,
+        )
+
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+    except Exception as e:
+        logger.error(f"[LLM] SiliconFlow API 调用失败: {e}")
+        yield f"\n\n[错误: LLM API 调用失败 - {str(e)}]"
 
 
 # ============================================
 # API 端点
 # ============================================
 
-@router.post("/v1/chat/completions")
+@router.post("/chat/completions")
 async def chat_completions(
     request: Request,
     background_tasks: BackgroundTasks
@@ -209,7 +238,7 @@ async def chat_completions(
         )
 
 
-@router.get("/v1/state/{user_id}")
+@router.get("/state/{user_id}")
 async def get_user_state_debug(user_id: str):
     """
     调试接口:查看用户状态
@@ -244,7 +273,7 @@ async def get_user_state_debug(user_id: str):
         )
 
 
-@router.get("/v1/state/{user_id}/snapshots")
+@router.get("/state/{user_id}/snapshots")
 async def list_user_snapshots(user_id: str, limit: int = 10):
     """
     列出用户的所有快照
@@ -289,7 +318,7 @@ async def list_user_snapshots(user_id: str, limit: int = 10):
         )
 
 
-@router.post("/v1/state/{user_id}/rollback")
+@router.post("/state/{user_id}/rollback")
 async def rollback_user_state(
     user_id: str,
     request: Request
@@ -380,7 +409,7 @@ async def rollback_user_state(
         )
 
 
-@router.delete("/v1/state/{user_id}")
+@router.delete("/state/{user_id}")
 async def delete_user_state(user_id: str):
     """
     删除用户状态(调试用)

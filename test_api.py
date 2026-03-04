@@ -1,14 +1,19 @@
 """测试 SiliconFlow API 配置"""
 
 import asyncio
+import os
 from openai import AsyncOpenAI
 
 async def test_api():
     """测试 API 连接"""
-    client = AsyncOpenAI(
-        api_key="sk-enrrsvuvlvaztjmzilcxnofmowvttxsxydbosovlknmgqhar",
-        base_url="https://api.siliconflow.cn/v1"
-    )
+    api_key = os.environ.get("OPENAI_API_KEY")
+    base_url = os.environ.get("OPENAI_BASE_URL", "https://api.siliconflow.cn/v1")
+
+    if not api_key:
+        print("❌ 请先在 .env 中设置 OPENAI_API_KEY")
+        return False
+
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
     
     try:
         print("🔍 测试 SiliconFlow API 连接...")
