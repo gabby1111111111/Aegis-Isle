@@ -28,7 +28,7 @@ class TestE2EStability:
         """测试连续 10 轮对话的状态一致性"""
         
         user_id = "e2e_10_rounds"
-        manager = StateManager(state_dir="data/test_e2e")
+        manager = StateManager()
         
         # 对话场景(模拟真实使用)
         conversations = [
@@ -167,8 +167,8 @@ class TestE2EStability:
         """测试对话过程中的快照系统"""
         
         user_id = "e2e_snapshot"
-        manager = StateManager(state_dir="data/test_e2e")
-        snapshot_manager = SnapshotManager(base_dir="data/test_e2e_snapshots")
+        manager = StateManager()
+        snapshot_manager = SnapshotManager()
         
         print("\n" + "="*70)
         print("🧪 测试快照系统在对话中的表现")
