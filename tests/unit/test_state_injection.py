@@ -2,7 +2,7 @@
 Unit tests for Session State Management (Context Injection).
 """
 import pytest
-from src.aegis_isle.core.state.context_injection import (
+from aegis_isle.core.state.context_injection import (
     inject_state_context,
     get_user_id_from_request,
 )
