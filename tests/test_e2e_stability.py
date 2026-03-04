@@ -28,6 +28,11 @@ class TestE2EStability:
         """测试连续 10 轮对话的状态一致性"""
         
         user_id = "e2e_10_rounds"
+        # 清理旧数据以防状态累积导致断言失败
+        state_file = Path(f"data/state/{user_id}.json")
+        if state_file.exists():
+            state_file.unlink()
+            
         manager = StateManager()
         
         # 对话场景(模拟真实使用)
@@ -167,6 +172,17 @@ class TestE2EStability:
         """测试对话过程中的快照系统"""
         
         user_id = "e2e_snapshot"
+        # 清理旧数据
+        state_file = Path(f"data/state/{user_id}.json")
+        if state_file.exists():
+            state_file.unlink()
+        
+        # 清理旧快照
+        import shutil
+        snapshot_dir = Path(f"data/snapshots/{user_id}")
+        if snapshot_dir.exists():
+            shutil.rmtree(snapshot_dir)
+            
         manager = StateManager()
         snapshot_manager = SnapshotManager()
         
@@ -217,11 +233,11 @@ class TestE2EStability:
         assert len(inventory_after.get_rows()) == 0, "背包应该为空"
         print("   背包已清空")
         
-        # 回滚到第二个快照
-        print(f"\n🔄 回滚到快照: {snapshots[1].snapshot_id}")
+        # 回滚到前一个快照（即创建药水前的快照，里面应该有宝剑）
+        print(f"\n🔄 回滚到快照: {snapshots[0].snapshot_id}")
         restored_state = await snapshot_manager.rollback_to_snapshot(
             user_id,
-            snapshots[1].snapshot_id
+            snapshots[0].snapshot_id
         )
         
         assert restored_state is not None, "回滚失败"

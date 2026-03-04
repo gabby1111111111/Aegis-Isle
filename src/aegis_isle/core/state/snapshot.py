@@ -145,8 +145,8 @@ class SnapshotManager:
         try:
             user_id = user_state.user_id
             
-            # 生成快照 ID
-            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # 生成快照 ID (精确到微秒，防止高频覆盖)
+            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             snapshot_id = f"snap_{timestamp_str}"
             
             # 快照文件路径

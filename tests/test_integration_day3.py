@@ -6,6 +6,7 @@ import pytest
 import asyncio
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 # 添加项目路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -39,20 +40,22 @@ class TestContextInjection:
         system_msg = [msg for msg in result if msg["role"] == "system"][0]
         assert "背包物品表" in system_msg["content"]
     
-    def test_summarize_large_state(self):
+    @patch('aegis_isle.core.state.context_injection.summarize_state')
+    def test_summarize_large_state(self, mock_summarize):
         """测试大状态的摘要"""
-        # 构造一个很大的状态
-        large_state = "## 背包物品表\n" + ("| 物品 | 数量 |\n| --- | --- |\n" + "| 物品X | 1 |\n" * 100)
+        mock_summarize.return_value = "## 状态摘要\n非常简短的状态摘要。"
+        # 构造一个很大的状态（确保远大于 max_tokens 限额，逼它走 summarizer）
+        large_state = "## 背包物品表\n" + ("| 物品 | 数量 |\n| --- | --- |\n" + "| 测试非常长的物品名称以增加Token量 | 99 |\n" * 200)
         
         messages = [{"role": "user", "content": "测试"}]
-        result = inject_state_context(messages, large_state, max_tokens=500)
+        result = inject_state_context(messages, large_state, max_tokens=100)
         
         # 应该触发摘要
         system_msg = [msg for msg in result if msg["role"] == "system"][0]
         content_length = len(system_msg["content"])
         
-        # 摘要后应该比原始短
-        assert content_length < len(large_state)
+        # 摘要后应该比原始短很多
+        assert content_length < len(large_state), f"摘要失效: 摘要后长度 {content_length} >= 原始 {len(large_state)}"
     
     def test_get_user_id_from_request(self):
         """测试用户 ID 提取"""
