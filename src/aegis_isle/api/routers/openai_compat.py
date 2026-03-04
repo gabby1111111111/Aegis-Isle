@@ -1,219 +1,452 @@
 """
-OpenAI-compatible API endpoints for Chat Completions.
-Supports both streaming (SSE) and non-streaming responses.
+OpenAI 兼容接口 (集成状态管理 + 真实 SiliconFlow LLM)
+
+修改点:
+1. 引入 BackgroundTasks
+2. 集成 context_injection
+3. 集成 background_updater
+4. 🆕 接入真实 SiliconFlow API (替换 Mock)
 """
 
+from fastapi import APIRouter, Request, BackgroundTasks
+from fastapi.responses import StreamingResponse, JSONResponse
+from typing import AsyncGenerator
 import json
+import asyncio
 import time
 import uuid
-from typing import List, Optional, Literal, Dict, Any, Union, AsyncGenerator
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import StreamingResponse, JSONResponse
-from pydantic import BaseModel, Field
-
-from ..dependencies import get_rag_pipeline
-from ...rag.pipeline import RAGPipeline
 from ...core.logging import logger
+from ...core.config import settings
+from ...core.state.manager import StateManager
+from ...core.state.context_injection import inject_state_context, get_user_id_from_request
+from ...core.state.background_updater import update_user_state
+from ...core.state.snapshot import SnapshotManager
+
 
 router = APIRouter()
 
-# === Data Models ===
+# 企业版强制使用的模型 (可通过 .env 的 DEFAULT_LLM_MODEL 覆盖)
+TARGET_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 
-class ChatMessage(BaseModel):
-    role: Literal["user", "assistant", "system"]
-    content: str
-    name: Optional[str] = None
 
-class ChatCompletionRequest(BaseModel):
-    model: str = "rag-default"
-    messages: List[ChatMessage]
-    stream: bool = False
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = None
-    top_p: Optional[float] = 1.0
-    presence_penalty: Optional[float] = 0.0
-    frequency_penalty: Optional[float] = 0.0
-    user: Optional[str] = None
+# ============================================
+# 真实 LLM 调用 (SiliconFlow API)
+# ============================================
 
-# === Helper Functions ===
-
-def _create_chunk(
-    content: Optional[str], 
-    model: str, 
-    finish_reason: Optional[str] = None,
-    completion_id: str = None
-) -> str:
-    """Create a standard OpenAI SSE data chunk."""
-    chunk_data = {
-        "id": completion_id,
-        "object": "chat.completion.chunk",
-        "created": int(time.time()),
-        "model": model,
-        "choices": [
-            {
-                "index": 0,
-                "delta": {"content": content} if content else {},
-                "finish_reason": finish_reason
-            }
-        ]
-    }
-    return f"data: {json.dumps(chunk_data)}\n\n"
-
-def _format_metadata_as_markdown(metadata_json: Dict[str, Any]) -> str:
-    """Convert metadata JSON to a Markdown string prefix."""
-    try:
-        sources = metadata_json.get("sources", [])
-        if not sources:
-            return ""
-        
-        md_lines = ["\n> **参考文档:**"]
-        for src in sources:
-            doc_name = src.get('source', 'unknown')
-            score = src.get('score', 0)
-            md_lines.append(f"> - `{doc_name}` (相关度: {score})")
-        
-        md_lines.append("\n---\n")
-        return "\n".join(md_lines)
-    except Exception:
-        return ""
-
-async def _stream_generator(
-    pipeline: RAGPipeline, 
-    query: str, 
-    model_name: str,
-    completion_id: str,
-    **kwargs
+async def call_llm_streaming(
+    messages: list,
+    model: str = "gpt-4"
 ) -> AsyncGenerator[str, None]:
-    """Generator for streaming responses."""
-    
-    # 1. Send role header (optional, mostly for structure)
-    # Some clients expect the first chunk to contain role
-    first_chunk = {
-        "id": completion_id,
-        "object": "chat.completion.chunk",
-        "created": int(time.time()),
-        "model": model_name,
-        "choices": [{"index": 0, "delta": {"role": "assistant"}, "finish_reason": None}]
-    }
-    yield f"data: {json.dumps(first_chunk)}\n\n"
+    """
+    调用真实的 SiliconFlow LLM API (流式)
+
+    从 settings 读取 API Key 和 Base URL:
+      - OPENAI_API_KEY  → SiliconFlow API Key
+      - OPENAI_BASE_URL → https://api.siliconflow.cn/v1
+
+    强制覆盖模型为 TARGET_MODEL，兼容 SillyTavern 传来的任意模型名。
+    """
+    from openai import AsyncOpenAI
+
+    logger.info(f"[LLM] 调用 SiliconFlow API: model={model}, messages={len(messages)}")
+
+    # 清理 messages，移除 SillyTavern 可能附带的 name 字段（会导致 400）
+    sanitized_messages = [
+        {"role": msg["role"], "content": msg.get("content", "")}
+        for msg in messages
+    ]
+
+    # 从 settings 读取（来自 .env 的 OPENAI_API_KEY / OPENAI_BASE_URL）
+    api_key = settings.openai_api_key
+    base_url = settings.openai_base_url or "https://api.siliconflow.cn/v1"
+
+    if not api_key:
+        logger.error("[LLM] OPENAI_API_KEY 未配置，请在 .env 文件中设置")
+        yield "[错误: 未配置 API Key，请在 .env 中设置 OPENAI_API_KEY]"
+        return
 
     try:
-        async for chunk in pipeline.query_stream(query, **kwargs):
-            content_to_send = chunk
+        stream = await client.chat.completions.create(
+            model=TARGET_MODEL,
+            messages=sanitized_messages,
+            stream=True,
+            max_tokens=2000,
+            temperature=settings.temperature,
+        )
 
-            # Check for Metadata Packet
-            # Note: pipeline yields a JSON string for metadata
-            if chunk.strip().startswith('{') and '"type": "metadata"' in chunk:
-                try:
-                    meta_data = json.loads(chunk)
-                    # Convert metadata to markdown prefix
-                    content_to_send = _format_metadata_as_markdown(meta_data)
-                except:
-                    # If parsing fails, treat as raw text or ignore
-                    pass
-            
-            if content_to_send:
-                yield _create_chunk(content_to_send, model_name, completion_id=completion_id)
-
-        # End of stream
-        yield _create_chunk(None, model_name, finish_reason="stop", completion_id=completion_id)
-        yield "data: [DONE]\n\n"
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
 
     except Exception as e:
-        logger.error(f"Error in stream generator: {e}")
-        error_msg = f"\n\n[System Error: {str(e)}]"
-        yield _create_chunk(error_msg, model_name, finish_reason="stop", completion_id=completion_id)
-        yield "data: [DONE]\n\n"
+        logger.error(f"[LLM] SiliconFlow API 调用失败: {e}")
+        yield f"\n\n[错误: LLM API 调用失败 - {str(e)}]"
 
-# === Route Handlers ===
+
+# ============================================
+# API 端点
+# ============================================
 
 @router.post("/chat/completions")
 async def chat_completions(
-    request: ChatCompletionRequest,
-    pipeline: RAGPipeline = Depends(get_rag_pipeline)
+    request: Request,
+    background_tasks: BackgroundTasks
 ):
     """
-    OpenAI-compatible Chat Completion Endpoint.
+    OpenAI 兼容的聊天完成接口(集成状态管理)
+    
+    工作流程:
+    1. 提取用户 ID
+    2. 加载用户状态
+    3. 注入状态到 Prompt
+    4. 调用 LLM
+    5. 流式返回响应
+    6. **后台异步更新状态**
     """
-    if not request.messages:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Messages list cannot be empty"
+    try:
+        # 解析请求
+        body = await request.json()
+        messages = body.get("messages", [])
+        model = body.get("model", "gpt-4")
+        stream = body.get("stream", True)
+        
+        # 提取用户 ID
+        user_id = get_user_id_from_request(body)
+        logger.info(f"[API] 处理用户 {user_id} 的请求")
+        
+        # 加载用户状态
+        state_manager = StateManager()
+        user_state = await state_manager.load_state(user_id)
+        logger.info(f"[API] 已加载用户 {user_id} 的状态")
+        
+        # 获取状态的 Markdown 表示
+        state_context = state_manager.get_context_string(user_state)
+        
+        # 注入状态到消息列表
+        enhanced_messages = inject_state_context(
+            messages=messages,
+            state_markdown=state_context,
+            max_tokens=2000
         )
-
-    # 1. Extract Query (Last user message)
-    # Simple strategy: Use the last message content as query
-    # Advanced strategy could concat history, but RAG usually focuses on the latest query
-    last_message = request.messages[-1]
-    query = last_message.content
-    
-    logger.info(f"OpenAI Compat Request: {query[:50]}... (Stream={request.stream})")
-    
-    completion_id = f"chatcmpl-{uuid.uuid4()}"
-    
-    # Common kwargs for pipeline
-    run_kwargs = {
-        "temperature": request.temperature,
-        "max_tokens": request.max_tokens,
-        "top_p": request.top_p
-    }
-
-    # 2. Streaming Response
-    if request.stream:
-        return StreamingResponse(
-            _stream_generator(
-                pipeline, 
-                query, 
-                request.model, 
-                completion_id, 
-                **run_kwargs
-            ),
-            media_type="text/event-stream"
-        )
-
-    # 3. Non-Streaming Response
-    else:
-        try:
-            # Call standard query method
-            result = await pipeline.query(query, **run_kwargs)
-            
-            # Format Metadata
-            metadata_prefix = ""
-            if result.retrieval_result and result.retrieval_result.results:
-                # Manually construct metadata packet to reuse formatter
-                # Only if using standard query result structure
-                # This part depends on your pipeline.query return structure
-                # For now, we append sources to the end or start if desired
-                # But typically non-streaming just returns clean answer
-                pass 
+        
+        logger.info(f"[API] 状态上下文长度: {len(state_context)} 字符")
+        logger.debug(f"[API] 增强后消息数: {len(enhanced_messages)}")
+        
+        # 获取用户最新消息(用于日志)
+        user_message = messages[-1].get("content", "") if messages else ""
+        
+        # 流式响应
+        if stream:
+            async def generate_sse_stream():
+                """生成 SSE 格式的流式响应"""
+                full_response = ""
                 
-            # Construct standard response
-            return {
-                "id": completion_id,
+                try:
+                    # 调用 LLM
+                    async for chunk in call_llm_streaming(enhanced_messages, model):
+                        full_response += chunk
+                        
+                        # 构造 SSE 数据
+                        data = {
+                            "id": f"chatcmpl-{user_id}",
+                            "object": "chat.completion.chunk",
+                            "model": model,
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {"content": chunk},
+                                    "finish_reason": None
+                                }
+                            ]
+                        }
+                        
+                        yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    
+                    # 发送结束标记
+                    yield "data: [DONE]\n\n"
+                    
+                    logger.info(f"[API] 流式响应完成,总长度: {len(full_response)} 字符")
+                    
+                    # 🔥 触发后台状态更新
+                    background_tasks.add_task(
+                        update_user_state,
+                        user_id=user_id,
+                        llm_output=full_response,
+                        user_message=user_message
+                    )
+                    
+                except Exception as e:
+                    logger.error(f"[API] 流式响应异常: {e}")
+                    error_data = {"error": str(e)}
+                    yield f"data: {json.dumps(error_data)}\n\n"
+            
+            return StreamingResponse(
+                generate_sse_stream(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "X-Accel-Buffering": "no"
+                }
+            )
+        
+        # 非流式响应
+        else:
+            full_response = ""
+            async for chunk in call_llm_streaming(enhanced_messages, model):
+                full_response += chunk
+            
+            logger.info(f"[API] 非流式响应完成,长度: {len(full_response)} 字符")
+            
+            # 🔥 触发后台状态更新
+            background_tasks.add_task(
+                update_user_state,
+                user_id=user_id,
+                llm_output=full_response,
+                user_message=user_message
+            )
+            
+            return JSONResponse({
+                "id": f"chatcmpl-{user_id}",
                 "object": "chat.completion",
-                "created": int(time.time()),
-                "model": request.model,
+                "model": model,
                 "choices": [
                     {
                         "index": 0,
                         "message": {
                             "role": "assistant",
-                            "content": result.answer
+                            "content": full_response
                         },
                         "finish_reason": "stop"
                     }
                 ],
                 "usage": {
-                    "prompt_tokens": 0, # Placeholder
-                    "completion_tokens": 0,
-                    "total_tokens": 0
+                    "prompt_tokens": len(json.dumps(enhanced_messages)),
+                    "completion_tokens": len(full_response),
+                    "total_tokens": len(json.dumps(enhanced_messages)) + len(full_response)
                 }
-            }
+            })
             
-        except Exception as e:
-            logger.error(f"Error in non-streaming request: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=str(e)
+    except Exception as e:
+        logger.error(f"[API] 请求处理失败: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return JSONResponse(
+            status_code=500,
+            content={"error": {"message": str(e), "type": "internal_error"}}
+        )
+
+
+@router.get("/state/{user_id}")
+async def get_user_state_debug(user_id: str):
+    """
+    调试接口:查看用户状态
+    
+    Args:
+        user_id: 用户 ID
+        
+    Returns:
+        用户状态的 JSON 表示
+    """
+    try:
+        state_manager = StateManager()
+        user_state = await state_manager.load_state(user_id)
+        
+        return JSONResponse({
+            "user_id": user_state.user_id,
+            "version": user_state.version,
+            "sheets_summary": {
+                uid: {
+                    "name": sheet.name,
+                    "row_count": len(sheet.get_rows()),
+                    "order": sheet.order_no
+                }
+                for uid, sheet in user_state.sheets.items()
+            }
+        })
+    except Exception as e:
+        logger.error(f"[API] 获取状态失败: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
+
+
+@router.get("/state/{user_id}/snapshots")
+async def list_user_snapshots(user_id: str, limit: int = 10):
+    """
+    列出用户的所有快照
+    
+    Args:
+        user_id: 用户 ID
+        limit: 返回数量限制
+        
+    Returns:
+        快照列表(JSON 格式)
+        
+    Example:
+        GET /v1/state/test_user/snapshots?limit=5
+    """
+    try:
+        snapshot_manager = SnapshotManager()
+        snapshots = await snapshot_manager.list_snapshots(user_id, limit=limit)
+        
+        return JSONResponse({
+            "success": True,
+            "user_id": user_id,
+            "snapshot_count": len(snapshots),
+            "snapshots": [
+                {
+                    "snapshot_id": snap.snapshot_id,
+                    "timestamp": snap.timestamp.isoformat(),
+                    "version": snap.version,
+                    "change_summary": snap.change_summary,
+                    "file_path": snap.file_path
+                }
+                for snap in snapshots
+            ]
+        })
+    except Exception as e:
+        logger.error(f"[API] 获取快照列表失败: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
+        )
+
+
+@router.post("/state/{user_id}/rollback")
+async def rollback_user_state(
+    user_id: str,
+    request: Request
+):
+    """
+    回滚用户状态到指定快照
+    
+    Args:
+        user_id: 用户 ID
+        request: 包含 snapshot_id 的 JSON 请求
+        
+    Request Body:
+        {
+            "snapshot_id": "snap_20260206_120000"
+        }
+        
+    Returns:
+        回滚结果
+        
+    Example:
+        POST /v1/state/test_user/rollback
+        Body: {"snapshot_id": "snap_20260206_120000"}
+    """
+    try:
+        body = await request.json()
+        snapshot_id = body.get("snapshot_id")
+        
+        if not snapshot_id:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "success": False,
+                    "error": "snapshot_id is required"
+                }
             )
+        
+        snapshot_manager = SnapshotManager()
+        
+        # 回滚到快照
+        restored_state = await snapshot_manager.rollback_to_snapshot(
+            user_id, 
+            snapshot_id
+        )
+        
+        if not restored_state:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "success": False,
+                    "error": f"Snapshot {snapshot_id} not found or rollback failed"
+                }
+            )
+        
+        # 保存回滚后的状态
+        state_manager = StateManager()
+        success = await state_manager.save_state(restored_state)
+        
+        if success:
+            logger.info(f"[API] 用户 {user_id} 已回滚到快照 {snapshot_id}")
+            
+            return JSONResponse({
+                "success": True,
+                "user_id": user_id,
+                "snapshot_id": snapshot_id,
+                "restored_version": restored_state.version,
+                "message": f"Successfully rolled back to snapshot {snapshot_id}"
+            })
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": "Failed to save rolled back state"
+                }
+            )
+        
+    except Exception as e:
+        logger.error(f"[API] 回滚失败: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
+        )
+
+
+@router.delete("/state/{user_id}")
+async def delete_user_state(user_id: str):
+    """
+    删除用户状态(调试用)
+    
+    Args:
+        user_id: 用户 ID
+        
+    Returns:
+        删除结果
+    """
+    try:
+        state_manager = StateManager()
+        success = state_manager.delete(user_id, create_backup=True)
+        
+        if success:
+            return JSONResponse({
+                "success": True,
+                "message": f"User {user_id} state deleted (backup created)"
+            })
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "error": "Failed to delete state"
+                }
+            )
+    except Exception as e:
+        logger.error(f"[API] 删除状态失败: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": str(e)
+            }
+        )
+
+
+# 导出
+__all__ = ["router"]

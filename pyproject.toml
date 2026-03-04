@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aegis-isle"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-Agent Collaborative RAG System for Enterprise Applications"
 authors = [
     {name = "AegisIsle Team", email = "team@aegisisle.com"}
@@ -59,9 +59,9 @@ cloud = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aegisisle/aegis-isle"
-Repository = "https://github.com/aegisisle/aegis-isle"
-Issues = "https://github.com/aegisisle/aegis-isle/issues"
+Homepage = "https://github.com/gabby1111111111/Aegis-Isle"
+Repository = "https://github.com/gabby1111111111/Aegis-Isle"
+Issues = "https://github.com/gabby1111111111/Aegis-Isle/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

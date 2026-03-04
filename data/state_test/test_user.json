@@ -1,0 +1,124 @@
+{
+  "sheets": {
+    "sheet_global": {
+      "uid": "sheet_global",
+      "name": "全局数据表",
+      "sourceData": {
+        "note": "记录当前主角所在地点及时间相关参数。",
+        "initNode": "插入一条关于当前世界状态的记录。",
+        "deleteNode": "禁止删除。",
+        "updateNode": "当主角从当前所在区域离开时,更新所在地点。每轮必须更新时间。",
+        "insertNode": ""
+      },
+      "content": [
+        [
+          null,
+          "主角当前所在地点",
+          "当前时间",
+          "上轮场景时间",
+          "经过的时间"
+        ]
+      ],
+      "orderNo": 0
+    },
+    "sheet_hero": {
+      "uid": "sheet_hero",
+      "name": "主角信息",
+      "sourceData": {
+        "note": "记录主角的核心身份信息。",
+        "initNode": "游戏初始化时,插入主角的唯一条目。",
+        "deleteNode": "禁止删除。",
+        "updateNode": "'过往经历'列会根据剧情发展持续增量更新。",
+        "insertNode": ""
+      },
+      "content": [
+        [
+          null,
+          "人物名称",
+          "性别/年龄",
+          "外貌特征",
+          "职业/身份",
+          "过往经历",
+          "性格特点"
+        ]
+      ],
+      "orderNo": 1
+    },
+    "sheet_inventory": {
+      "uid": "sheet_inventory",
+      "name": "背包物品表",
+      "sourceData": {
+        "note": "记录主角拥有的所有物品、装备。",
+        "initNode": "游戏初始化时,根据剧情与设定添加主角的初始携带物品。",
+        "deleteNode": "物品被完全消耗、丢弃或摧毁时删除。",
+        "updateNode": "获得已有的物品,使其数量增加时更新。",
+        "insertNode": "主角获得背包中没有的全新物品时添加。"
+      },
+      "content": [
+        [
+          null,
+          "物品名称",
+          "数量",
+          "描述/效果",
+          "类别"
+        ],
+        [
+          null,
+          "生锈的铁剑",
+          "1",
+          "攻击力+3",
+          "武器"
+        ],
+        [
+          null,
+          "红色药水",
+          "5",
+          "恢复50HP",
+          "消耗品"
+        ],
+        [
+          null,
+          "生锈的铁剑",
+          "1",
+          "攻击力+3",
+          "武器"
+        ],
+        [
+          null,
+          "红色药水",
+          "5",
+          "恢复50HP",
+          "消耗品"
+        ]
+      ],
+      "orderNo": 4
+    },
+    "sheet_quest": {
+      "uid": "sheet_quest",
+      "name": "任务与事件表",
+      "sourceData": {
+        "note": "记录所有当前正在进行的任务。",
+        "initNode": "游戏初始化时,根据剧情与设定添加一条主线剧情。",
+        "deleteNode": "任务完成、失败或过期时删除。",
+        "updateNode": "任务取得关键进展时进行更新。",
+        "insertNode": "主角接取或触发新的主线或支线任务时添加。"
+      },
+      "content": [
+        [
+          null,
+          "任务名称",
+          "任务类型",
+          "发布者",
+          "详细描述",
+          "当前进度",
+          "任务时限",
+          "奖励",
+          "惩罚"
+        ]
+      ],
+      "orderNo": 5
+    }
+  },
+  "version": 1,
+  "user_id": "test_user"
+}

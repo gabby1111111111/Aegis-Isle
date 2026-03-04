@@ -319,6 +319,69 @@ class AuditLogger:
             **kwargs
         )
 
+    def log_llm_call(
+        self,
+        model: str,
+        prompt_tokens: int,
+        completion_tokens: int,
+        latency_ms: float,
+        user_id: Optional[str] = None,
+        request_id: Optional[str] = None,
+        character_card_id: Optional[str] = None,
+        cost_usd: float = 0.0,
+        outcome: Literal["success", "failure", "error"] = "success",
+        error_message: Optional[str] = None,
+        **kwargs
+    ) -> None:
+        """
+        记录 LLM API 调用的审计日志。
+        
+        专为 SillyTavern 集成设计，记录每次 LLM 推理的元数据，
+        包括 token 用量、延迟、费用和可选的角色卡 ID。
+        
+        Args:
+            model: LLM 模型名称 (如 Qwen/Qwen2.5-7B-Instruct)
+            prompt_tokens: 输入 token 数
+            completion_tokens: 输出 token 数
+            latency_ms: 响应延迟 (毫秒)
+            user_id: SillyTavern 用户 ID
+            request_id: 请求唯一标识
+            character_card_id: SillyTavern 角色卡 ID (可选)
+            cost_usd: 估算费用 (美元)
+            outcome: 调用结果
+            error_message: 错误信息 (如果有)
+        """
+        metadata = {
+            "model": model,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+            "latency_ms": round(latency_ms, 1),
+            "cost_usd": round(cost_usd, 6),
+        }
+        if character_card_id:
+            metadata["character_card_id"] = character_card_id
+
+        # 慢请求自动升级日志级别
+        level = "info"
+        if latency_ms > 5000:
+            level = "warning"
+            logger.warning(
+                f"[AuditLog] ⚠️ 慢请求告警: {model} 耗时 {latency_ms:.0f}ms (>5s)"
+            )
+
+        self.log_event(
+            event_type="model_inference",
+            action="llm_completion",
+            level=level,
+            user_id=user_id,
+            request_id=request_id,
+            outcome=outcome,
+            error_message=error_message,
+            metadata=metadata,
+            **kwargs
+        )
+
 
 def configure_logging():
     """Configure logging with Loguru."""

@@ -114,3 +114,20 @@ tmp/
 secrets.yaml
 credentials.json
 service-account.json
+
+# Shujuku state & snapshots (user data, not for version control)
+data/state/
+data/snapshots/
+
+# Auto-generated ingestion cache
+data/ingestion_cache_*.json
+
+# Test data / media
+data/emperor_*.json
+data/emperor_*.jpg
+data/emperor_*.png
+data/interview_db.json
+
+# Temp files
+run_log.txt
+*.tmp
