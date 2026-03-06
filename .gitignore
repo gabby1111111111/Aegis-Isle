@@ -131,3 +131,13 @@ data/interview_db.json
 # Temp files
 run_log.txt
 *.tmp
+tmp_*
+
+# Aegis-Isle & SillyTavern Privacy Data
+debug/
+data/processed/
+data/st_processed/
+data/vectorstore/
+data/test_e2e/
+data/state_test/
+*.jsonl

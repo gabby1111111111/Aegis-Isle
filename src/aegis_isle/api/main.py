@@ -20,6 +20,7 @@ from .routers import (
     auth_router,
     openai_compat
 )
+from .routers.memory import router as memory_router
 
 
 @asynccontextmanager
@@ -79,10 +80,11 @@ def create_app() -> FastAPI:
     )
 
     # Add CORS middleware
+    # 允许来自所有本地来源的请求（包括 SillyTavern 在 8000 端口的跨域请求）
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.allowed_hosts_list if settings.allowed_hosts != "*" else ["*"],
-        allow_credentials=True,
+        allow_origins=["*"],
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -132,6 +134,13 @@ def create_app() -> FastAPI:
         admin_router,
         prefix="/api/v1/admin",
         tags=["admin"]
+    )
+
+    # 🌟 长线记忆 API（供 SillyTavern 插件调用）
+    app.include_router(
+        memory_router,
+        prefix="/v1",
+        tags=["memory"]
     )
 
     @app.get("/")

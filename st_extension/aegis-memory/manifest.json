@@ -1,0 +1,14 @@
+{
+    "display_name": "🧠 Aegis-Isle 长线记忆",
+    "loading_order": 50,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "gabby27",
+    "version": "0.3.0",
+    "homePage": "https://github.com/gabby1111111111/Aegis-Isle",
+    "tags": ["memory", "rag"],
+    "description": "通过 Aegis-Isle 后端为角色提供长线 RAG 记忆，让 AI 记住你们历史聊天中的具体细节。",
+    "generate_interceptor": "aegisMemoryInterceptor"
+}

@@ -22,6 +22,31 @@ from ...core.state.manager import StateManager
 from ...core.state.context_injection import inject_state_context, get_user_id_from_request
 from ...core.state.background_updater import update_user_state
 from ...core.state.snapshot import SnapshotManager
+from ...rag.st_memory_manager import memory_manager
+import hashlib
+import os
+import re
+
+# Mock references to LangGraph for Task C trigger (to be implemented more fully if needed)
+# For now, we'll represent the triggering of a background agent chain.
+async def trigger_agent_chain(command: str, user_id: str, universe_id: str, character_name: str, messages: list):
+    logger.info(f"[AgentTrigger] Background task started for command {command} in universe {universe_id} for char {character_name}")
+    # TODO: Initialize GraphState, route to specific agents, and save results to memory.
+
+def get_universe_id(messages: list, character_name: str = "Unknown") -> str:
+    """Extract universe_id from ST System Prompt or generate a fallback."""
+    for msg in messages:
+        if msg.get("role") == "system":
+            content = msg.get("content", "")
+            m = re.search(r'\[Universe:\s*(.+?)\]', content)
+            if m:
+                return m.group(1).strip()
+            
+            # Fallback: Hash of character_name + first 100 chars of system prompt
+            hash_input = f"{character_name}_{content[:100]}".encode('utf-8')
+            fallback_id = f"fallback_{character_name}_{hashlib.md5(hash_input).hexdigest()[:8]}"
+            return fallback_id
+    return f"fallback_{character_name}_default"
 
 
 router = APIRouter()
@@ -130,11 +155,112 @@ async def chat_completions(
             max_tokens=2000
         )
         
+        # 获取用户最新消息(用于日志和检索记忆)
+        user_message = messages[-1].get("content", "") if messages else ""
+        
+        # 🌟 任务 C: ST 触发指令拦截
+        target_character = body.get("character", "Unknown") # Extract character name from ST request if possible
+        world_line = get_universe_id(messages, target_character)
+        
+        if user_message.strip().startswith("/"):
+            command = user_message.strip().split(" ")[0].lower()
+            if command in ["/recap", "/relation", "/portrait", "/plot"]:
+                # 立即返回占位符, 阻断主链路 LLM 调用
+                logger.info(f"[API] 拦截到 ST 指令 {command}，启动后台 Agent 链...")
+                background_tasks.add_task(
+                    trigger_agent_chain,
+                    command=command,
+                    user_id=user_id,
+                    universe_id=world_line,
+                    character_name=target_character,
+                    messages=enhanced_messages
+                )
+                
+                placeholder_text = "⏳ 正在分析，结果将在下一轮对话中呈现..."
+                if stream:
+                    async def command_placeholder_stream():
+                        data = {"id": f"chatcmpl-{user_id}", "object": "chat.completion.chunk", "model": model, "choices": [{"index": 0, "delta": {"content": placeholder_text}, "finish_reason": None}]}
+                        yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                        yield "data: [DONE]\n\n"
+                    return StreamingResponse(command_placeholder_stream(), media_type="text/event-stream")
+                else:
+                    return JSONResponse({"id": f"chatcmpl-{user_id}", "object": "chat.completion", "model": model, "choices": [{"index": 0, "message": {"role": "assistant", "content": placeholder_text}, "finish_reason": "stop"}]})
+
+        # 🌟 任务 A: 检索路由 & 并发获取记忆
+        # 并发任务定义
+        async def fetch_faiss_chunks(query, char, world):
+            # Fallback mock for faiss sub_chunks logic
+            return await memory_manager.search_memory(query, char, world, k=3)
+        
+        async def fetch_graph_memory(query, char, world):
+            # TODO: Add real graph edge/node searching here based on keywords
+            # Mock empty for now
+            return []
+            
+        async def fetch_episode_memory(query, char, world):
+            # TODO: Add real episodes searching here
+            return []
+            
+        async def _empty_list():
+            return []
+
+        if user_message:
+            try:
+                # 1. 意图检测 (纯关键词)
+                do_faiss = any(k in user_message for k in ["那段", "那时候", "当时", "氛围"])
+                do_graph = any(k in user_message for k in ["关系", "感觉", "对我", "喜不喜欢"])
+                do_episode = any(k in user_message for k in ["第一次", "什么时候", "发生过"])
+                
+                # Default to FAISS + Episode if no specific keyword matched
+                if not do_faiss and not do_graph and not do_episode:
+                    do_faiss = True
+                    do_episode = True
+                
+                tasks = []
+                # 2. 路由分发并发
+                if do_faiss: tasks.append(fetch_faiss_chunks(user_message, target_character, world_line))
+                else: tasks.append(_empty_list())
+                    
+                if do_graph: tasks.append(fetch_graph_memory(user_message, target_character, world_line))
+                else: tasks.append(_empty_list())
+                    
+                if do_episode: tasks.append(fetch_episode_memory(user_message, target_character, world_line))
+                else: tasks.append(_empty_list())
+
+                results = await asyncio.gather(*tasks)
+                faiss_docs, graph_docs, episode_docs = results
+                
+                # Combine results
+                all_docs = faiss_docs + graph_docs + episode_docs
+                
+                if all_docs:
+                    memory_context = memory_manager.format_context_for_prompt(all_docs)
+                    logger.info(f"[API] [{world_line}] 检索出 {len(all_docs)} 块长线记忆，准备注入。并发耗时极低。")
+                    
+                    # 3. 将长期记忆拼接在 System Message 的最后
+                    for msg in enhanced_messages:
+                        if msg["role"] == "system":
+                            msg["content"] += f"\n\n{memory_context}"
+                            break
+            except Exception as e:
+                logger.error(f"[API] 注入长线记忆时发生错误: {e}")
+        
+        # 🌟 调试输出保存
+        if os.environ.get("DEBUG_SAVE", "").lower() == "true":
+            from datetime import datetime
+            from pathlib import Path
+            debug_dir = Path("debug/prompts")
+            debug_dir.mkdir(parents=True, exist_ok=True)
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            debug_file = debug_dir / f"{world_line}_{ts}.txt"
+            with open(debug_file, "w", encoding="utf-8") as f:
+                f.write("=== ENHANCED MESSAGES ===\n")
+                f.write(json.dumps(enhanced_messages, ensure_ascii=False, indent=2))
+        
         logger.info(f"[API] 状态上下文长度: {len(state_context)} 字符")
         logger.debug(f"[API] 增强后消息数: {len(enhanced_messages)}")
         
-        # 获取用户最新消息(用于日志)
-        user_message = messages[-1].get("content", "") if messages else ""
+        # 此时已经获取了用户消息
         
         # 流式响应
         if stream:
