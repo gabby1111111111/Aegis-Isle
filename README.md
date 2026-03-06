@@ -44,7 +44,7 @@ graph TD
     classDef core fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#fff;
     classDef st fill:#e53e3e,stroke:#c53030,stroke-width:2px,color:#fff,stroke-dasharray: 5 5;
     classDef rag fill:#2b6cb0,stroke:#2c5282,stroke-width:2px,color:#fff;
-    classDef graph fill:#805ad5,stroke:#553c9a,stroke-width:2px,color:#fff;
+    classDef bgagent fill:#805ad5,stroke:#553c9a,stroke-width:2px,color:#fff;
 
     Client[Enterprise OA / CRM<br/>Generic SDK]
     ST[SillyTavern RP Extended UI<br/>Roleplay Node]:::st
@@ -52,7 +52,7 @@ graph TD
     subgraph Aegis_Isle_Core [Aegis-Isle Agentic Core]
         style Aegis_Isle_Core fill:#f7fafc,stroke:#cbd5e0,stroke-width:2px,color:#1a202c
         Router[Fast Regex Intent Router & Hijacker<br/>Zero-delay Proxy]:::core
-        Agent[Background LangGraph Autonomous Nodes<br/>Reflection & Learn]:::graph
+        Agent[Background LangGraph Autonomous Nodes<br/>Reflection & Learn]:::bgagent
         Extractor[3-Level Fault-tolerant State Extractor<br/>Pydantic / XML regex]:::rag
         TripleRAG[Triple-Core RAG Engine<br/> FAISS / Graph / Epis]:::rag
 
