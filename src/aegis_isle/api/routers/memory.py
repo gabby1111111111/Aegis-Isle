@@ -152,6 +152,45 @@ async def search_memory(req: MemorySearchRequest):
         logger.error(f"[Memory] 查询记忆失败: {e}", exc_info=True)
         return MemorySearchResponse(memories=[], context_string="", count=0)
 
+
+# ============================================
+# 接口：获取角色可用的所有宇宙/世界线列表
+# ============================================
+
+@router.get("/memory/universes")
+async def get_universes(character_name: str):
+    """
+    前端 ST 插件拉取当前角色的可用宇宙/世界线列表
+    返回结果是包含字符串的数组，比如 ["AIDom", "Cyberpunk"]。没有世界线则返回空数组 []。
+    """
+    try:
+        vs_dir = memory_manager.vectorstore_dir
+        if not os.path.exists(vs_dir):
+            return JSONResponse({"universes": []})
+            
+        import glob
+        # 匹配 character_name_* 格式的文件夹
+        pattern = os.path.join(vs_dir, f"{character_name}_*")
+        folders = glob.glob(pattern)
+        
+        universes = []
+        for folder in folders:
+            if os.path.isdir(folder):
+                basename = os.path.basename(folder)
+                # basename 是 ZouZheng_AIDom，切分出最后的 AIDom
+                # 假设角色名不包含下划线，或者我们严格用 split("_", 1) 不太对，因为角色名可能有下划线
+                # 最好使用 basename[len(character_name)+1:]
+                world_line = basename[len(character_name)+1:]
+                if world_line:
+                    universes.append(world_line)
+                    
+        return JSONResponse({"universes": sorted(universes)})
+        
+    except Exception as e:
+        logger.error(f"[Memory] 获取宇宙列表失败: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
 # ============================================
 # 接口：接收前端保存完整 Prompt 用于 Debug
 # ============================================

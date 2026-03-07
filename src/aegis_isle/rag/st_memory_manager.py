@@ -212,18 +212,57 @@ class STMemoryManager:
     async def search_memory(self, query: str, character_name: str, world_line: Optional[str] = None, k: int = 4) -> List[Document]:
         """
         Searches the FAISS index for a character and returns relevant chunks.
+        Supports multi-universe search if world_line is comma-separated.
         1. 提取 query 中的地点/时间关键词
-        2. 从 FAISS 获取 k*4 候选
-        3. 按 scene_meta 元数据优先过滤
-        4. 返回 top-k
+        2. 从多个 FAISS 库并发获取 候选
+        3. 聚合、按分数去重
+        4. 按 scene_meta 元数据优先过滤
+        5. 返回 top-k
         """
-        vectorstore = self.load_index(character_name, world_line)
-        if not vectorstore:
+        world_lines = []
+        if world_line:
+            world_lines = [w.strip() for w in world_line.split(",") if w.strip()]
+        if not world_lines:
+            world_lines = [None]  # 回退到单基准宇宙
+            
+        vectorstores = []
+        for wl in world_lines:
+            vs = self.load_index(character_name, wl)
+            if vs: vectorstores.append(vs)
+            
+        if not vectorstores:
             return []
-        
+            
         hints = self._extract_location_hints(query)
-        raw_results = vectorstore.similarity_search(query, k=k * 4)
         
+        # 多宇宙联合查询
+        all_results_with_scores = []
+        
+        def _search_vs(vs):
+            # FAISS returns (Document, score), lower score is better (L2 distance)
+            return vs.similarity_search_with_score(query, k=k * 4)
+            
+        # 并发跑 FAISS 查询 (FAISS search is blocking, run in thread)
+        loop = asyncio.get_event_loop()
+        tasks = [loop.run_in_executor(None, _search_vs, vs) for vs in vectorstores]
+        results_lists = await asyncio.gather(*tasks)
+        
+        for res_list in results_lists:
+            all_results_with_scores.extend(res_list)
+            
+        # 按分数排序 (L2 distance 越小越好)
+        all_results_with_scores.sort(key=lambda x: x[1])
+        
+        # 去重并提取 Document
+        seen_texts = set()
+        raw_results = []
+        for doc, score in all_results_with_scores:
+            if doc.page_content not in seen_texts:
+                seen_texts.add(doc.page_content)
+                raw_results.append(doc)
+                if len(raw_results) >= k * 4:  # 只保留聚合后的 top k*4 去做后过滤
+                    break
+                    
         if hints:
             filtered = self._post_filter_by_metadata(raw_results, hints)
             return filtered[:k]

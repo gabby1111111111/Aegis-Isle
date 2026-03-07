@@ -13,7 +13,7 @@ console.log('🧠 [AegisMemory] 脚本文件已加载，开始初始化...');
         enabled: true,
         aegis_base_url: 'http://127.0.0.1:8001',
         character_name: '',
-        world_line: '',
+        world_line: '', // 存储为逗号分隔的字符串，例如 "AIDom,Cyberpunk"
         k: 3,
         realtime_ingest: true,
         debug: false,
@@ -277,7 +277,7 @@ console.log('🧠 [AegisMemory] 脚本文件已加载，开始初始化...');
     // 设置面板 UI
     // ============================================================
 
-    function renderUI() {
+    async function renderUI() {
         console.log('[AegisMemory] 渲染设置面板...');
         const s = getSettings();
 
@@ -291,13 +291,21 @@ console.log('🧠 [AegisMemory] 脚本文件已加载，开始初始化...');
     <div class="inline-drawer-content">
       <label style="display:block;color:#aaa;font-size:.8em;margin-top:6px">Aegis 后端地址</label>
       <input id="aegis-url" type="text" value="${s.aegis_base_url}" placeholder="http://127.0.0.1:8001" style="width:100%;box-sizing:border-box;margin-bottom:5px;" />
+      
       <label style="display:block;color:#aaa;font-size:.8em">角色 ID（留空用角色卡名）</label>
-      <input id="aegis-char" type="text" value="${s.character_name}" placeholder="ZouZheng" style="width:100%;box-sizing:border-box;margin-bottom:5px;" />
-      <label style="display:block;color:#aaa;font-size:.8em">世界线分组（可选）</label>
-      <input id="aegis-world" type="text" value="${s.world_line}" placeholder="AIDom" style="width:100%;box-sizing:border-box;margin-bottom:8px;" />
+      <div style="display:flex;gap:5px;margin-bottom:5px;">
+          <input id="aegis-char" type="text" value="${s.character_name}" placeholder="ZouZheng" style="flex:1;box-sizing:border-box;" />
+      </div>
+
+      <label style="display:block;color:#aaa;font-size:.8em">记忆载体 (多宇宙联合查询)</label>
+      <div id="aegis-universe-container" class="aegis-universe-box">
+          <div style="color:#666;font-size:0.85em;padding:4px;">正在连接云端大脑加载宇宙节点...</div>
+      </div>
+      <div style="font-size: 0.75em; color: #888; margin-bottom: 8px;">* 若未勾选任何选项，默认仅查询角色原始基准宇宙。</div>
+      
       <label><input id="aegis-enabled" type="checkbox" ${s.enabled ? 'checked' : ''} /> 启用长线记忆注入</label><br/>
       <label><input id="aegis-realtime" type="checkbox" ${s.realtime_ingest ? 'checked' : ''} /> 实时存入新对话到记忆库</label><br/>
-      <label><input id="aegis-debug" type="checkbox" ${s.debug ? 'checked' : ''} /> Debug 日志</label>
+      <label><input id="aegis-debug" type="checkbox" ${s.debug ? 'checked' : ''} /> Debug 日志 (保存装配后 Prompt)</label>
       <div id="aegis-status" style="font-size:.8em;margin-top:8px;color:${s.enabled ? '#4caf50' : '#888'}">
         ${s.enabled ? '🟢 长线记忆已激活' : '⚫ 已停用'}
       </div>
@@ -316,18 +324,77 @@ console.log('🧠 [AegisMemory] 脚本文件已加载，开始初始化...');
         if (target) {
             target.insertAdjacentHTML('beforeend', html);
             console.log('[AegisMemory] 面板已挂载到:', target.id || target.className);
+            bindEvents();
+            fetchAndRenderUniverses();
         } else {
             console.warn('[AegisMemory] 未找到扩展设置容器！等待...');
-            // 再试一次
             setTimeout(() => {
                 const t2 = document.getElementById('extensions_settings') ||
                            document.getElementById('extensions_settings2');
-                if (t2) { t2.insertAdjacentHTML('beforeend', html); bindEvents(); }
+                if (t2) { 
+                    t2.insertAdjacentHTML('beforeend', html); 
+                    bindEvents(); 
+                    fetchAndRenderUniverses();
+                }
             }, 2000);
             return;
         }
+    }
 
-        bindEvents();
+    // 从 Aegis 后端拉取可用的世界线列表并渲染多选框
+    async function fetchAndRenderUniverses() {
+        const s = getSettings();
+        const container = document.getElementById('aegis-universe-container');
+        if (!container) return;
+        
+        const charName = getCurrentChar();
+        
+        try {
+            const res = await fetch(`${s.aegis_base_url}/v1/memory/universes?character_name=${encodeURIComponent(charName)}`);
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = await res.json();
+            
+            const universes = data.universes || [];
+            
+            if (universes.length === 0) {
+                container.innerHTML = '<div style="color:#888;font-size:0.85em;padding:4px;">未检测到附加世界线，将仅使用基准宇宙。</div>';
+                return;
+            }
+            
+            // 解析当前已保存的逗号分隔的世界线
+            const selectedWorldLines = s.world_line ? s.world_line.split(',').map(x => x.trim()).filter(x => x) : [];
+            let checkboxesHtml = '';
+            
+            for (const u of universes) {
+                const isChecked = selectedWorldLines.includes(u);
+                checkboxesHtml += `
+                    <label class="aegis-univ-item">
+                        <input type="checkbox" class="aegis-univ-cb" value="${u}" ${isChecked ? 'checked' : ''} />
+                        ${u}
+                    </label>
+                `;
+            }
+            
+            container.innerHTML = checkboxesHtml;
+            
+            // 绑定多选框点击事件
+            const cbs = container.querySelectorAll('.aegis-univ-cb');
+            cbs.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    const activeValues = Array.from(container.querySelectorAll('.aegis-univ-cb:checked')).map(el => el.value);
+                    const newWorldLineString = activeValues.join(',');
+                    // 更新设置并保存
+                    const sets = getSettings();
+                    sets.world_line = newWorldLineString;
+                    saveSettings();
+                    console.log('[AegisMemory] 世界线设定已更新为:', newWorldLineString);
+                });
+            });
+
+        } catch (e) {
+            container.innerHTML = `<div style="color:#e53e3e;font-size:0.85em;padding:4px;">无法连接大核拉取宇宙节点...</div>`;
+            console.error('[AegisMemory] 获取宇宙列表失败:', e);
+        }
     }
 
     function bindEvents() {
@@ -349,7 +416,17 @@ console.log('🧠 [AegisMemory] 脚本文件已加载，开始初始化...');
         };
         bind('aegis-url', 'aegis_base_url');
         bind('aegis-char', 'character_name');
-        bind('aegis-world', 'world_line');
+        
+        // 当角色名字改变时，重新拉取对应可以用的宇宙列表
+        const charInput = document.getElementById('aegis-char');
+        if (charInput) {
+            charInput.addEventListener('blur', () => {
+                fetchAndRenderUniverses();
+            });
+        }
+        
+        // bind('aegis-world', 'world_line');  (已废弃，改用 fetchAndRenderUniverses 中绑定的复选框逻辑)
+        
         bind('aegis-enabled', 'enabled', true);
         bind('aegis-realtime', 'realtime_ingest', true);
         bind('aegis-debug', 'debug', true);
