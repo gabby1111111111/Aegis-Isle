@@ -266,7 +266,19 @@ console.log('🧠 [AegisMemory] 脚本文件已加载，开始初始化...');
                 }
             });
 
-            console.log('[AegisMemory] 消息监听器已注册（CHAT_COMPLETION_PROMPT_READY + MESSAGE_RECEIVED）');
+            // ★ Hook 3：当切换聊天/角色时，自动更新宇宙列表
+            eventSource.on(event_types.CHAT_CHANGED, () => {
+                const s = getSettings();
+                const charInput = document.getElementById('aegis-char');
+                if (charInput && !s.character_name) {
+                    // 如果用户没强制写死角色名，就自动更新 placeholder
+                    charInput.placeholder = `当前: ${getCurrentChar()}`;
+                }
+                // 重新拉取该角色的可用世界线
+                fetchAndRenderUniverses();
+            });
+
+            console.log('[AegisMemory] 消息监听器已注册（CHAT_COMPLETION_PROMPT_READY + MESSAGE_RECEIVED + CHAT_CHANGED）');
         } catch (e) {
             console.error('[AegisMemory] 消息监听器注册失败:', e.message);
         }

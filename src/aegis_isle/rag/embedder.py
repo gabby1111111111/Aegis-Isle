@@ -53,7 +53,7 @@ class TextEmbedder(BaseEmbedder):
 
     def __init__(
         self,
-        model_name: str = "all-MiniLM-L6-v2",
+        model_name: str = "BAAI/bge-large-zh-v1.5",
         provider: str = "sentence_transformers",
         **kwargs
     ):

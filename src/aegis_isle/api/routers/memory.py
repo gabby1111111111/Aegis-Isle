@@ -175,12 +175,15 @@ async def get_universes(character_name: str):
         
         universes = []
         for folder in folders:
-            if os.path.isdir(folder):
+            if os.path.isdir(folder) or folder.endswith(".index"):
                 basename = os.path.basename(folder)
-                # basename 是 ZouZheng_AIDom，切分出最后的 AIDom
-                # 假设角色名不包含下划线，或者我们严格用 split("_", 1) 不太对，因为角色名可能有下划线
-                # 最好使用 basename[len(character_name)+1:]
+                # basename 是 ZouZheng_AIDom.index
                 world_line = basename[len(character_name)+1:]
+                
+                # 去除 .index 后缀
+                if world_line.endswith(".index"):
+                    world_line = world_line[:-6]
+                    
                 if world_line:
                     universes.append(world_line)
                     

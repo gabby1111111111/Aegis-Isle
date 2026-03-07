@@ -273,30 +273,32 @@ class STMemoryManager:
         """从 episodes.jsonl 中查找对应的 plot 摘要"""
         import glob, json, re
         
-        # parent_chunk_id 格式: xxx_chunk_004 → episode编号: 004
-        match = re.search(r'_chunk_(\d+)$', parent_chunk_id)
+        # parent_chunk_id 格式: xxx_chunk_004 → 提取数字 4
+        match = re.search(r'_chunk_0*(\d+)$', parent_chunk_id)
         if not match:
             return ""
-        chunk_num = match.group(1)  # e.g. "004"
+        chunk_num_int = int(match.group(1))
         
-        prefix = chat_file.replace("_sub_chunks.jsonl", "")
-        ep_files = glob.glob(os.path.join("debug", "chunks", f"{prefix}_episodes.jsonl"))
+        # 使用模糊匹配找到对应的 episodes.jsonl (因为真实文件名可能带有时间戳)
+        # 例如: 16岁被收养私生活乱___2026_01_20_10h49m  -> 匹配 *16岁被收养私生活乱___2026_01_20_10h49m*_episodes.jsonl
+        world_line = parent_chunk_id.split("_chunk_")[0]
+        ep_files = glob.glob(os.path.join("debug", "chunks", f"*{world_line}*_episodes.jsonl"))
+        
         if not ep_files:
             return ""
             
-        # episode_id 格式: ep_xxx_004
-        target_suffix = f"_{chunk_num}"
         for fpath in ep_files:
             try:
                 with open(fpath, "r", encoding="utf-8") as f:
                     for line in f:
-                        if target_suffix in line:
-                            data = json.loads(line)
-                            ep_id = data.get("episode_id", "")
-                            if ep_id.endswith(target_suffix):
-                                return data.get("plot", "")
-            except Exception:
-                pass
+                        data = json.loads(line)
+                        ep_id = data.get("episode_id", "")
+                        # ep_id 格式可能是 ep_xxx_004，提取末尾数字
+                        ep_match = re.search(r'_0*(\d+)$', ep_id)
+                        if ep_match and int(ep_match.group(1)) == chunk_num_int:
+                            return data.get("plot", "")
+            except Exception as e:
+                logger.error(f"Error reading episode file {fpath}: {e}")
         return ""
 
     def _fetch_parent_chunk_text(self, parent_chunk_id: str, chat_file: str, sub_chunk_text: str = "") -> str:
@@ -395,7 +397,11 @@ class STMemoryManager:
             # 如果没找到， fallback 回原本的小 chunk
             content = full_context if full_context else doc.page_content
             
-            formatted_chunks.append(f"【记忆片段 {len(formatted_chunks) + 1}】（来源：{chat_file}）\n{content}")
+            # 提取所属的宇宙/世界线
+            universe = doc.metadata.get("world_line")
+            universe_label = universe if universe else "基准宇宙"
+            
+            formatted_chunks.append(f"【记忆片段 {len(formatted_chunks) + 1}】[所属宇宙: {universe_label}]（来源：{chat_file}）\n{content}")
             
         context_string = "\n\n".join(formatted_chunks)
         return (

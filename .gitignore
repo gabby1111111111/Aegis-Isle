@@ -141,3 +141,6 @@ data/vectorstore/
 data/test_e2e/
 data/state_test/
 *.jsonl
+
+# Coworkers AI
+cowokers_ai/
