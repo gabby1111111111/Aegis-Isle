@@ -60,6 +60,8 @@ class Question(BaseModel):
     id: str = Field(..., description="Unique question identifier")
     content: str = Field(..., min_length=10, description="Question text")
     answer_key: Optional[str] = Field(None, description="Reference answer or key points")
+    gabriella_context: Optional[str] = Field(None, description="Gabriella's Cyber Tea Party explanation")
+    pro_context: Optional[str] = Field(None, description="Professional interviewer perspective")
     difficulty: int = Field(..., ge=1, le=5, description="Difficulty level (1-5)")
     review_box: int = Field(default=0, ge=0, le=5, description="Spaced repetition box (0-5)")
     next_review: str = Field(

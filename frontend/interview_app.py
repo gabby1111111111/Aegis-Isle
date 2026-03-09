@@ -34,7 +34,33 @@ from aegis_isle.interview import (
     Generator
 )
 from aegis_isle.interview.story_manager import StoryManager
+import httpx
+import logging
 
+logger = logging.getLogger("love_and_code.tracker")
+
+async def send_to_companion_link(action: str, title: str, tags: list, comment_text: str = None):
+    """
+    伪装浏览器扩展，向 ST-Companion-Link 发送信号
+    """
+    url = "http://localhost:5001/api/signal"
+    payload = {
+        "action": action,
+        "note_url": "love_and_code://interview", # 虚构伪协议
+        "comment_text": comment_text,
+        "note_data": {
+            "title": f"[Love & Code面试练习] {title}",
+            "tags": tags + ["面试练习", "Love&Code"],
+            "platform": "love_and_code",
+            "author": {"nickname": "系统题库"}
+        }
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.post(url, json=payload, timeout=2.0)
+            logger.info(f"✅ 已发送 {action} 信号至 Companion-Link: {title}")
+    except Exception as e:
+        logger.warning(f"⚠️ 发送 Companion-Link 信号失败 (服务未开启?): {e}")
 
 # ============================================================================
 # Language Configurationren
@@ -278,7 +304,7 @@ def load_custom_css():
                 0 20px 50px rgba(0,0,0,0.5); /* 阴影 */
             
             padding: 2rem 5rem; /* 减少上下内边距 */
-            z-index: 1000;
+            z-index: 10;
             height: 35vh; /* 固定高度，缩小面板 */
             overflow-y: auto;
             border-radius: 2px;
@@ -289,7 +315,7 @@ def load_custom_css():
             position: fixed;
             bottom: 38vh; /* 调整位置：5vh (bottom) + 35vh (height) - 2vh (overlap) */
             left: 12vw;
-            z-index: 1002;
+            z-index: 12;
             
             background: #000000;
             color: #ffffff;
@@ -375,7 +401,7 @@ def load_custom_css():
             line-height: 1 !important;
             padding: 0 !important;
             margin: 0 !important;
-            z-index: 1005 !important;
+            z-index: 15 !important;
             box-shadow: none !important;
             animation: bounce 1s infinite;
         }}
@@ -434,6 +460,20 @@ def load_custom_css():
             background: #ffffff;
             border-right: 3px solid #000000;
         }}
+        
+        /* === 修复 st.toast 被遮挡的问题 (Top Level z-index) === */
+        div[data-testid="stToastContainer"] {{
+            z-index: 999999 !important;
+        }}
+        
+        div[data-testid="stToast"] {{
+            z-index: 999999 !important;
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid #000;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.5);
+            font-family: 'Noto Sans SC', sans-serif;
+            color: #000;
+        }}
         </style>
         """
     
@@ -489,6 +529,11 @@ def initialize_session_state():
         # Default to Gojo if no card uploaded
         st.session_state.current_persona = st.session_state.persona_manager.get_default_persona()
 
+    if "emperor_persona" not in st.session_state:
+        st.session_state.emperor_persona = st.session_state.current_persona
+        st.session_state.tutor_personas = []
+        st.session_state.current_tutor = st.session_state.current_persona
+
     if "current_question" not in st.session_state:
         st.session_state.current_question = None
 
@@ -536,15 +581,43 @@ async def generate_new_question():
 
     st.session_state.current_question = question
     
+    import random
+    if st.session_state.tutor_personas:
+        st.session_state.current_tutor = random.choice(st.session_state.tutor_personas)
+    else:
+        st.session_state.current_tutor = st.session_state.current_persona
+
     with st.spinner(t("loading")):
-        poly_q = await st.session_state.generator.generate_question_interaction(
-            st.session_state.current_persona,
-            question,
-            st.session_state.jd_context,
-            language=st.session_state.language
-        )
+        if hasattr(st.session_state.generator, 'generate_dual_question_interaction'):
+            poly_q = await st.session_state.generator.generate_dual_question_interaction(
+                st.session_state.emperor_persona,
+                st.session_state.current_tutor,
+                question,
+                st.session_state.jd_context,
+                language=st.session_state.language
+            )
+        else:
+            poly_q = await st.session_state.generator.generate_question_interaction(
+                st.session_state.emperor_persona,
+                question,
+                st.session_state.jd_context,
+                language=st.session_state.language
+            )
         st.session_state.polyphonic_question = poly_q
         st.session_state.feedback_data = None  # Reset feedback
+        
+        # --- 发送 read 信号到 ST-Companion-Link 15分钟缓冲区 ---
+        question_title = question.question_text[:30] + "..." if question else "未知题目"
+        extracted_tags = [question.category] if question and hasattr(question, 'category') else []
+        try:
+            asyncio.create_task(send_to_companion_link(
+                action="read",
+                title=question_title,
+                tags=extracted_tags
+            ))
+        except Exception:
+            pass
+        # ----------------------------------------------------
 
 
 async def submit_answer(user_answer: str):
@@ -553,13 +626,23 @@ async def submit_answer(user_answer: str):
         return
 
     with st.spinner(t("loading")):
-        feedback = await st.session_state.generator.generate_feedback(
-            st.session_state.current_persona,
-            st.session_state.current_question,
-            user_answer,
-            {},
-            language=st.session_state.language
-        )
+        if hasattr(st.session_state.generator, 'generate_dual_feedback'):
+            feedback = await st.session_state.generator.generate_dual_feedback(
+                st.session_state.emperor_persona,
+                st.session_state.current_tutor,
+                st.session_state.current_question,
+                user_answer,
+                {},
+                language=st.session_state.language
+            )
+        else:
+            feedback = await st.session_state.generator.generate_feedback(
+                st.session_state.emperor_persona,
+                st.session_state.current_question,
+                user_answer,
+                {},
+                language=st.session_state.language
+            )
         st.session_state.feedback_data = feedback
         
         # Update progress
@@ -593,6 +676,19 @@ async def submit_answer(user_answer: str):
         
         if story_trigger:
             st.session_state.pending_story_node = story_trigger
+
+        # --- 发送 comment 信号到 ST-Companion-Link 以触发角色潜意识发言 ---
+        reaction_text = f"刚才做对了一道面试题，得分+15！好耶！" if is_correct else (f"这道面试题答得磕磕绊绊，只拿到一部分分数..." if is_partial else f"这题又答错了，好郁闷，被扣了10分...")
+        try:
+            asyncio.create_task(send_to_companion_link(
+                action="comment",
+                title="本次答题结果结算",
+                tags=["答题反馈"],
+                comment_text=reaction_text
+            ))
+        except Exception:
+            pass
+        # -------------------------------------------------------------------
 
 
 async def ingest_kb(file):
@@ -633,7 +729,17 @@ def load_emperor_test():
             avatar_path=None
         )
         
-        st.session_state.current_persona = emperor
+        st.session_state.emperor_persona = emperor
+        st.session_state.current_persona = emperor # Fallback
+        
+        # Load the 3 tutors from PersonaManager
+        pm = st.session_state.persona_manager
+        # Ensure default personas are there
+        tutors = []
+        if "gojo" in pm.personas: tutors.append(pm.personas["gojo"])
+        if "sukuna" in pm.personas: tutors.append(pm.personas["sukuna"])
+        if "nanami" in pm.personas: tutors.append(pm.personas["nanami"])
+        st.session_state.tutor_personas = tutors
         
         # Load question database
         db_path = Path("data/emperor_test_db.json")
@@ -1009,24 +1115,29 @@ def render_interview():
     """, unsafe_allow_html=True)
 
     # === 角色台词 (Dialogue) ===
-    # Clean dialogue: Remove name prefix
-    raw_dialogue = poly_q.get('lore_flavor', '')
-    dialogue_content = raw_dialogue.replace(f"{character_name}：", "").replace(f"{character_name}:", "")
-    dialogue_content = dialogue_content.replace("人类帝皇：", "").replace("人类帝皇:", "")
-    
     dialogue_container = st.container()
     
     # Check if this specific question's dialogue has been shown
-    # We use a composite key of question ID + 'shown'
     q_key = f"q_{st.session_state.current_question.id}_shown"
     
+    if 'emperor_flavor' in poly_q and 'tutor_flavor' in poly_q:
+        emp_text = poly_q['emperor_flavor'].replace("人类帝皇：", "").replace("人类帝皇:", "")
+        tut_text = poly_q['tutor_flavor'].replace(f"{st.session_state.current_tutor.name}：", "").replace(f"{st.session_state.current_tutor.name}:", "")
+    else:
+        raw_dialogue = poly_q.get('lore_flavor', '')
+        dialogue_content = raw_dialogue.replace(f"{character_name}：", "").replace(f"{character_name}:", "")
+        emp_text = dialogue_content.replace("人类帝皇：", "").replace("人类帝皇:", "")
+        tut_text = ""
+    
     if q_key not in st.session_state:
-        stream_text(dialogue_content, dialogue_container)
+        stream_text(emp_text, dialogue_container)
+        if tut_text:
+            st.toast(f"**【{st.session_state.current_tutor.name}】的小纸条：**\n\n{tut_text}", icon="💬")
         st.session_state[q_key] = True
     else:
         dialogue_container.markdown(f"""
         <div class="dialogue-text">
-            {dialogue_content}
+            {emp_text}
         </div>
         """, unsafe_allow_html=True)
 
@@ -1138,18 +1249,25 @@ def render_interview():
             </div>
             """, unsafe_allow_html=True)
         
-        # 1. Emperor's Verdict (Character reaction)
+        # 1. Emperor & Tutor Verdicts
         verdict_comment = verdict_data.get('comment', '')
         # Clean the verdict comment
-        character_name = st.session_state.current_persona.name
+        character_name = st.session_state.emperor_persona.name
         verdict_clean = verdict_comment.replace(f"{character_name}：", "").replace(f"{character_name}:", "")
         verdict_clean = verdict_clean.replace("人类帝皇：", "").replace("人类帝皇:", "")
+        
+        # Merge Tutor's explanation if available
+        tut_exp = fb.get("servitor_explanation", "")
+        tut_name = st.session_state.current_tutor.name
+        tut_clean = tut_exp.replace(f"{tut_name}：", "").replace(f"{tut_name}:", "")
         
         fb_key = f"q_{st.session_state.current_question.id}_fb_shown"
         verdict_container = st.container()
         
         if fb_key not in st.session_state:
             stream_text(verdict_clean, verdict_container)
+            if tut_clean:
+                st.toast(f"**【{tut_name}】的课后辅导：**\n\n{tut_clean}", icon="💡")
             st.session_state[fb_key] = True
         else:
             verdict_container.markdown(f"""
@@ -1166,15 +1284,6 @@ def render_interview():
             st.markdown(f"""
             <div style="margin-top: 20px; border-left: 4px solid #000; padding-left: 15px; color: #444; font-family: 'Noto Sans SC', sans-serif; font-size: 18px;">
                 <strong>💡 标准答案：</strong> {standard_answer}
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # 3. Servitor Explanation (ELI5)
-        servitor_explanation = fb.get("servitor_explanation", "")
-        if servitor_explanation:
-            st.markdown(f"""
-            <div style="margin-top: 10px; border-left: 4px solid #666; padding-left: 15px; color: #666; font-family: 'Noto Sans SC', sans-serif; font-size: 18px; font-style: italic;">
-                <strong>🤖 机仆解析：</strong> {servitor_explanation}
             </div>
             """, unsafe_allow_html=True)
 

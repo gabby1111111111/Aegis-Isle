@@ -143,6 +143,79 @@ Output ONLY the JSON object, no markdown blocks.
                 "encouragement": "回答。" if language == "zh" else "Answer."
             }
 
+    async def generate_dual_question_interaction(
+        self,
+        emperor_persona: Persona,
+        tutor_persona: Persona,
+        question: Question,
+        jd_context: str = "",
+        language: str = "en"
+    ) -> Dict[str, Any]:
+        """Generate concurrent question interaction from both Emperor and a Tutor."""
+        lang_instruction = "English" if language == "en" else "Chinese (Simplified)"
+        
+        # 1. Emperor Prompt (Strict Questioning)
+        emp_sys = emperor_persona.get_system_prompt()
+        emp_user = f"""YOU ARE THE SCENARIO ENGINE. The character ({emperor_persona.name}) is the SUPREME EXAMINER.
+[Technical Question]
+{question.content}
+
+Generate a JSON object representing how {emperor_persona.name} coldly asks this question.
+**Format**: "{emperor_persona.name}：（动作/心理描写）\\"对话内容\\""
+{{
+  "lore_flavor": "{emperor_persona.name}：（动作/心理描写）\\"A majestic command to answer the question.\\"",
+  "original_question": "{question.content}"
+}}
+Must be in {lang_instruction}. Output ONLY JSON.
+"""
+
+        # 2. Tutor Prompt (Teaching & Hints)
+        tut_sys = tutor_persona.get_system_prompt()
+        tut_user = f"""YOU ARE THE SCENARIO ENGINE. The character ({tutor_persona.name}) is the TUTOR whispering advice to the candidate.
+[Technical Question]
+{question.content}
+
+[Your Task]
+Generate a JSON object representing how {tutor_persona.name} react to the Emperor's question and secretly gives the candidate a hint.
+**Format**: "{tutor_persona.name}：（动作/心理描写）\\"对话内容\\""
+{{
+  "lore_flavor": "{tutor_persona.name}：（动作/心理描写）\\"In-character reaction to the question and encouraging the user.\\"",
+  "tech_hint": "3-5 technical keywords separated by commas.",
+  "eli5_hint": "A simplified analogy in {tutor_persona.name}'s voice."
+}}
+Must be in {lang_instruction}. Output ONLY JSON.
+"""
+
+        import asyncio
+        import json
+        
+        async def fetch_emp():
+            try:
+                res = await self.llm.generate(f"{emp_sys}\n\nUser: {emp_user}")
+                return self._parse_json_response(res.generated_text)
+            except Exception:
+                fallback_lore = emperor_persona.name + "：（凝视着你）\"回答这个问题。\""
+                return {"lore_flavor": fallback_lore, "original_question": question.content}
+
+        async def fetch_tut():
+            try:
+                res = await self.llm.generate(f"{tut_sys}\n\nUser: {tut_user}")
+                return self._parse_json_response(res.generated_text)
+            except Exception:
+                fallback_lore = tutor_persona.name + "：（拍拍你的肩膀）\"别紧张，发挥你的实力。\""
+                return {"lore_flavor": fallback_lore, "tech_hint": "N/A", "eli5_hint": "N/A"}
+
+        emp_res, tut_res = await asyncio.gather(fetch_emp(), fetch_tut())
+        
+        # Combine results
+        return {
+            "emperor_flavor": emp_res.get("lore_flavor", ""),
+            "original_question": emp_res.get("original_question", question.content),
+            "tutor_flavor": tut_res.get("lore_flavor", ""),
+            "tech_hint": tut_res.get("tech_hint", ""),
+            "eli5_hint": tut_res.get("eli5_hint", "")
+        }
+
     async def generate_story_node(
         self,
         persona: Persona,
@@ -298,6 +371,89 @@ Output ONLY the JSON object, no markdown blocks.
                 "standard_answer": question.answer_key or "N/A",
                 "servitor_explanation": "暂无解释。" if language == "zh" else "N/A"
             }
+
+    async def generate_dual_feedback(
+        self,
+        emperor_persona: Persona,
+        tutor_persona: Persona,
+        question: Question,
+        user_answer: str,
+        evaluation: Dict[str, Any],
+        language: str = "en"
+    ) -> Dict[str, Any]:
+        """Generate concurrent feedback from Emperor (Verdict) and Tutor (Explanation)."""
+        lang_instruction = "English" if language == "en" else "Chinese (Simplified)"
+
+        # Context Extraction
+        # Fall back to answer_key if specific context doesn't exist
+        pro_context = getattr(question, 'pro_context', None) or question.answer_key
+        gabriella_context = getattr(question, 'gabriella_context', None) or question.answer_key
+
+        # 1. Emperor Prompt (Verdict Only)
+        emp_sys = emperor_persona.get_system_prompt()
+        emp_user = f"""YOU ARE THE JUDGMENT ENGINE. Character: {emperor_persona.name}.
+[Technical Question]
+{question.content}
+[Expected Professional Answer]
+{pro_context}
+[Candidate's Answer]
+{user_answer}
+
+Generate a JSON object with {emperor_persona.name}'s verdict.
+{{
+  "verdict": {{
+    "status": "correct" | "incorrect" | "partial",
+    "comment": "{emperor_persona.name}：（动作/心理）\\"Critique the Candidate's answer strictly based on the Expected Professional Answer.\\""
+  }}
+}}
+Must be in {lang_instruction}. Output ONLY JSON.
+"""
+
+        # 2. Tutor Prompt (Standard Answer and ELI5 Explanation)
+        tut_sys = tutor_persona.get_system_prompt()
+        tut_user = f"""YOU ARE THE JUDGMENT ENGINE. Character: {tutor_persona.name}.
+[Technical Question]
+{question.content}
+[Cyber Tea Party Conversational Context]
+{gabriella_context}
+[Professional Answer]
+{pro_context}
+[Candidate's Answer]
+{user_answer}
+
+Generate a JSON object with {tutor_persona.name}'s friendly explanation and standard answer.
+{{
+  "standard_answer": "Extract the core technical points from the Professional Answer.",
+  "servitor_explanation": "{tutor_persona.name}：（动作/心理）\\"Translate the ideas from the 'Cyber Tea Party Conversational Context' into your own character's unique speaking style to help the candidate understand.\\""
+}}
+Must be in {lang_instruction}. Output ONLY JSON.
+"""
+
+        import asyncio
+        
+        async def fetch_emp():
+            try:
+                res = await self.llm.generate(f"{emp_sys}\n\nUser: {emp_user}")
+                return self._parse_json_response(res.generated_text)
+            except Exception:
+                fallback_comment = emperor_persona.name + "：（沉默不语）"
+                return {"verdict": {"status": "partial", "comment": fallback_comment}}
+
+        async def fetch_tut():
+            try:
+                res = await self.llm.generate(f"{tut_sys}\n\nUser: {tut_user}")
+                return self._parse_json_response(res.generated_text)
+            except Exception:
+                return {"standard_answer": question.answer_key, "servitor_explanation": "网络断开中..."}
+
+        emp_res, tut_res = await asyncio.gather(fetch_emp(), fetch_tut())
+        
+        # Combine
+        return {
+            "verdict": emp_res.get("verdict", {"status": "partial", "comment": ""}),
+            "standard_answer": tut_res.get("standard_answer", question.answer_key),
+            "servitor_explanation": tut_res.get("servitor_explanation", "")
+        }
 
     def _parse_json_response(self, text: str) -> Dict[str, Any]:
         """Extract and parse JSON from LLM response."""

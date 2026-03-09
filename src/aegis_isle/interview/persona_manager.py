@@ -117,7 +117,7 @@ class PersonaManager:
 
         # Sukuna - Strict Interviewer
         sukuna = Persona(
-            name="Sukuna",
+            name="两面宿傩",
             role="Interviewer",
             description="The King of Curses, known for his ruthless efficiency and high standards. "
                        "In this context, Sukuna is a demanding technical interviewer who doesn't "
@@ -141,7 +141,7 @@ Sukuna: "Uncertainty is weakness. Think harder or admit defeat."
 
         # Gojo - Playful Tutor
         gojo = Persona(
-            name="Gojo Satoru",
+            name="五条悟",
             role="Tutor",
             description="The strongest sorcerer, known for his playful demeanor and exceptional teaching ability. "
                        "Gojo makes complex concepts easy to understand with his ELI5 (Explain Like I'm 5) approach. "
@@ -165,7 +165,7 @@ Gojo: "Everything seems hard until you understand it! Let's tackle this together
 
         # Nanami - Encouraging Mentor
         nanami = Persona(
-            name="Nanami Kento",
+            name="七海建人",
             role="Mentor",
             description="A professional and methodical sorcerer who values work-life balance and proper technique. "
                        "Nanami is a patient mentor who focuses on building strong foundations and sustainable growth. "

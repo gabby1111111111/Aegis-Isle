@@ -13,7 +13,7 @@ from pathlib import Path
 def main():
     """Launch Streamlit app."""
     # Get frontend directory
-    frontend_dir = Path(__file__).parent / "frontend"
+    frontend_dir = Path(__file__).parent.parent / "frontend"
     app_file = frontend_dir / "interview_app.py"
 
     if not app_file.exists():
@@ -30,7 +30,7 @@ def main():
     # Launch Streamlit
     try:
         subprocess.run([
-            "streamlit", "run",
+            sys.executable, "-m", "streamlit", "run",
             str(app_file),
             "--theme.base", "dark",
             "--theme.primaryColor", "#ff6b9d",
