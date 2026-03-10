@@ -1,0 +1,1 @@
+﻿src/aegis_isle/core/state/token_optimizer.py:73:61: E203 whitespace before ':'
