@@ -52,11 +52,11 @@ class EpisodeSearcher:
             
         results = []
         for i, ep in enumerate(matched, 1):
-            time = ep.get('time_range', '未知时间')
+            time_range = ep.get('time_range', '未知时间')
             plot = ep.get('plot', '')
             seeds = ep.get('seeds', [])
             seed_str = " | ".join(seeds) if seeds else "无剧情种子"
-            results.append(f"【剧情锚点 {i}】 (时段: {time})\n概览: {plot}\n埋点: {seed_str}")
+            results.append(f"【剧情锚点 {i}】 (时段: {time_range})\n概览: {plot}\n埋点: {seed_str}")
             
         return "\n\n".join(results)
 

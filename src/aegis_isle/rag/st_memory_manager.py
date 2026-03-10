@@ -133,6 +133,30 @@ class STMemoryManager:
         
         logger.info(f"Saved ST memory index to {index_path} via temp workaround")
 
+        # --- 将 chat summary 写进 LifeEventBus ---
+        try:
+            from aegis_isle.rag.event_logger import event_bus
+            import asyncio
+            
+            # Simple summarization based on count for now, DailyDigest will extract content
+            summary = f"记录了 {len(documents)} 段对话记忆。"
+            
+            # Since ingest_chunks is running in a sync executor but maybe within an async loop,
+            # we need to be careful about event loop submission.
+            try:
+                loop = asyncio.get_running_loop()
+                asyncio.run_coroutine_threadsafe(
+                    event_bus.log_chat_summary(world_line or "default", character_name, summary),
+                    loop
+                )
+            except RuntimeError:
+                # No running event loop in this thread
+                asyncio.run(event_bus.log_chat_summary(world_line or "default", character_name, summary))
+                
+        except Exception as e:
+            logger.error(f"Failed to log chat_summary to event bus: {e}", exc_info=True)
+        # ---------------------------------------------
+
     # ── 元数据预过滤相关常量 ──
     LOCATION_KEYWORDS = {
         "酒吧": ["酒吧", "bar", "锚点"],

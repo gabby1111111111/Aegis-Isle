@@ -144,3 +144,6 @@ data/state_test/
 
 # Coworkers AI
 cowokers_ai/
+
+# Agent Config & Coordinate Book (Do not leak to Github)
+.agent/project_mapping.yaml

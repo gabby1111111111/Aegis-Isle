@@ -1,94 +1,158 @@
-{
-  "questions": {
-    "emperor_q1": {
-      "id": "emperor_q1",
-      "content": "什么是数据库索引(Index)？它的作用是什么？",
-      "answer_key": "索引是提高数据库查询速度的数据结构，类似书籍的目录，能够快速定位数据位置，避免全表扫描。常见类型有B树索引和哈希索引。",
-      "difficulty": 2,
-      "review_box": 0,
-      "next_review": "2025-11-28T18:44:20.199931",
-      "created_at": "2025-11-28T18:44:20.199931",
-      "category": "database",
-      "tags": [
-        "database",
-        "index",
-        "performance"
-      ],
-      "source": "emperor_test",
-      "attempts": 0,
-      "correct_answers": 0
-    },
-    "emperor_q2": {
-      "id": "emperor_q2",
-      "content": "解释什么是HTTP状态码，并说明200、404、500分别代表什么？",
-      "answer_key": "HTTP状态码表示请求的处理结果。200表示成功；404表示资源未找到；500表示服务器内部错误。",
-      "difficulty": 1,
-      "review_box": 0,
-      "next_review": "2025-11-28T18:44:20.199931",
-      "created_at": "2025-11-28T18:44:20.199931",
-      "category": "web",
-      "tags": [
-        "http",
-        "status_code",
-        "web"
-      ],
-      "source": "emperor_test",
-      "attempts": 0,
-      "correct_answers": 0
-    },
-    "emperor_q3": {
-      "id": "emperor_q3",
-      "content": "什么是RESTful API？它的核心原则是什么？",
-      "answer_key": "RESTful API是基于REST架构风格的接口设计。核心原则：无状态、资源导向(使用URI)、统一接口(GET/POST/PUT/DELETE)、可缓存、分层系统。",
-      "difficulty": 3,
-      "review_box": 0,
-      "next_review": "2025-11-28T18:44:20.199931",
-      "created_at": "2025-11-28T18:44:20.199931",
-      "category": "api_design",
-      "tags": [
-        "rest",
-        "api",
-        "architecture"
-      ],
-      "source": "emperor_test",
-      "attempts": 0,
-      "correct_answers": 0
-    },
-    "emperor_q4": {
-      "id": "emperor_q4",
-      "content": "解释什么是Docker容器，它与虚拟机有什么区别？",
-      "answer_key": "Docker容器是轻量级虚拟化技术，共享宿主机内核，启动快、资源占用少。虚拟机则包含完整操作系统，资源占用大但隔离性更强。",
-      "difficulty": 3,
-      "review_box": 0,
-      "next_review": "2025-11-28T18:44:20.199931",
-      "created_at": "2025-11-28T18:44:20.199931",
-      "category": "devops",
-      "tags": [
-        "docker",
-        "container",
-        "virtualization"
-      ],
-      "source": "emperor_test",
-      "attempts": 0,
-      "correct_answers": 0
-    },
-    "emperor_q5": {
-      "id": "emperor_q5",
-      "content": "什么是时间复杂度？请说明O(1)、O(n)、O(log n)的含义。",
-      "answer_key": "时间复杂度描述算法执行时间随输入规模增长的趋势。O(1)表示常数时间；O(n)表示线性增长；O(log n)表示对数增长（如二分查找）。",
-      "difficulty": 2,
-      "review_box": 0,
-      "next_review": "2025-11-28T18:44:20.199931",
-      "created_at": "2025-11-28T18:44:20.199931",
-      "category": "algorithms",
-      "tags": [
-        "algorithm",
-        "complexity",
-        "big_o"
-      ],
-      "source": "emperor_test",
-      "attempts": 0,
-      "correct_answers": 0
-    }
+[
+  {
+    "id": "q_1",
+    "content": "请解释 RAG 的工作原理。与直接对 LLM 进行微调相比，RAG 主要解决了什么问题？",
+    "gabriella_context": "咱们来聊聊《博德之门 3》。想象一下，LLM 就是这里的盖尔 (Gale)。盖尔是个绝世法师，读过万卷书，不管是耐色瑞尔的历史还是魔法原理，他都懂。但是，假如你现在问盖尔：“嘿，2026 年 3 月的广州漫展在哪举办？” 盖尔绝对会懵圈，因为他在几年前就被封印进游戏里了，他的脑子里只有“过去”的知识。\n\n这时候你有两个选择：\n\n微调 (Fine-tuning)：这就像是你把盖尔抓回法师塔，把这几年发生的所有新闻、漫展信息、K-pop 所有的回归舞台数据，硬生生塞进他的脑子里，让他重新“考研”一次。这太累了！而且漫展信息下周就变了，你难道每周都要把他抓回去重修一次吗？这就像让 aespa 每次回归都要重新把以前所有的舞步忘掉再学新的，成本高到爆炸，而且容易让他“走火入魔”（遗忘旧知识）。\nRAG (Retrieval-Augmented Generation)：这就是我们现在的做法。我不强行改造盖尔的大脑。我在他手里塞了一本**“实时攻略书”**（这就是外部知识库）。当我要问漫展信息时，我先去网上搜到最新的情报，写在小纸条上，递给盖尔：“诺，这是背景资料，请基于这个回答我的问题。” 盖尔一看纸条，马上就能用他那华丽的辞藻（生成能力）告诉我答案。\n在你代码里的位置： 这就是你在 \nsrc/aegis_isle/rag/pipeline.py\n 里写的那个 RAGPipeline.query 方法 (L178)。\n\n你先调用 self.retriever.search(query) 去搜攻略（L194）。\n然后把搜到的结果 retrieval_result 传给 self.generator.generate (L206)，让盖尔看着攻略回答。\n所以 RAG 就是给这个“失忆天才”配了一个“拥有最新情报的谷歌搜索”。它解决的核心痛点就是：模型太贵太笨重，改不动脑子，不如给它递小抄。 而且这还能防止它一本正经地胡说八道（幻觉），毕竟小抄都在这儿了，它不敢乱编。",
+    "pro_context": "“在 Aegis-Isle 项目中，我选择 RAG 架构主要是为了解决大模型知识滞后和幻觉的问题。\n\n您可以把 LLM 想象成一个只拥有过去记忆的推理引擎。微调（Fine-tuning）虽然能注入知识，但它的更新周期太长、成本太高，且对于我们项目中这种需要频繁更新的领域知识（比如最新的开发文档或即时资讯），微调显然是不现实的。\n\nRAG 的工作原理是一个**‘检索-增强-生成’的闭环： 首先，我们将私有数据向量化并存储； 当用户提问时，系统先在向量库中检索出最相关的上下文片段； 然后，将这些片段作为 Prompt 的一部分注入给 LLM，相当于为它提供了即时的‘短期记忆’； 最后，LLM 基于这些事实进行生成**。\n\n这样做有两个核心优势：第一是时效性，我在数据库里插入一条新文档，系统下一秒就能回答相关问题，无需重新训练；第二是可解释性与准确性，通过限制 LLM ‘基于检索到的上下文回答’，我们可以显著降低幻觉，甚至可以让系统标出答案引用的具体文档来源，这在企业级应用中是非常关键的。”",
+    "answer_key": "“在 Aegis-Isle 项目中，我选择 RAG 架构主要是为了解决大模型知识滞后和幻觉的问题。\n\n您可以把 LLM 想象成一个只拥有过去记忆的推理引擎。微调（Fine-tuning）虽然能注入知识，但它的更新周期太长、成本太高，且对于我们项目中这种需要频繁更新的领域知识（比如最新的开发文档或即时资讯），微调显然是不现实的。\n\nRAG 的工作原理是一个**‘检索-增强-生成’的闭环： 首先，我们将私有数据向量化并存储； 当用户提问时，系统先在向量库中检索出最相关的上下文片段； 然后，将这些片段作为 Prompt 的一部分注入给 LLM，相当于为它提供了即时的‘短期记忆’； 最后，LLM 基于这些事实进行生成**。\n\n这样做有两个核心优势：第一是时效性，我在数据库里插入一条新文档，系统下一秒就能回答相关问题，无需重新训练；第二是可解释性与准确性，通过限制 LLM ‘基于检索到的上下文回答’，我们可以显著降低幻觉，甚至可以让系统标出答案引用的具体文档来源，这在企业级应用中是非常关键的。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_2",
+    "content": "一个完整的 RAG 流水线包含哪些关键步骤？",
+    "gabriella_context": "好，现在我们要去《赛博朋克 2077》里的荒坂塔偷资料了。这个过程就是一套完整的 RAG 流水线，我们把它看作是一次**“情报黑客行动”**。\n\n数据准备 (Data Load)：这就像是你去黑市收集情报。情报来源五花八门，有纸质的机密文件（PDF），有公司内网的加密邮件（HTML），还有监控录像截图（Image）。你的第一步是把这些乱七八糟的格式全部“转码”成我们能看懂的纯文本。这叫文档解析。\n代码：\nsrc/aegis_isle/rag/document_processor.py\n 里的 DocumentProcessor 类。\n切块 (Chunking)：你收集到的情报可能是一整本 500 页的《公司员工手册》。你不能把这一整本直接扔给你的黑客队友及其芯片（LLM 的 Context Window 是有限的）。你得把它撕成一页一页的，甚至是一段一段的“情报碎片”。每一片大概 500 字，得保证每一片读起来都有头有尾。\n代码：\nsrc/aegis_isle/rag/chunker.py\n 里的 \nTableAwareRecursiveChunker\n (L77) 或 \nEnhancedSemanticChunker\n (L453)。\n嵌入 (Embedding)：这是最酷的一步！这就像是《黑客帝国》里的**“代码视觉化”**。电脑看不懂汉字，它只认数字。我们需要一个翻译机（Embedding Model），把每一段“情报碎片”变成一串神秘的坐标数字（向量）。比如“杀生丸”和“凛”这两段文字，虽然字不一样，但在高维空间里，它们的坐标会靠得很近，因为它们“关系紧密”。\n代码：\nsrc/aegis_isle/rag/embedder.py\n 里的 \nMultiModalEmbedder\n (L314)。\n索引 (Indexing)：把这些变好的数字坐标，存进一个超级巨大的全息图书馆（向量数据库 Qdrant/Milvus）。这就像是给每一份情报打上了全息标签，方便以后一毫秒就能搜到。\n代码：\nsrc/aegis_isle/rag/retriever.py\n 里的 \n_add_to_qdrant_multimodal\n 方法 (L469)。\n检索 (Retrieval)：现在任务开始了！V (用户) 问了一个问题。系统会把这个问题也变成数字坐标，然后去全息图书馆里“扫描”，看哪几份情报的坐标跟问题的坐标最接近。这就叫向量相似度搜索。\n代码：\nsrc/aegis_isle/rag/retriever.py\n 里的 EnhancedMultiModalRetriever.search (L546)。\n生成 (Generation)：最后一步，把搜到的那几份关键情报（Top-K chunks），连同 V 的问题，一起打包发送给那个被我们接在网线上的“全知之脑”（ChatGPT/Claude）。它读完情报，告诉你：“荒坂塔的后门密码是 123456。” 任务完成！\n代码：\nsrc/aegis_isle/rag/generator.py\n 里的 LLMGenerator.generate (L109)。",
+    "pro_context": "“在 Aegis-Isle 中，我构建了一个标准的端到端 RAG 流水线，主要包含五个核心阶段：\n\n第一是ETL 与数据处理：我编写了 DocumentProcessor 来处理多模态数据，包括清洗 PDF 中的噪声、解析 Markdown 格式等，确保输入质量。 第二是切片 (Chunking)：这是关键。我没有使用简单的字符截断，而是针对不同文档结构设计了分块策略，稍后我会详细展开。 第三是嵌入 (Embedding)：我使用了多模态的 Embedding 模型将文本和图片映射到统一的向量空间。 第四是索引与存储 (Indexing)：利用向量数据库（如 Qdrant）存储这些高维向量，建立高效的 ANN 索引。 第五是检索与生成 (Retrieval & Generation)：在运行时，我不仅使用向量相似度召回，还引入了 Rerank 机制，最后将筛选出的高质量 Context 组装进 System Prompt，调用 LLM 生成最终回答。\n\n整个流程环环相扣，任何一个环节的质量都会直接决定最终的输出效果。”",
+    "answer_key": "“在 Aegis-Isle 中，我构建了一个标准的端到端 RAG 流水线，主要包含五个核心阶段：\n\n第一是ETL 与数据处理：我编写了 DocumentProcessor 来处理多模态数据，包括清洗 PDF 中的噪声、解析 Markdown 格式等，确保输入质量。 第二是切片 (Chunking)：这是关键。我没有使用简单的字符截断，而是针对不同文档结构设计了分块策略，稍后我会详细展开。 第三是嵌入 (Embedding)：我使用了多模态的 Embedding 模型将文本和图片映射到统一的向量空间。 第四是索引与存储 (Indexing)：利用向量数据库（如 Qdrant）存储这些高维向量，建立高效的 ANN 索引。 第五是检索与生成 (Retrieval & Generation)：在运行时，我不仅使用向量相似度召回，还引入了 Rerank 机制，最后将筛选出的高质量 Context 组装进 System Prompt，调用 LLM 生成最终回答。\n\n整个流程环环相扣，任何一个环节的质量都会直接决定最终的输出效果。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_3",
+    "content": "在构建知识库时，文本切块策略至关重要。你会如何选择？",
+    "gabriella_context": "这个问题我们用 aespa 的 MV 剪辑 来类比。\n\n假设你要把 aespa 所有的 MV 剪成短视频发到抖音上。 策略 A：固定时长剪辑（Fixed Size）。你不管三七二十一，每 10 秒剪一刀。结果呢？可能 Karina 正要飙高音（High Note），或者 Winter 正要拔剑（名场面），咔嚓一下被你切断了。上半截在第一个视频里，下半截在第二个视频里。观众看了会想打人：“这什么鬼？没头没尾的！” 这就是普通的切块，容易切坏语义完整性。\n\n策略 B：语义感知剪辑（Semantic Chunking）。这就是我在项目里用的高级货！你会像一个专业的剪辑师一样，分析画面内容。\n\n场景感知：这一段是 Black Mamba 的丛林场景，那我把它作为一个整体剪下来。\n结构感知：这里出现了一张**“旷野地图”（表格 Table）**。我绝对不能把地图撕成两半！我要确保这张图在这一段里是完整的。如果地图太长，我会小心翼翼地保留表头，把下面分成两半，但每一半都能看懂这是地图。\n在你代码里的位置： 看 \nsrc/aegis_isle/rag/chunker.py\n。\n\n你写了个类叫 \nTableAwareRecursiveChunker\n (L77)。\n如果你看到 === TABLES === 这种标记，就会进入 \n_chunk_tables\n (L207) 逻辑，专门保护表格不被切坏。\n如果表格太大，你还在 \n_split_large_table\n (L252) 里写了逻辑，切分的时候强行把表头（Header）加到每一块上去，防止下面那块的人这列数据是啥。\n在 Aegis-Isle 里，我特别注意处理表格和图片。因为如果是像《战锤 40K》那样复杂的设定集，里面全是武器参数表，如果乱切，这些参数就废了。所以我写代码的时候，就像是在做一个“有强迫症的剪辑师”，看到 \nTable\n 标签就自动进入“保护模式”，必须完整保留或者带表头拆分。",
+    "pro_context": "“切块策略是 RAG 系统中极容易被忽视但又至关重要的一环。在 Aegis-Isle 的开发与调试过程中，我发现简单的 RecursiveCharacterTextSplitter 往往会破坏信息的语义完整性，尤其是针对结构化数据。\n\n因此，我针对性地实现了两种策略： 首先是语义感知切块。对于普通文本，我不仅仅是看字符数，而是利用 NLP 工具或简单的语义判断通过句号、段落符来断句，尽量保证一个 Chunk 包含一个完整的语义单元，避免上下文断裂。\n\n其次，也是我项目的一个亮点，是表格感知的切块策略 (Table-Aware Chunking)。在处理技术文档时，表格往往包含关键参数。如果按字符硬切，通过 Markdown 格式渲染的表格就会因为丢失 Header 或分隔符而乱码。我在代码中实现了对表格边界的检测，逻辑是：如果遇到表格，尽量作为一个整体保留；如果表格超长，我会强制在切分出的每一个子块中都复写表头 (Header)。\n\n这种策略背后的权衡是：虽然增加了预处理的计算开销和逻辑复杂度，但它极大地提升了检索结果的可用性，特别是当用户查询具体参数时，LLM 能读到完整的行与列对应关系，准确率有了质的飞跃。”",
+    "answer_key": "“切块策略是 RAG 系统中极容易被忽视但又至关重要的一环。在 Aegis-Isle 的开发与调试过程中，我发现简单的 RecursiveCharacterTextSplitter 往往会破坏信息的语义完整性，尤其是针对结构化数据。\n\n因此，我针对性地实现了两种策略： 首先是语义感知切块。对于普通文本，我不仅仅是看字符数，而是利用 NLP 工具或简单的语义判断通过句号、段落符来断句，尽量保证一个 Chunk 包含一个完整的语义单元，避免上下文断裂。\n\n其次，也是我项目的一个亮点，是表格感知的切块策略 (Table-Aware Chunking)。在处理技术文档时，表格往往包含关键参数。如果按字符硬切，通过 Markdown 格式渲染的表格就会因为丢失 Header 或分隔符而乱码。我在代码中实现了对表格边界的检测，逻辑是：如果遇到表格，尽量作为一个整体保留；如果表格超长，我会强制在切分出的每一个子块中都复写表头 (Header)。\n\n这种策略背后的权衡是：虽然增加了预处理的计算开销和逻辑复杂度，但它极大地提升了检索结果的可用性，特别是当用户查询具体参数时，LLM 能读到完整的行与列对应关系，准确率有了质的飞跃。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_4",
+    "content": "如何选择一个合适的嵌入模型？评估指标有哪些？",
+    "gabriella_context": "选 Embedding 模型就像是在《赛博朋克 2077》里给 V 选义眼插件。\n\n市面上有很多种义眼（模型）：\n\nOpenAI 出品的“歧路司 Kiroshi”系列（text-embedding-3-large）：这是一个全能型的顶级义眼。看的特别准，能分辨出非常细微的差别（维度高，1536 甚至 3072 维），支持多语言。缺点是贵，而且必须联网，一定要连接到荒坂公司的服务器才能用（API 调用），有延迟。\n代码：\nembedder.py\n 里的 \n_initialize_openai\n (L101)。\n开源社区的“HuggingFace”系列（比如 BGE-M3, MiniLM）：这就像是街头黑客改装的义眼。体积小（模型参数少），不需要联网（本地部署），速度极快，甚至可以在你的便携式平板里跑。虽然精度可能比顶级货差那么一点点，但对于大部分街头混战（垂直领域知识库）来说，完全够用了。\n代码：\nembedder.py\n 里的 \n_initialize_sentence_transformer\n (L89)，默认用了 all-MiniLM-L6-v2。\n怎么评估这个义眼好不好？ 我们要去打**“MTEB 竞技场”**（这是真实存在的 HuggingFace 榜单）。我们要看它的：\n\nHit Rate (命中率)：我在人群中一眼就能扫出通缉犯的概率。\nLatency (延迟)：扫一眼需要 0.1 秒还是 1 秒？打架的时候慢一秒就死定了。\nDimension (大小)：它生成的数据占不占内存？\n在 Aegis-Isle 里，因为我是只有一台轻薄本的独立开发者（没钱买服务器），所以我首选那种虽小但精悍的开源模型，或者用 OpenAI 的小模型作为基准。",
+    "pro_context": "“在选择 Embedding 模型时，我主要考量三个维度：性能、成本和部署环境。\n\n在 Aegis-Isle 项目初期，我首先参考了 MTEB (Massive Text Embedding Benchmark) 排行榜。这是一个行业标准的评估基准。我关注模型在 Retrieval 任务上的具体得分，特别是 Recall@K 指标。\n\n具体到我的选择： 如果是为了追求极致效果且预算充足，我会选择 OpenAI 的 text-embedding-3-large 或阿里的 Qwen 系列，它们支持长上下文且语义理解能力强。 但在这个项目中，为了保证系统的响应速度和可控性，我采用了轻量级的 all-MiniLM-L6-v2 和 BGE 系列进行实验。这些模型虽然维度较低（如 384 或 768 维），但在本地 CPU/GPU 推理速度极快，且存储向量的成本更低。\n\n评估一个模型好坏，除了看榜单分数，我还会在自己的业务数据集上做测试。我看重两个指标：\n\nRecall (召回率)：正确的文档是否被包含在了 Top-K 结果里？\nMRR (平均倒数排名)：正确的文档是否排在列表的前面？因为如果正确答案排在第 10 位，LLM 可能因为上下文窗口限制或注意力衰减而忽略它。”",
+    "answer_key": "“在选择 Embedding 模型时，我主要考量三个维度：性能、成本和部署环境。\n\n在 Aegis-Isle 项目初期，我首先参考了 MTEB (Massive Text Embedding Benchmark) 排行榜。这是一个行业标准的评估基准。我关注模型在 Retrieval 任务上的具体得分，特别是 Recall@K 指标。\n\n具体到我的选择： 如果是为了追求极致效果且预算充足，我会选择 OpenAI 的 text-embedding-3-large 或阿里的 Qwen 系列，它们支持长上下文且语义理解能力强。 但在这个项目中，为了保证系统的响应速度和可控性，我采用了轻量级的 all-MiniLM-L6-v2 和 BGE 系列进行实验。这些模型虽然维度较低（如 384 或 768 维），但在本地 CPU/GPU 推理速度极快，且存储向量的成本更低。\n\n评估一个模型好坏，除了看榜单分数，我还会在自己的业务数据集上做测试。我看重两个指标：\n\nRecall (召回率)：正确的文档是否被包含在了 Top-K 结果里？\nMRR (平均倒数排名)：正确的文档是否排在列表的前面？因为如果正确答案排在第 10 位，LLM 可能因为上下文窗口限制或注意力衰减而忽略它。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_5",
+    "content": "除了基础的向量检索，你还知道哪些可以提升 RAG 检索质量的技术？",
+    "gabriella_context": "基础的向量检索就像是**“直男式搜索”**。你问“那个长的像吸血鬼的白毛是谁？”，向量可能给你搜出一堆“吸血鬼日记”或者“白发魔女”，因为它只看字面意思的相似度。\n\n为了提升质量，我给我的 RAG 系统加了几个恋爱脑 Buff（高级技术）：\n\nQuery Expansion (让他多想一点)： 你问的很含蓄：“我想看那个跳舞很飒的女团。” 系统（Query Expander）会在心里默默帮你补全：“她是不是在找 ITZY？还是 Le Sserafim？是不是要搜‘刀群舞’？‘Girl Crush’？” 它会把你的问题扩展成五个不同的问法，一起去搜。这样就算你话没说对，它也能懂你的心。\n代码：\nsrc/aegis_isle/rag/retriever.py\n 里的 \nQueryExpander\n 类 (L40)。\nHybrid Search (软硬兼施)： 向量搜索是**“看感觉”（语义相似），关键词搜索（BM25）是“抠字眼”（精确匹配）。 如果我要搜一个错误代码 Error 502 Bad Gateway，向量可能会给我搜出一堆“网络连接失败”的散文。但我就是想要包含 502 这三个数字的文档！ 所以混合检索就是：左手拿着文科生的语义理解，右手拿着理科生**的精确匹配，最后加权打分。谁合适听谁的。\n代码：\nsrc/aegis_isle/rag/retriever.py\n 里的 \nEnhancedHybridRetriever\n (L1301)。\nReranking (最后一道关卡)： 这就像是选修课时的**“终极面试”。初选（Retrieval）为了速度，一下子捞上来 50 个人。但这 50 个人里有很多是凑数的。 Reranker 就是那个拿着放大镜的魔鬼考官**（Cross-Encoder）。它会把这 50 个人和你的问题一对一地仔细看一遍，打一个非常精准的分。哪怕初选排第 20 的人，如果是真命天子，Reranker 也能把它提到第 1 位。\n代码：\nsrc/aegis_isle/rag/retriever.py\n 里的 \nReranker\n 类 (L123)。",
+    "pro_context": "“基础的向量检索在应对复杂查询时往往存在局限性，比如无法处理精确匹配需求或语义漂移。在 Aegis-Isle 中，我实施了一套组合拳来提升检索质量：\n\n首先是查询扩展 (Query Expansion)。用户的 Query 往往是模糊或不完整的。我利用 LLM 将用户的原始查询重写为多个语义相关但表述不同的 Query，并行检索，这极大地提高了召回率（Recall），避免了因为用词差异导致的漏找。\n\n其次是混合检索 (Hybrid Search)。我结合了向量检索（Dense Retrieval）和基于 BM25 的关键词检索（Sparse Retrieval）。向量擅长语义匹配，而 BM25 擅长专有名词的精确匹配。通过加权融合两者的分数，系统在处理技术专有名词或特定 ID 时的表现更加稳健。\n\n最后，也是最有效的一步，是重排序 (Reranking)。向量检索为了速度使用的是双塔模型 (Bi-Encoder)，只能计算余弦相似度，精度有限。我在召回 Top-50 个结果后，引入了一个 Cross-Encoder 模型（如 bge-reranker）进行精排。Cross-Encoder 能深入理解 Query 和 Document 之间的细粒度交互，虽然计算开销大，但确实能把最相关的结果‘捞’到最前面，显著解决了‘Lost in the Middle’问题。”",
+    "answer_key": "“基础的向量检索在应对复杂查询时往往存在局限性，比如无法处理精确匹配需求或语义漂移。在 Aegis-Isle 中，我实施了一套组合拳来提升检索质量：\n\n首先是查询扩展 (Query Expansion)。用户的 Query 往往是模糊或不完整的。我利用 LLM 将用户的原始查询重写为多个语义相关但表述不同的 Query，并行检索，这极大地提高了召回率（Recall），避免了因为用词差异导致的漏找。\n\n其次是混合检索 (Hybrid Search)。我结合了向量检索（Dense Retrieval）和基于 BM25 的关键词检索（Sparse Retrieval）。向量擅长语义匹配，而 BM25 擅长专有名词的精确匹配。通过加权融合两者的分数，系统在处理技术专有名词或特定 ID 时的表现更加稳健。\n\n最后，也是最有效的一步，是重排序 (Reranking)。向量检索为了速度使用的是双塔模型 (Bi-Encoder)，只能计算余弦相似度，精度有限。我在召回 Top-50 个结果后，引入了一个 Cross-Encoder 模型（如 bge-reranker）进行精排。Cross-Encoder 能深入理解 Query 和 Document 之间的细粒度交互，虽然计算开销大，但确实能把最相关的结果‘捞’到最前面，显著解决了‘Lost in the Middle’问题。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_6",
+    "content": "请解释“Lost in the Middle”问题。有什么方法可以缓解？",
+    "gabriella_context": "这个现象简直就是**“期末考试前的我”**！\n\n想象老师给你划了 20 本书的重点（Context），让你背下来明天考试。 你一定是把第一本书背得滚瓜烂熟（开头），然后太累了中间十几本就随便翻翻，到了最后一本书觉得不行了要赶紧背一下（结尾）。 到了考试（生成回答）的时候，如果答案在第 10 本书里，你大概率是想不起来的。这就是“Lost in the Middle”。\n\nLLM 也是这样，它有注意力缺陷。当上下文太长的时候，它会优先关注开头和结尾的信息，中间的东西就像被扔进了黑洞。\n\n怎么救？\n\n掐头去尾，留中间？不，是把中间变开头！ 既然它记不住中间，那我就由 Reranker 出马，把最重要的那条信息，强行排到第一位！不管它原来在哪里，Reranker 把它揪出来放在最显眼的地方。\n代码：\nretriever.py\n 的 Reranker.rerank 方法 (L135)，你会看到它打完分后做了一个 sort (L181)，把分最高的排到 List 的第一个，这就是把最重要的提到最开头。\n少吃多餐 (Top-K 减负)。 不要一次性塞 20 个文档给它。利用 Reranker 的筛选能力，只给它最精准的 5 个。文档少了，它自然就不会“消化不良”，每一条都能看进去。",
+    "pro_context": "“'Lost in the Middle' 是大模型长上下文处理中的一个经典现象。研究表明，当 Reference Context 过长时，LLM 往往倾向于关注输入序列的首部和尾部，而忽略位于中间位置的关键信息。这会导致即使检索系统召回了正确答案，只要它出现在 Context 的中间位置，LLM 依然可能回答错误。\n\n为了缓解这个问题，我在系统中采取了两项措施： 第一是严格的 Reranking 机制。通过 Cross-Encoder 对召回结果进行打分排序，确保相关性最高的文档块始终出现在 Context List 的最顶端（即 Prompt 的开头位置），最大化被 LLM ‘注意’到的概率。 第二是控制 Context Window 的信噪比。我不会盲目追求超长的上下文窗口，而是倾向于‘少而精’。通过调优阈值，只将置信度极高的 Top-3 或 Top-5 片段喂给模型，减少无关信息的干扰，从而提升生成的准确性。”",
+    "answer_key": "“'Lost in the Middle' 是大模型长上下文处理中的一个经典现象。研究表明，当 Reference Context 过长时，LLM 往往倾向于关注输入序列的首部和尾部，而忽略位于中间位置的关键信息。这会导致即使检索系统召回了正确答案，只要它出现在 Context 的中间位置，LLM 依然可能回答错误。\n\n为了缓解这个问题，我在系统中采取了两项措施： 第一是严格的 Reranking 机制。通过 Cross-Encoder 对召回结果进行打分排序，确保相关性最高的文档块始终出现在 Context List 的最顶端（即 Prompt 的开头位置），最大化被 LLM ‘注意’到的概率。 第二是控制 Context Window 的信噪比。我不会盲目追求超长的上下文窗口，而是倾向于‘少而精’。通过调优阈值，只将置信度极高的 Top-3 或 Top-5 片段喂给模型，减少无关信息的干扰，从而提升生成的准确性。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_7",
+    "content": "如何全面地评估一个 RAG 系统的性能？",
+    "gabriella_context": "这就像是给女团选秀打分！我们不能只看脸（生成），也不能只看跳舞（检索），要分阶段考核。\n\n第一轮考核：练习生海选（检索阶段 Retrieval）\n\n命中率 (Recall)：我要找一个“高音担当”，海选出来的 10 个人里，到底有没有那个真正能唱高音的人？如果有，就叫命中。如果全是混子，那就是 Recall 低。\n排名 (MRR)：那个能唱高音的人，是排在第 1 名被我一眼看到，还是排在第 10 名缩在角落里？排第 1 最好。\n代码：你现在的 \npipeline.py\n 有个简单的 \nhealth_check\n (L322) 测试连通性，但要真正算 Recall，你需要写一个新的脚本，跑测试集。\n第二轮考核：出道舞台表现（生成阶段 Generation）\n\n忠实度 (Faithfulness)：这就像“不开麦假唱检测”。LLM 唱出来的歌词（回答），是不是真的写在歌词本（检索到的文档）上的？如果它自己瞎编了一段 Rap，那就是幻觉，零分！\n相关性 (Answer Relevance)：评委问“你的梦想是什么”，你回答“我喜欢吃火锅”。这就是答非所问，相关性低。\n如果你想在这个环节装得更专业一点，你就提到一个神奇的工具叫 Ragas。它就像是一个“AI 评委”，专门自动化给 RAG 系统打分的。",
+    "pro_context": "“评估 RAG 系统是一个复杂的工程，不能仅凭感觉，必须量化。我通常将评估分为两个独立的阶段：检索层和生成层。\n\n对于检索层 (Retrieval)，我主要关注：\n\nHit Rate / Recall@K：衡量系统是否成功检索到了包含正确答案的文档块。\nMRR (Mean Reciprocal Rank)：衡量正确文档在结果列表中的排名位置，排名越靠前越好，这对 Lost in the Middle 问题尤为重要。\n对于生成层 (Generation)，我参考了 Ragas 框架的评估维度：\n\nFaithfulness (忠实度)：检测生成的回答是否完全基于检索到的上下文，这直接反映了幻觉程度。\nAnswer Relevance (答案相关性)：评估回答是否直接解决了用户的 Query。\n在实际操作中，我会构建一个包含‘问题-文档-标准答案’的Golden Dataset (金标数据集)，利用 LLM-as-a-Judge 的方式（比如用 GPT-4 打分）来自动化运行这些指标，从而持续监控系统的迭代效果。”",
+    "answer_key": "“评估 RAG 系统是一个复杂的工程，不能仅凭感觉，必须量化。我通常将评估分为两个独立的阶段：检索层和生成层。\n\n对于检索层 (Retrieval)，我主要关注：\n\nHit Rate / Recall@K：衡量系统是否成功检索到了包含正确答案的文档块。\nMRR (Mean Reciprocal Rank)：衡量正确文档在结果列表中的排名位置，排名越靠前越好，这对 Lost in the Middle 问题尤为重要。\n对于生成层 (Generation)，我参考了 Ragas 框架的评估维度：\n\nFaithfulness (忠实度)：检测生成的回答是否完全基于检索到的上下文，这直接反映了幻觉程度。\nAnswer Relevance (答案相关性)：评估回答是否直接解决了用户的 Query。\n在实际操作中，我会构建一个包含‘问题-文档-标准答案’的Golden Dataset (金标数据集)，利用 LLM-as-a-Judge 的方式（比如用 GPT-4 打分）来自动化运行这些指标，从而持续监控系统的迭代效果。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_8",
+    "content": "在什么场景下，你会选择使用图数据库或知识图谱？",
+    "gabriella_context": "这个问题我们来聊聊《全职猎人》或者《权力的游戏》。\n\n如果你用 向量数据库，它擅长的是“找相似”。你搜“揍敌客家族”，它会给你展示奇犽的照片、席巴的照片，因为他们长得像，或者描述里都有“杀手”这个词。\n\n但是，如果你问一个八卦且烧脑的问题：“奇犽的爷爷的爸爸是谁？他和幻影旅团的团长有什么过节？” 这时候向量数据库就懵了。因为它不懂“爷爷的爸爸”这种层级关系，也不懂“过节”这种复杂的人际关系网。\n\n这时候就需要 图数据库 (Graph DB) 了，比如 Neo4j。 它就像是我们在追剧时画的那个复杂的人物关系图。\n\n节点（Node）：奇犽，杰诺，马哈，库洛洛。\n边（Edge）：[是直接血亲] -> [是死对头] -> [曾经交易过]。\n所以，当题目变成“推理题”或者“关系题”时，图数据库就是神。比如金融里查洗钱（A 转给 B 转给 C 转回 A），或者医疗里查药物相互作用。但在我的 Aegis-Isle 里，暂时还不需要这么复杂的关系，所以我还没上图数据库，但我心里有数！（代码里如果以后要加，大概会在 \nretriever.py\n 里加一个 GraphRetriever 类）。",
+    "pro_context": "“这就涉及到了 Vector Search 的局限性和 Graph 的强项。我认为选择图数据库主要取决于数据之间的结构化关联深度。\n\n向量数据库非常擅长处理非结构化数据的语义相似度搜索，比如‘寻找关于保险条款的文档’。但是，当面对多跳推理 (Multi-hop Reasoning) 或需要深度关系遍历的场景时，向量就无能为力了。\n\n例如：‘A 公司的供应链上游有哪些企业最近卷入了法律诉讼？’ 这个问题需要先找到 A 的供应商（关系 1），再找供应商的法律记录（关系 2）。这种基于显式关系的推理，是知识图谱（Knowledge Graph）和图数据库（如 Neo4j）的绝对主场。\n\n近期非常火的 GraphRAG 就是试图结合两者。利用 Graph 来提取实体和关系，利用 Vector 来做语义对齐。如果 Aegis-Isle 未来需要处理复杂的代码依赖分析（Function A calls Function B which uses Class C）或者企业股权穿透，我会毫不犹豫地引入图数据库来增强检索能力。”",
+    "answer_key": "“这就涉及到了 Vector Search 的局限性和 Graph 的强项。我认为选择图数据库主要取决于数据之间的结构化关联深度。\n\n向量数据库非常擅长处理非结构化数据的语义相似度搜索，比如‘寻找关于保险条款的文档’。但是，当面对多跳推理 (Multi-hop Reasoning) 或需要深度关系遍历的场景时，向量就无能为力了。\n\n例如：‘A 公司的供应链上游有哪些企业最近卷入了法律诉讼？’ 这个问题需要先找到 A 的供应商（关系 1），再找供应商的法律记录（关系 2）。这种基于显式关系的推理，是知识图谱（Knowledge Graph）和图数据库（如 Neo4j）的绝对主场。\n\n近期非常火的 GraphRAG 就是试图结合两者。利用 Graph 来提取实体和关系，利用 Vector 来做语义对齐。如果 Aegis-Isle 未来需要处理复杂的代码依赖分析（Function A calls Function B which uses Class C）或者企业股权穿透，我会毫不犹豫地引入图数据库来增强检索能力。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_9",
+    "content": "传统的 RAG 流程是“先检索后生成”，你是否了解一些更复杂的 RAG 范式？",
+    "gabriella_context": "传统的 RAG 就像是**“一锤子买卖”**。检索一次，回答一次，结束。\n\n代码：你的 \npipeline.py\n 里的 \nquery\n 就是这样标准的线性流程 (L178)。\n但是如果是很难的问题，比如“请帮我规划一个去日本看演唱会顺便巡礼《咒术回战》的 7 天攻略，预算 1 万”。这种问题，搜一次肯定不够。\n\n复杂的 RAG 就像是写论文或者侦探破案：\n\nIterative RAG (迭代式)： 先搜一下“日本演唱会时间”。发现需要先定机票。 于是系统自己决定再去搜一下“机票价格”。 搜完机票，发现还要定酒店。再去搜“涩谷酒店”。 就像是一个虽然笨但很勤奋的助手，多搜几轮，直到把资料凑齐了再写攻略。\nSelf-RAG (自省式)： 模型写了一句话：“五条悟被封印在涩谷。” 然后它突然自我怀疑（Self-Reflection）：“等一下，这个信息准吗？我得确认一下。” 于是它主动发起一次检索去验证这句话。如果不准，它就删掉重写。这就非常像我们在写代码时，写几行就编译运行一下（Check），报错了就改。",
+    "pro_context": "“当然，基础的 Naive RAG 往往难以应对复杂推理任务。我一直关注并研究 Advanced RAG 的几种范式：\n\n第一种是Iterative RAG (迭代检索)。对于复杂问题，单次检索往往信息不全。迭代 RAG 允许模型在生成过程中多次发起检索，利用上一步检索到的上下文来澄清下一步的搜索意图，逐步逼近答案。\n\n第二种是Self-RAG (自省式 RAG)。这是一个非常棒的思路。它引入了 Reflection (反思) 机制。模型在生成的同时，会自我评估‘我现在的生成需要检索吗？’或者‘检索回来的内容真的相关吗？’。通过这种 Self-Critique，系统可以主动过滤低质量检索，甚至在这个过程中修正自己的幻觉。\n\n此外还有 Agentic RAG，这也是我目前最感兴趣的方向。将检索封装为一个 Tool，由 Agent 自主规划何时检索、如何检索，这比硬编码的流水线更具灵活性。”",
+    "answer_key": "“当然，基础的 Naive RAG 往往难以应对复杂推理任务。我一直关注并研究 Advanced RAG 的几种范式：\n\n第一种是Iterative RAG (迭代检索)。对于复杂问题，单次检索往往信息不全。迭代 RAG 允许模型在生成过程中多次发起检索，利用上一步检索到的上下文来澄清下一步的搜索意图，逐步逼近答案。\n\n第二种是Self-RAG (自省式 RAG)。这是一个非常棒的思路。它引入了 Reflection (反思) 机制。模型在生成的同时，会自我评估‘我现在的生成需要检索吗？’或者‘检索回来的内容真的相关吗？’。通过这种 Self-Critique，系统可以主动过滤低质量检索，甚至在这个过程中修正自己的幻觉。\n\n此外还有 Agentic RAG，这也是我目前最感兴趣的方向。将检索封装为一个 Tool，由 Agent 自主规划何时检索、如何检索，这比硬编码的流水线更具灵活性。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_10",
+    "content": "RAG 系统在实际部署中可能面临哪些挑战？",
+    "gabriella_context": "部署 RAG 就像是把你的独立游戏发布到 Steam 上，开发的时候觉得完美，一上线全是 BUG。\n\n延迟 (Latency) - “卡顿是原罪”： 你自己测的时候觉得 3 秒出结果还能接受。但用户是被 Web2.0 惯坏的，超过 1 秒他们就觉得“这破网卡了”。而 RAG 又要 Embedding 又要检索又要 LLM 生成，每一步都在拖时间。怎么优化速度，是个大难题。\n代码：你在 \npipeline.py\n 的 \nquery\n 里加了很多 time.time() (L185, L193, L205) 来计算每一步的耗时，这就是为了监控延迟。\n脏数据 - “垃圾进，垃圾出”： 你以为用户的文档都是排版精美的 PDF？错！全是扫描歪了的图片、乱码的表格、全是水印的 PPT。 如果 DocumentProcessor 没写好，把页眉页脚这种垃圾文字也喂给 LLM，LLM 就会开始胡言乱语。这就像给做饭的厨师送去烂菜叶，神仙也做不出好菜。\n更新一致性 - “版本不兼容”： 文档今天改了，向量库没更新。用户问的是新政策，RAG 答的是旧黄历。这就尴尬了。你需要一个机制，文件一变，立刻重新切片入库。",
+    "pro_context": "“从 Demo 到 Production，RAG 系统确实面临诸多挑战，结合我的项目经验，主要有三点：\n\n第一是端到端延迟 (Latency)。RAG 链路很长，尤其是 Embedding 和 LLM 生成这两步非常耗时。在实际部署中，我们需要引入缓存机制 (Semantic Cache)，对常见问题直接返回结果；同时采用流式输出 (Streaming)，让用户先看到第一个字，降低心理等待时间。\n\n第二是数据质量与清洗 (Data Quality)。‘Garbage In, Garbage Out’在 RAG 中体现得淋漓尽致。PDF 解析中的乱码、页眉页脚的干扰、表格的错位，都会严重破坏检索效果。我花了很多精力在 DocumentProcessor 的正则表达式清洗上，这就是为了解决这个问题。\n\n第三是知识库的动态更新 (State Consistency)。当源文件发生增删改时，如何高效地同步更新向量数据库是一个工程难题。全量重建索引太慢，增量更新又容易产生幽灵数据。需要设计良好的 CDC (Change Data Capture) 机制来保证知识的一致性。”",
+    "answer_key": "“从 Demo 到 Production，RAG 系统确实面临诸多挑战，结合我的项目经验，主要有三点：\n\n第一是端到端延迟 (Latency)。RAG 链路很长，尤其是 Embedding 和 LLM 生成这两步非常耗时。在实际部署中，我们需要引入缓存机制 (Semantic Cache)，对常见问题直接返回结果；同时采用流式输出 (Streaming)，让用户先看到第一个字，降低心理等待时间。\n\n第二是数据质量与清洗 (Data Quality)。‘Garbage In, Garbage Out’在 RAG 中体现得淋漓尽致。PDF 解析中的乱码、页眉页脚的干扰、表格的错位，都会严重破坏检索效果。我花了很多精力在 DocumentProcessor 的正则表达式清洗上，这就是为了解决这个问题。\n\n第三是知识库的动态更新 (State Consistency)。当源文件发生增删改时，如何高效地同步更新向量数据库是一个工程难题。全量重建索引太慢，增量更新又容易产生幽灵数据。需要设计良好的 CDC (Change Data Capture) 机制来保证知识的一致性。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_11",
+    "content": "了解搜索系统吗？和 RAG 有什么区别？",
+    "gabriella_context": "搜索系统 (Search Engine)：就是谷歌/百度。\n我问：“《进击的巨人》大结局是什么？”\n它给我扔过来一堆链接（蓝色的网页标题）。\n由于我得自己点进去，自己看，自己总结。就像去图书馆，管理员给你指个书架：“书在那，自己翻。”\n代码：这对应你 \nretriever.py\n 里的 \nsearch\n 方法 (L546)，只返回文档块，不生成答案。\nRAG：就是ChatGPT。\n我问同样的问题。\n它直接告诉我：“艾伦最后变成了……”（剧透预警）。\n由于它帮我读了那些书，嚼碎了，喂到我嘴里。就像是你雇了个学霸书童，他读完书直接把答案讲给你听。\n代码：这对应你 \npipeline.py\n 里的 \nquery\n 方法 (L178)，它包含了 \nsearch\n 加上 \ngenerator\n。\n区别：搜索是给你素材，RAG 是给你成品。",
+    "pro_context": "“搜索系统和 RAG 虽然都依赖检索技术，但它们的目标和交互范式完全不同。\n\n传统搜索系统（如 Elasticsearch, Solr）的核心是**‘查’。它的目标是返回最相关的 Document List。它依赖的是倒排索引（Inverted Index）和相关性打分（如 BM25、PageRank）。它的交付物是信息源**，用户需要自己阅读和提炼。\n\nRAG 系统的核心是**‘答’。它的目标是直接生成 Answer。它是搜索技术的上层封装，利用 LLM 的认知能力将检索到的信息源进行语义综合 (Synthesis)** 和推理。它的交付物是经过加工的知识。\n\n可以这么说：RAG = 搜索引擎（作为检索器） + LLM（作为阅读器和生成器）。RAG 正在重塑搜索体验，从‘Keyword-based’向‘Intent-based’转变。”",
+    "answer_key": "“搜索系统和 RAG 虽然都依赖检索技术，但它们的目标和交互范式完全不同。\n\n传统搜索系统（如 Elasticsearch, Solr）的核心是**‘查’。它的目标是返回最相关的 Document List。它依赖的是倒排索引（Inverted Index）和相关性打分（如 BM25、PageRank）。它的交付物是信息源**，用户需要自己阅读和提炼。\n\nRAG 系统的核心是**‘答’。它的目标是直接生成 Answer。它是搜索技术的上层封装，利用 LLM 的认知能力将检索到的信息源进行语义综合 (Synthesis)** 和推理。它的交付物是经过加工的知识。\n\n可以这么说：RAG = 搜索引擎（作为检索器） + LLM（作为阅读器和生成器）。RAG 正在重塑搜索体验，从‘Keyword-based’向‘Intent-based’转变。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
+  },
+  {
+    "id": "q_12",
+    "content": "知道或者使用过哪些开源 RAG 框架比如 Ragflow？如何选择合适场景？",
+    "gabriella_context": "LangChain：这就是 Lego (乐高) 积木。\n它给你提供了几千甚至上万种小零件（类和函数）。你想搭什么都行，城堡、飞船、机器人。\n缺点：太碎了！有时候我只想搭个小房子，它非要我从砖头烧起。而且版本更新极快，今天写的代码明天就 Deprecated 了。\nLlamaIndex：这是专门用来管数据索引的神器。\n如果你有几Ｔ的复杂数据，LlamaIndex 就像是一个超级图书管理员，它特别擅长怎么把数据存好、索引好。\nRagflow：这是最近很火的**“开箱即用”全家桶**。\n它就像是那种已经拼好的高达模型。你买回来就能摆着看（直接能跑）。\n它最牛的地方在于DeepDoc，也就是它对 PDF 里的表格解析做得特别好。如果你有很多复杂的财务报表，用 LangChain 解析可能是一坨乱码，但 Ragflow 能把表格还原得很漂亮。\n怎么选？ 如果我要快速搞个 Demo 给投资人看，用 LangChain/Ragflow。 如果我要做一个真正要上线、需要深度定制逻辑（比如我的 TableAwareChunking）的产品，我会借鉴它们的思路，但自己写核心 Pipeline，就像我在 Aegis-Isle 做的那样，这样才可控。\n\n代码：你看你的项目结构，虽然没有直接 import langchain，但是 \nPipeline\n、DocumentProcessor、\nRetriever\n 的模块划分，其实就是参考了 RAG 框架的经典架构，但是是你自己手写的轻量版。",
+    "pro_context": "“我非常关注开源社区的动态，对主流框架都有过调研。\n\nLangChain 是生态最丰富的，适合快速原型开发（Prototyping），它的组件化设计非常灵活。 LlamaIndex 则更专注于数据层，它在构建高级索引（如树状索引、关键词表混合索引）方面非常有深度。 而您提到的 Ragflow，我印象最深的是它集成的 DeepDoc 模块。它在处理 OCR 和复杂版面分析（Layout Analysis）方面做得非常出色，特别是对于包含大量图表的 PDF 文档，Ragflow 的解析效果往往优于传统的 Python 库。\n\n关于选择： 如果是处理非结构化程度高、版面复杂的文档（如研报、合同），我会优先考虑集成 Ragflow 或借鉴其解析模块。 但对于 Aegis-Isle 这样需要高度定制化切片逻辑和交互逻辑的项目，我倾向于参考 LlamaIndex 的设计理念，通过手写核心 Pipeline 来实现。因为框架往往封装过重，难以调试底层的 Prompt 细节或 Chunking 边界，只有自己掌握核心代码，才能在生产环境中快速定位和解决 Corner Case。”",
+    "answer_key": "“我非常关注开源社区的动态，对主流框架都有过调研。\n\nLangChain 是生态最丰富的，适合快速原型开发（Prototyping），它的组件化设计非常灵活。 LlamaIndex 则更专注于数据层，它在构建高级索引（如树状索引、关键词表混合索引）方面非常有深度。 而您提到的 Ragflow，我印象最深的是它集成的 DeepDoc 模块。它在处理 OCR 和复杂版面分析（Layout Analysis）方面做得非常出色，特别是对于包含大量图表的 PDF 文档，Ragflow 的解析效果往往优于传统的 Python 库。\n\n关于选择： 如果是处理非结构化程度高、版面复杂的文档（如研报、合同），我会优先考虑集成 Ragflow 或借鉴其解析模块。 但对于 Aegis-Isle 这样需要高度定制化切片逻辑和交互逻辑的项目，我倾向于参考 LlamaIndex 的设计理念，通过手写核心 Pipeline 来实现。因为框架往往封装过重，难以调试底层的 Prompt 细节或 Chunking 边界，只有自己掌握核心代码，才能在生产环境中快速定位和解决 Corner Case。”",
+    "difficulty": "high",
+    "box": 0,
+    "tags": [
+      "rag",
+      "gabriella"
+    ]
   }
-}
+]

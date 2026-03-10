@@ -143,6 +143,14 @@ def create_app() -> FastAPI:
         tags=["memory"]
     )
 
+    # 🌌 世界线管理器 API
+    from .routers.universe_manager import router as universe_router
+    app.include_router(
+        universe_router,
+        prefix="/v1",
+        tags=["universe"]
+    )
+
     @app.get("/")
     async def root():
         """Root endpoint."""

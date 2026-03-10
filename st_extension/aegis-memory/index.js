@@ -203,6 +203,7 @@ console.log('🧠 [AegisMemory] 脚本文件已加载，开始初始化...');
                     console.log(`  🌐 FAISS 向量检索: ${debugInfo.routed_faiss ? '命中 (长度 '+debugInfo.faiss_len+')' : '未命中'}`);
                     console.log(`  🌐 Graph 实体检索: ${debugInfo.routed_graph ? '命中 (长度 '+debugInfo.graph_len+')' : '未命中'}`);
                     console.log(`  🌐 Episode 剧情检索: ${debugInfo.routed_episode ? '命中 (长度 '+debugInfo.episode_len+')' : '未命中'}`);
+                    console.log(`  🌐 Diary 统一日记检索: ${(debugInfo.diary_len || 0) > 0 ? '命中 (长度 '+debugInfo.diary_len+')' : '未命中'}`);
                 }
 
                 const lastUser = [...chat].reverse().find(m => m.role === 'user');
@@ -233,7 +234,7 @@ console.log('🧠 [AegisMemory] 脚本文件已加载，开始初始化...');
                 // DEBUG_SAVE 功能（任务 H）：把最终组装完的所有 payload 发往后端持久化
                 if (s.debug) {
                     try {
-                        const promptText = chat.map(c => `[${c.role}]: ${typeof c.content === 'string' ? c.content : JSON.stringify(c.content)}`).join('\\n\\n');
+                        const promptText = chat.map(c => `[${c.role}]: ${typeof c.content === 'string' ? c.content : JSON.stringify(c.content)}`).join('\n\n');
                         const charAndWorld = s.world_line ? `${getCurrentChar()}_${s.world_line}` : getCurrentChar();
                         await fetch(`${s.aegis_base_url}/v1/memory/debug_save`, {
                             method: 'POST',

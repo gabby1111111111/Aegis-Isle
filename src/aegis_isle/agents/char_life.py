@@ -2,70 +2,177 @@
 CharLifeAgent: 独立的后台自治节点
 
 功能描述:
-1. 定时或对话间隙触发。
-2. 读取角色的 `graph_nodes` 中的 `tags`/`hobbies`/`occupation` 构建搜索关键词。
-3. 调用 Researcher 拉取相关新闻/学术动态。
-4. 调用 Summarizer 生成 100-200 字的角色视角碎片感想。
-5. 存入 FAISS，类型标记为 `autonomous_memory`。
-6. 更新 Graph 里该角色节点的 `current_mood` 属性。
+1. 读取角色的 Persona (通过 PersonaManager) 提取兴趣标签。
+2. 调用 Researcher (Wikipedia API) 拉取相关词条的摘要。
+3. 调用 Summarizer (SiliconFlow) 生成 100-200 字的角色视角碎片感想，并强制使用 ECoT 与 Show-Don't-Tell 技巧。
+4. 将内心独白发送至 LifeEventBus。
 """
 
 import json
 import logging
 import asyncio
+import re
+import httpx
 from datetime import datetime
 from typing import Optional
+
+from aegis_isle.core.config import settings
+from aegis_isle.interview.persona_manager import PersonaManager
+from aegis_isle.rag.event_logger import event_bus
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
 class CharLifeAgent:
-    def __init__(self, memory_manager, vector_store=None):
+    def __init__(self, memory_manager=None, vector_store=None):
         self.memory_manager = memory_manager
         self.vector_store = vector_store
+        self.persona_manager = PersonaManager()
 
     async def extract_keywords_from_graph(self, character_name: str, universe_id: str) -> list[str]:
-        """从 Graph nodes 提取搜索关键词"""
-        # TODO: 从 neo4j / 真实 graph 存储中读取该角色的 attributes
-        # 模拟返回
+        """从角色的 Persona 中提取兴趣标签用于搜索"""
         logger.info(f"[{self.__class__.__name__}] 提取 {character_name} 在 {universe_id} 的兴趣标签...")
-        return ["刑法学动态", "未成年人保护", "古典音乐"]
+        persona = self.persona_manager.get_persona(character_name)
+        if not persona:
+            # 如果没找到， fallback 给一些通用词
+            logger.warning(f"[{self.__class__.__name__}] 未找到 {character_name} 的 Persona 卡片，使用默认标签")
+            return ["文学加工", "心理学", "现代艺术"]
+            
+        # 简单从 description 或 personality 提取几个潜在关键词
+        # 实际项目中如果 tag 结构化更好可以直接拿。这里用启发式简单切分
+        import random
+        text = persona.description + " " + persona.personality
+        # 提取两个字以上的名词或形容词作为粗糙的关键词 (这里简单处理，提取中文字符串片段)
+        words = re.findall(r'[\u4e00-\u9fa5]{2,5}', text)
+        if len(words) > 5:
+            return random.sample(words, 3)
+        return ["社会新闻", "科技前沿", "历史人文"]
 
     async def fetch_news_via_researcher(self, keywords: list[str]) -> str:
-        """调用 Researcher 节点获取外部新闻"""
-        # TODO: 集成 Tavily / 真实 Researcher 逻辑
-        logger.info(f"[{self.__class__.__name__}] 搜索新闻: {keywords}")
-        return "今日头条：未成年人保护法修订草案公开征求意见，涉及监护人责任认定标准的变化。"
+        """调用 Wikipedia API 极速获取外部知识/新闻作为刺激源"""
+        if not keywords:
+            return "日常发呆中..."
+            
+        import random
+        keyword = random.choice(keywords)
+        logger.info(f"[{self.__class__.__name__}] 使用词汇 [{keyword}] 搜索外部刺激源...")
+        
+        url = "https://zh.wikipedia.org/w/api.php"
+        params = {
+            "action": "query",
+            "list": "search",
+            "srsearch": keyword,
+            "utf8": "",
+            "format": "json",
+            "srlimit": 1
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                res = await client.get(url, params=params)
+                if res.status_code == 200:
+                    data = res.json()
+                    search_results = data.get("query", {}).get("search", [])
+                    if search_results:
+                        snippet = search_results[0].get("snippet", "")
+                        # 简单清理 HTML 标签
+                        clean_snippet = re.sub(r'<[^>]+>', '', snippet)
+                        title = search_results[0].get("title", "")
+                        return f"最近看了一些关于【{title}】的资料：{clean_snippet}..."
+        except Exception as e:
+            logger.warning(f"[{self.__class__.__name__}] 外部检索失败: {e}")
+            
+        return f"脑海中闪过了关于【{keyword}】的思考碎片..."
 
     async def generate_reaction_via_summarizer(self, character_name: str, news_context: str) -> dict:
-        """调用 Summarizer 生成碎片感想和情绪标签"""
-        # TODO: 注入 Prompt 调用 LLM 生成 100-200 字感想
+        """调用 SiliconFlow LLM 生成碎片感想和情绪标签 (包含高级 Prompt Engineering)"""
         logger.info(f"[{self.__class__.__name__}] 为 {character_name} 生成反应...")
-        return {
-            "char_reaction": "让他想起上周课上那个学生的提问，关于监护权边界的探讨总是那么苍白...",
-            "emotion_tag": "沉思/轻微烦躁",
-            "source_topic": "未成年人保护法修订"
-        }
+        
+        persona = self.persona_manager.get_persona(character_name)
+        persona_desc = f"Name: {persona.name}\nRole: {persona.role}\nPersonality: {persona.personality}" if persona else f"Name: {character_name}\nPersonality: 随和"
+        
+        system_prompt = f"""你现在是在精神世界里进行反思的 {character_name}。这不会发送给别人，仅仅是你的私密心理活动。
+
+<identity_rules>
+{persona_desc}
+</identity_rules>
+
+<recent_events>
+你刚刚接触到了以下信息/事件：
+{news_context}
+</recent_events>
+
+<writing_constraints>
+1. 【展示而非告知】：绝对禁止使用“开心、难过、期待”等抽象情绪词汇。必须通过周围环境的互动、身体细微动作、或关注的具体物品来展示情绪。
+2. 【零比喻】：禁止使用“像…一样”、“仿佛”。用最克制、最白描的语言直击本质。
+3. 【禁止升华】：禁止在结尾总结感悟或说教，在动作或一个未尽的念头处戛然而止。
+4. 【符合人设】：绝不可 OOC。你的语言风格必须完全契合你的核心性格。
+</writing_constraints>
+
+请在 <thinking> 标签内进行 3 步思考，然后在 <autonomous_memory> 标签内写下 50-150 字的高质量日志内容。"""
+
+        api_key = settings.openai_api_key
+        base_url = settings.openai_base_url or "https://api.siliconflow.cn/v1"
+        model = "Qwen/Qwen2.5-7B-Instruct"
+
+        if not api_key:
+            logger.warning("未配置 OPENAI_API_KEY，降级为 Mock 返回")
+            return {
+                "char_reaction": f"看着关于 {news_context[:10]} 的资料，指尖在纸页上停顿了一下，最终还是翻了过去。",
+                "emotion_tag": "平静", 
+                "source_topic": "未配置API"
+            }
+
+        client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[{"role": "system", "content": system_prompt}],
+                max_tokens=500,
+                temperature=0.7
+            )
+            content = response.choices[0].message.content
+            
+            # 提取 <autonomous_memory> 标签中的内容
+            diary_match = re.search(r'<autonomous_memory>(.*?)</autonomous_memory>', content, re.DOTALL)
+            reaction = diary_match.group(1).strip() if diary_match else content.strip()
+            
+            # 清理过长的 thinking 内容，如果 LLM 没有正确输出标签
+            if "<thinking>" in reaction:
+                reaction = reaction.split("</thinking>")[-1].strip()
+                
+            return {
+                "char_reaction": reaction,
+                "emotion_tag": "深思", # 情绪标签可以另行提取，这里先写固定或靠后续步骤
+                "source_topic": news_context[:20]
+            }
+        except Exception as e:
+            logger.error(f"[{self.__class__.__name__}] LLM 生成失败: {e}")
+            return {
+                "char_reaction": "叹了口气，把这件事情抛在了脑后。",
+                "emotion_tag": "无奈",
+                "source_topic": "Error"
+            }
 
     async def save_autonomous_memory(self, universe_id: str, character_name: str, reaction_data: dict):
-        """将感想存入 FAISS 并标记类型为 autonomous_memory"""
-        # TODO: 封装为 ChatChunk (或 Document) 存入 FAISS
-        memory_doc = {
-            "type": "autonomous_memory",
-            "universe_id": universe_id,
-            "char": character_name,
-            "trigger": "news",
-            "source_topic": reaction_data.get("source_topic", ""),
-            "char_reaction": reaction_data.get("char_reaction", ""),
-            "emotion_tag": reaction_data.get("emotion_tag", "平静"),
-            "timestamp": datetime.now().isoformat()
-        }
-        logger.info(f"[{self.__class__.__name__}] 保存自治记忆: {json.dumps(memory_doc, ensure_ascii=False)}")
-        # await self.memory_manager.ingest_chunks(...)
+        """将感想发送至 LifeEventBus 统一保存"""
+        logger.info(f"[{self.__class__.__name__}] 发送自治记忆至 LifeEventBus...")
+        await event_bus.log_character_activity(
+            universe_id=universe_id,
+            character=character_name,
+            action_type="autonomous_introspection",
+            details={
+                "trigger": "news/wiki",
+                "source_topic": reaction_data.get("source_topic", ""),
+                "char_reaction": reaction_data.get("char_reaction", ""),
+                "emotion_tag": reaction_data.get("emotion_tag", "平静"),
+            }
+        )
 
     async def update_graph_mood(self, universe_id: str, character_name: str, emotion_tag: str):
         """更新 Graph 节点的 current_mood 属性"""
-        # TODO: 执行 Graph DB 更新 (如 neo4j Cypher)
-        logger.info(f"[{self.__class__.__name__}] 更新 {character_name} ({universe_id}) 心情至: {emotion_tag}")
+        logger.debug(f"[{self.__class__.__name__}] 更新 {character_name} ({universe_id}) 心情至: {emotion_tag}")
 
     async def run_cycle(self, character_name: str, universe_id: str):
         """执行一个完整的自治生命周期循环"""
@@ -82,10 +189,9 @@ class CharLifeAgent:
             await self.save_autonomous_memory(universe_id, character_name, reaction)
             await self.update_graph_mood(universe_id, character_name, reaction.get("emotion_tag", "平静"))
             
-            logger.info(f"[{self.__class__.__name__}] 后台思考循环完成。")
+            logger.info(f"[{self.__class__.__name__}] 后台思考循环完成。已写入 LifeEventBus。")
             
         except Exception as e:
-            # 必须隔离报错，避免影响主系统
             logger.error(f"[{self.__class__.__name__}] 执行出错: {e}", exc_info=True)
 
 
@@ -94,7 +200,8 @@ class CharLifeAgent:
 # -----------------------------------------------------
 if __name__ == "__main__":
     async def test():
+        # 需要确保环境变量中有 OPENAI_API_KEY
         agent = CharLifeAgent(memory_manager=None)
-        await agent.run_cycle("邹峥", "12岁_养父_真实开局")
+        await agent.run_cycle("ZouZheng", "12岁_养父_真实开局")
         
     asyncio.run(test())

@@ -1,0 +1,31 @@
+---LOG---
+2e2c86c - gabby, Sat Mar 7 20:51:59 2026 +0800 : feat(rag): add multi-universe query support and dynamic ST plugin checkbox UI
+---STATUS---
+On branch main
+Your branch is ahead of 'origin/main' by 1 commit.
+  (use "git push" to publish your local commits)
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   .gitignore
+	modified:   src/aegis_isle/api/routers/memory.py
+	modified:   src/aegis_isle/rag/embedder.py
+	modified:   src/aegis_isle/rag/st_memory_manager.py
+	modified:   st_extension/aegis-memory/index.js
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	current_status.txt
+	git_info_report.txt
+	recent_commits.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+---DIFF---
+ .gitignore                              |  5 ++++-
+ src/aegis_isle/api/routers/memory.py    | 11 ++++++----
+ src/aegis_isle/rag/embedder.py          |  2 +-
+ src/aegis_isle/rag/st_memory_manager.py | 36 +++++++++++++++++++--------------
+ st_extension/aegis-memory/index.js      | 14 ++++++++++++-
+ 5 files changed, 46 insertions(+), 22 deletions(-)

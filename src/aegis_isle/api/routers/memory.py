@@ -15,6 +15,8 @@ import logging
 from ...rag.st_memory_manager import memory_manager
 from ...rag.graph_searcher import graph_searcher
 from ...rag.episode_searcher import episode_searcher
+from ...rag.event_logger import event_bus
+from ...rag.daily_digest import daily_digest
 import asyncio
 import os
 import time
@@ -104,20 +106,25 @@ async def search_memory(req: MemorySearchRequest):
             if not do_episode: return ""
             return await episode_searcher.search(req.query, req.world_line or "")
 
-        # 并发执行三路检索
-        docs, graph_text, episode_text = await asyncio.gather(
+        async def _run_diary():
+            return await daily_digest.search(req.query, k=2)
+
+        # 并发执行四路检索
+        docs, graph_text, episode_text, diary_text = await asyncio.gather(
             _run_faiss(),
             _run_graph(),
-            _run_episode()
+            _run_episode(),
+            _run_diary()
         )
         
         # 结果拼装
         faiss_text = memory_manager.format_context_for_prompt(docs) if docs else ""
         
         final_context_parts = []
+        if diary_text: final_context_parts.append(diary_text)
         if graph_text: final_context_parts.append(graph_text)
         if episode_text: final_context_parts.append(episode_text)
-        if faiss_text: final_context_parts.append(f"【详细记忆】\n{faiss_text}")
+        if faiss_text: final_context_parts.append(f"【最近聊天片段】\n{faiss_text}")
         
         final_context_string = "\n\n".join(final_context_parts)
         
@@ -136,7 +143,8 @@ async def search_memory(req: MemorySearchRequest):
             "routed_episode": do_episode,
             "faiss_len": len(faiss_text),
             "graph_len": len(graph_text),
-            "episode_len": len(episode_text)
+            "episode_len": len(episode_text),
+            "diary_len": len(diary_text)
         }
         
         logger.info(f"[Memory] 并发查询完成, context总长度: {len(final_context_string)}")
@@ -206,10 +214,9 @@ class DebugSaveRequest(BaseModel):
 async def debug_save_prompt(req: DebugSaveRequest):
     """供前端调用的 Debug 保存接口，将最终拼接好的 Prompt 持久化"""
     try:
-        if os.environ.get("DEBUG_SAVE", "").lower() != "true":
-            return JSONResponse({"status": "skipped", "reason": "DEBUG_SAVE not enabled"})
-            
-        debug_dir = os.path.join(os.getcwd(), "debug", "prompts")
+        # 移除强制要求环境变量的阻挠，只要前端发了请求就存
+        # 按照用户强制要求指定到根目录的 debug/prompts 下
+        debug_dir = r"E:\Aegis_Isle\AegisIsle_cc_ver\Aegis-Isle\debug\prompts"
         os.makedirs(debug_dir, exist_ok=True)
         
         safe_world = "".join([c for c in req.universe_id if c.isalnum() or c in (' ', '-', '_')]).strip()
@@ -278,4 +285,79 @@ async def ingest_memory(req: MemoryIngestRequest):
         
     except Exception as e:
         logger.error(f"[Memory] 存入记忆失败: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+# ============================================
+# 接口：接收事件日志写流 (LifeEventBus)
+# ============================================
+
+class DiaryEventRequest(BaseModel):
+    source: str                 # "browsing", "interview", "character", "chat"
+    action: str                 # 行为名称，如 "read", "like", "answer_question"
+    title: Optional[str] = None # 用于浏览或题目
+    tags: Optional[List[str]] = None
+    url: Optional[str] = None
+    platform: Optional[str] = None
+    comment: Optional[str] = None
+    correct: Optional[bool] = None     # 面试系统用
+    category: Optional[str] = None     # 面试系统用
+    universe_id: Optional[str] = None  # 角色行为/聊天摘要用
+    character: Optional[str] = None    # 角色行为/聊天摘要用
+    summary: Optional[str] = None      # 聊天摘要用
+    details: Optional[dict] = None     # 角色行为用
+
+@router.post("/diary/event")
+async def receive_diary_event(req: DiaryEventRequest):
+    """
+    统一的数据流入口：接收前端、其他后台服务或代理扩展的异步事件流并写入 JSONL
+    """
+    try:
+        source = req.source.lower()
+        if source == "browsing":
+            await event_bus.log_browsing(
+                action=req.action,
+                title=req.title or "Unknown",
+                tags=req.tags or [],
+                url=req.url or "",
+                platform=req.platform or "Unknown",
+                comment=req.comment
+            )
+        elif source == "interview":
+            await event_bus.log_interview(
+                question_text=req.title or "Unknown Question",
+                correct=req.correct if req.correct is not None else False,
+                category=req.category or "Unknown",
+                tags=req.tags or []
+            )
+        elif source == "chat":
+            await event_bus.log_chat_summary(
+                universe_id=req.universe_id or "default",
+                character=req.character or "Unknown",
+                summary=req.summary or ""
+            )
+        elif source == "character":
+            await event_bus.log_character_activity(
+                universe_id=req.universe_id or "default",
+                character=req.character or "Unknown",
+                action_type=req.action,
+                details=req.details or {}
+            )
+        else:
+            return JSONResponse(status_code=400, content={"status": "error", "message": f"未知来源: {source}"})
+            
+        return JSONResponse({"status": "ok", "message": "事件已记录入 LifeEventBus"})
+    except Exception as e:
+        logger.error(f"[DiaryEvent] 记录事件失败: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+@router.post("/diary/compile")
+async def compile_daily_diary():
+    """手动触发汇聚当天的所有事件 JSONL 成一条日记文本，并编入 FAISS 索引"""
+    try:
+        from ...rag.daily_digest import daily_digest
+        result = await daily_digest.compile_and_index()
+        return JSONResponse(result)
+    except Exception as e:
+        logger.error(f"[DiaryCompile] 编译日记失败: {e}", exc_info=True)
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
