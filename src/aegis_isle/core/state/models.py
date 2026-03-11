@@ -6,7 +6,7 @@ Each UserState contains multiple Sheets (tables), each with metadata and row dat
 """
 
 from typing import Dict, List, Any, Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
@@ -54,8 +54,7 @@ class SheetMetadata(BaseModel):
         description="Conditions for inserting new rows"
     )
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class Sheet(BaseModel):
@@ -80,8 +79,7 @@ class Sheet(BaseModel):
         description="Display order of this sheet"
     )
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
     def get_header(self) -> List[str]:
         """Get the header row (first row)."""
@@ -242,5 +240,4 @@ class TableEditCommand(BaseModel):
         description="Condition for update/delete (e.g., {'column': 0, 'value': 'Key'})"
     )
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)

@@ -13,7 +13,7 @@ from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, asdict
 from enum import IntEnum
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from ..core.logging import logger
 from ..core.config import settings
@@ -78,7 +78,8 @@ class Question(BaseModel):
     attempts: int = Field(default=0, ge=0, description="Number of attempts")
     correct_answers: int = Field(default=0, ge=0, description="Number of correct answers")
 
-    @validator('next_review', 'created_at')
+    @field_validator('next_review', 'created_at')
+    @classmethod
     def validate_datetime_string(cls, v):
         """Validate datetime string format."""
         try:
