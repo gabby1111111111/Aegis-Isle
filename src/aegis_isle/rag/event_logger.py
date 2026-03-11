@@ -22,7 +22,8 @@ class LifeEventBus:
             "browsing": self.base_dir / "browsing.jsonl",
             "interview": self.base_dir / "interview.jsonl",
             "chat_summary": self.base_dir / "chat_summary.jsonl",
-            "character_activity": self.base_dir / "character_activity.jsonl"
+            "character_activity": self.base_dir / "character_activity.jsonl",
+            "pending_char_activity": self.base_dir / "pending_char_activity.jsonl"
         }
         
         # 确保文件存在
@@ -83,14 +84,14 @@ class LifeEventBus:
         await asyncio.to_thread(self._append_to_log, "chat_summary", data)
 
     async def log_character_activity(self, universe_id: str, character: str, action_type: str, details: dict):
-        """记录角色自主做的事情（CharLifeAgent）"""
+        """记录角色自主做的事情（CharLifeAgent），先进入待审核队列"""
         data = {
             "action": action_type,
             "universe_id": universe_id,
             "character": character,
             "details": details
         }
-        await asyncio.to_thread(self._append_to_log, "character_activity", data)
+        await asyncio.to_thread(self._append_to_log, "pending_char_activity", data)
 
 # 全局单例
 event_bus = LifeEventBus()
