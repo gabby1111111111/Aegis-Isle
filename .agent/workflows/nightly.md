@@ -25,7 +25,7 @@ python scripts/nightly_pipeline.py
 
 2. 检查生成的报告
 ```
-cat cowokers_ai/NIGHTLY_REPORT.md
+cat cowokers_ai/reports/NIGHTLY_REPORT.md
 ```
 
 3. 查看三轨看板是否更新
@@ -92,7 +92,7 @@ streamlit run <改动的页面>.py --server.port <空闲端口>
 
 | 输出 | 路径 | 说明 |
 |------|------|------|
-| 夜间报告 | `cowokers_ai/NIGHTLY_REPORT.md` | 测试结果 + 变更统计 |
+| 夜间报告 | `cowokers_ai/reports/NIGHTLY_REPORT.md` | 测试结果 + 变更统计 |
 | 三轨看板 | `cowokers_ai/CURRENT_TASK.md` | 按三条战线自动分类 |
 | 面试同步 | `cowokers_ai/interview_changelog.md` | 代码变更 → 面试话术 |
 | 详细日志 | `logs/nightly/YYYYMMDD_HHMMSS.log` | 历史日志存档 |

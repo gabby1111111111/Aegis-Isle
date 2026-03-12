@@ -143,7 +143,7 @@ git add .
 git commit -m "auto-fix: Antigravity nightly loop completed - X files fixed, Y skipped"
 ```
 
-生成战报文件 `cowokers_ai/LOOP_REPORT.md`:
+生成战报文件 `cowokers_ai/reports/LOOP_REPORT.md`:
 ```markdown
 # 🌙 夜间自动修复战报
 

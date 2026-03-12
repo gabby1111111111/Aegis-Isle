@@ -32,12 +32,13 @@ description: 早安汇报 - Bubby 总管家带领各模块小弟向 Boss 汇报
 // turbo-all
 
 0. **捕捉主神的踪迹（过去 6 小时回溯）**：在终端执行 `git status -s` 和 `git log --all --since="6 hours ago" --name-status`（如果需要，请同时在面试系统和ST集成扩展中也执行），并查看当前正在挂机的后台终端任务。专门挑出那些明显的**人类手写特征**（非 Agent 格式化提交）的脚本、新技能、或是测试文件。
-1. **浏览子 Agent 产出报告**：用 `view_file` 读取 `cowokers_ai/` 下所有 `DONE_*.md`、`LOOP_REPORT.md`、`NIGHTLY_DONE.md`、`NIGHTLY_REPORT.md` 文件的完整内容
+1. **浏览子 Agent 产出报告**：用 `view_file` 读取 `cowokers_ai/archive/` 下所有 `DONE_*.md`、`NIGHTLY_DONE.md`，以及 `cowokers_ai/reports/` 下的 `LOOP_REPORT.md`、`NIGHTLY_REPORT.md` 文件的完整内容
 2. **核实代码是否真的改了**：对每个子 Agent 声称修改的文件，用 `git diff` 或 `view_file` 实际验证修改存在
 3. **核实分支状态**：在 Aegis-Isle 项目下运行 `git branch -a` 和 `git log --all --oneline -n 15`
 4. **核实测试结果**：在 Aegis-Isle 项目下实际运行 `pytest -v tests/ 2>&1 | tail -20` 查看真实测试输出
 5. **核实文件是否存在**：对每份声称生成的文档文件，用 `view_file` 确认文件真实存在且内容非空
 6. **检查 auto_generated_docs/**：查看 `cowokers_ai/auto_generated_docs/` 下的所有文件是否存在以及它们的大小
+7. **了解目录结构**：`cowokers_ai/` 已按功能分类，详见 `cowokers_ai/README.md`。核心文件在根目录，报告在 `reports/`，设计文档在 `plans/`，已归档报告在 `archive/`
 7. **读取昨日报告**：查看 `C:\Users\MR\Desktop\bubby report\` 下是否有昨天的报告，读取作为对比参考
 
 > [!CAUTION]
@@ -97,7 +98,7 @@ Agent 小弟们每次做的任务不一样，**不要硬编码具体的 Agent �
 
 > [!IMPORTANT]
 > 不要假设 Agent 的名字或任务内容！一切以文件中的实际内容为准。
-> 如果 `cowokers_ai/` 下没有任何新的报告文件，直接写"昨晚无 Agent 值班"。
+> 如果 `cowokers_ai/archive/` 和 `cowokers_ai/reports/` 下没有任何新的报告文件，直接写"昨晚无 Agent 值班"。
 
 > [!CAUTION]
 > **强制门禁检查**: 任何 Agent 提交的功能性改动，如果缺少 `REVIEW_PACKAGE.md` 证据包
