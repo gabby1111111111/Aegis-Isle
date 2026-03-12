@@ -165,7 +165,7 @@ async def search_memory(req: MemorySearchRequest):
 # 接口：获取角色可用的所有宇宙/世界线列表
 # ============================================
 
-@router.get("/memory/universes")
+@router.get("/memory/{character_name}/universes")
 async def get_universes(character_name: str):
     """
     前端 ST 插件拉取当前角色的可用宇宙/世界线列表

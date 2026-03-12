@@ -142,6 +142,13 @@ async def chat_completions(request: Request, background_tasks: BackgroundTasks):
         # 解析请求
         body = await request.json()
         messages = body.get("messages", [])
+        
+        if not messages:
+            return JSONResponse(
+                status_code=400,
+                content={"error": {"message": "messages array is required and cannot be empty", "type": "invalid_request_error"}},
+            )
+            
         model = body.get("model", "gpt-4")
         stream = body.get("stream", True)
 
