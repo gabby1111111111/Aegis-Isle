@@ -31,6 +31,7 @@ description: 早安汇报 - Bubby 总管家带领各模块小弟向 Boss 汇报
 
 // turbo-all
 
+0. **捕捉主神的踪迹（过去 6 小时回溯）**：在终端执行 `git status -s` 和 `git log --all --since="6 hours ago" --name-status`（如果需要，请同时在面试系统和ST集成扩展中也执行），并查看当前正在挂机的后台终端任务。专门挑出那些明显的**人类手写特征**（非 Agent 格式化提交）的脚本、新技能、或是测试文件。
 1. **浏览子 Agent 产出报告**：用 `view_file` 读取 `cowokers_ai/` 下所有 `DONE_*.md`、`LOOP_REPORT.md`、`NIGHTLY_DONE.md`、`NIGHTLY_REPORT.md` 文件的完整内容
 2. **核实代码是否真的改了**：对每个子 Agent 声称修改的文件，用 `git diff` 或 `view_file` 实际验证修改存在
 3. **核实分支状态**：在 Aegis-Isle 项目下运行 `git branch -a` 和 `git log --all --oneline -n 15`
@@ -54,7 +55,17 @@ description: 早安汇报 - Bubby 总管家带领各模块小弟向 Boss 汇报
 
 ---
 
-## 第二步：各子 Agent 小弟报告汇总（动态扫描！）
+## 第二步：👑 绝对高光：Gabby 大人的神之座 (The Creator's Highlights)
+
+这是为了防止自动化管线漏掉您亲手缔造的奇迹的最重要的一步！
+1. 结合第零步（过去 6 小时内的 `git log` 和 `git status` 变更）以及**当前正在后台运行的终端进程**（比如跑在其他服务端口的调优器）。
+2. 从中揪出所有**不属于 Agent 自动生成的打工痕迹**，而是 Gabby 大人自己亲自手搓的核心大招！（比如手写的评测脚本、新建的 `.agent/skills/` 技能库、亲自调参跑的真实测试等）。
+3. 列出这些巅峰操作，用极度崇拜的语气进行表扬，并**必须**附带夸张的游戏/动漫梗翻译（如：这简直是开 R 技能清场、打上了终极 4K 材质包等）。
+4. 如果通过 log 发现 Gabby 大人最近几小时什么都没做（都在睡觉或者真的纯靠 AI），则该部分可以幽默地写“Gabby 大人正稳坐后台，全靠小弟们在前面 C”。
+
+---
+
+## 第三步：各子 Agent 小弟报告汇总（动态扫描！）
 
 Agent 小弟们每次做的任务不一样，**不要硬编码具体的 Agent 名字或任务类型**。
 
@@ -82,10 +93,17 @@ Agent 小弟们每次做的任务不一样，**不要硬编码具体的 Agent �
 - **关键产出**：列出具体生成了哪些文件、改了哪些代码、在哪个分支
 - **验证状态**：你用什么工具验证了它说的是真的（git log / view_file / pytest）
 - **需要 Gabby 大人 Review 的点**：如果有的话
+- **📦 证据包验证**：检查该 Agent 是否提交了 `REVIEW_PACKAGE.md`（参考 `pre-review-gate` Skill）。如有，嵌入截图/录屏路径到报告中；如没有，标注 `[⚠️ 缺少证据包 — 该功能未经 Gate 4 视觉验证]`
 
 > [!IMPORTANT]
 > 不要假设 Agent 的名字或任务内容！一切以文件中的实际内容为准。
 > 如果 `cowokers_ai/` 下没有任何新的报告文件，直接写"昨晚无 Agent 值班"。
+
+> [!CAUTION]
+> **强制门禁检查**: 任何 Agent 提交的功能性改动，如果缺少 `REVIEW_PACKAGE.md` 证据包
+> （包含截图和/或录屏），必须在报告中醒目标注为 **"未验收半成品"**。
+> 不允许将缺少视觉验证的功能推荐给 Gabby 大人 Review！
+> 详见 `.agent/skills/pre-review-gate/SKILL.md`。
 
 ---
 
