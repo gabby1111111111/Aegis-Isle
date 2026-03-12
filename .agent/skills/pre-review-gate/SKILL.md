@@ -168,6 +168,15 @@ flake8 src/ --count --statistics
 - `PathsToReview` 设为 `REVIEW_PACKAGE.md` 的路径
 - `Message` 简要说明改了什么，**不要复述证据包内容**
 
+### 📱 最终步：呼叫 Gabby 大人 (Mobile Push)
+
+在调用 `notify_user` 的同时（或之前），你必须**主动往 Gabby 大人的专属手机频道发一条 PUSH 通知**，提醒她来看你的成果。
+
+执行以下命令：
+```bash
+curl.exe -d "Gabby大人！我的证据包已经准备好了，快来看！✨" -H "Title: 📦 Review 邀请 - {功能名称}" -H "Priority: high" -H "Tags: bell,package" "https://ntfy.sh/gabby-ring"
+```
+
 ---
 
 ## ⚡ 速查流程图
