@@ -3,11 +3,10 @@ Enhanced Researcher Agent with web search integration and fallback mechanisms.
 Combines knowledge base retrieval with real-time web search capabilities.
 """
 
-import json
 import time
 from typing import Any, Dict, List, Optional, Union
 
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
 from ..base import BaseAgent, AgentConfig, AgentMessage, AgentResponse, AgentRole
@@ -34,7 +33,7 @@ class EnhancedResearcherAgent(BaseAgent):
         enable_web_search: bool = True,
         enable_rag_retrieval: bool = True,
         search_providers_config: Optional[Dict[str, Dict[str, str]]] = None,
-        fallback_strategy: str = "web_on_empty"  # always_web, web_on_empty, rag_only
+        fallback_strategy: str = "web_on_empty",  # always_web, web_on_empty, rag_only
     ):
         """Initialize enhanced researcher agent.
 
@@ -52,7 +51,9 @@ class EnhancedResearcherAgent(BaseAgent):
                 description="Enhanced research agent with web search and RAG integration",
                 max_tokens=2000,
                 temperature=0.7,
-                tools=["web_search", "rag_retrieval"] if enable_web_search else ["rag_retrieval"]
+                tools=["web_search", "rag_retrieval"]
+                if enable_web_search
+                else ["rag_retrieval"],
             )
 
         super().__init__(config)
@@ -77,7 +78,9 @@ class EnhancedResearcherAgent(BaseAgent):
             f"Strategy: {fallback_strategy}"
         )
 
-    def _initialize_search_tool(self, providers_config: Dict[str, Dict[str, str]]) -> None:
+    def _initialize_search_tool(
+        self, providers_config: Dict[str, Dict[str, str]]
+    ) -> None:
         """Initialize web search tool.
 
         Args:
@@ -97,7 +100,7 @@ class EnhancedResearcherAgent(BaseAgent):
                     name="researcher_web_search",
                     description="Web search for research and real-time information",
                     timeout=30,
-                    max_retries=3
+                    max_retries=3,
                 )
 
                 self.search_tool = SearchTool(
@@ -105,7 +108,7 @@ class EnhancedResearcherAgent(BaseAgent):
                     primary_provider="duckduckgo",  # Default to free provider
                     providers_config=providers_config,
                     enable_fallback=True,
-                    max_results=10
+                    max_results=10,
                 )
 
                 # Register the tool
@@ -122,9 +125,9 @@ class EnhancedResearcherAgent(BaseAgent):
             # Get enhanced retriever with reranking
             self.rag_retriever = get_retriever(
                 retriever_type="enhanced_multimodal",
-                vector_db_type=getattr(settings, 'vector_db_type', 'qdrant'),
+                vector_db_type=getattr(settings, "vector_db_type", "qdrant"),
                 enable_query_expansion=True,
-                enable_reranking=True
+                enable_reranking=True,
             )
 
             logger.info("Initialized RAG retriever for knowledge base search")
@@ -136,13 +139,15 @@ class EnhancedResearcherAgent(BaseAgent):
     def _initialize_llm(self) -> None:
         """Initialize the language model for result synthesis."""
         try:
-            model_name = self.config.model_name or getattr(settings, 'default_model', 'gpt-3.5-turbo')
+            model_name = self.config.model_name or getattr(
+                settings, "default_model", "gpt-3.5-turbo"
+            )
 
             self.llm = ChatOpenAI(
                 model=model_name,
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens,
-                openai_api_key=getattr(settings, 'openai_api_key', None)
+                openai_api_key=getattr(settings, "openai_api_key", None),
             )
 
             logger.debug(f"Initialized LLM: {model_name}")
@@ -166,10 +171,8 @@ class EnhancedResearcherAgent(BaseAgent):
             # Extract message content
             if isinstance(message, AgentMessage):
                 content = message.content
-                sender_id = message.sender_id
             else:
                 content = str(message)
-                sender_id = "user"
 
             logger.info(f"Researcher agent processing query: {content[:100]}...")
 
@@ -193,8 +196,8 @@ class EnhancedResearcherAgent(BaseAgent):
                     "rag_results": research_result.get("rag_results", 0),
                     "web_results": research_result.get("web_results", 0),
                     "strategy_used": research_result.get("strategy_used"),
-                    "total_sources": research_result.get("total_sources", 0)
-                }
+                    "total_sources": research_result.get("total_sources", 0),
+                },
             )
 
             if not research_result.get("success", True):
@@ -217,7 +220,7 @@ class EnhancedResearcherAgent(BaseAgent):
                 content="Research failed",
                 success=False,
                 error=str(e),
-                execution_time=execution_time
+                execution_time=execution_time,
             )
 
     async def _conduct_research(self, query: str) -> Dict[str, Any]:
@@ -266,7 +269,7 @@ class EnhancedResearcherAgent(BaseAgent):
                     "sources": [],
                     "rag_results": 0,
                     "web_results": 0,
-                    "strategy_used": self.fallback_strategy
+                    "strategy_used": self.fallback_strategy,
                 }
 
             # Synthesize results into coherent response
@@ -279,7 +282,7 @@ class EnhancedResearcherAgent(BaseAgent):
                     "url": result.get("url", result.get("source", "")),
                     "snippet": result.get("snippet", result.get("content", ""))[:200],
                     "type": result.get("type", "unknown"),
-                    "score": result.get("score", 0.0)
+                    "score": result.get("score", 0.0),
                 }
                 sources.append(source_info)
 
@@ -290,7 +293,7 @@ class EnhancedResearcherAgent(BaseAgent):
                 "rag_results": len(rag_results),
                 "web_results": len(web_results),
                 "total_sources": len(sources),
-                "strategy_used": self.fallback_strategy
+                "strategy_used": self.fallback_strategy,
             }
 
         except Exception as e:
@@ -298,7 +301,7 @@ class EnhancedResearcherAgent(BaseAgent):
             return {
                 "success": False,
                 "error": str(e),
-                "content": "An error occurred during research"
+                "content": "An error occurred during research",
             }
 
     async def _search_rag(self, query: str) -> List[Dict[str, Any]]:
@@ -319,8 +322,7 @@ class EnhancedResearcherAgent(BaseAgent):
 
             # Perform enhanced search with reranking
             search_result: EnhancedQueryResult = await self.rag_retriever.search(
-                query=query,
-                limit=5
+                query=query, limit=5
             )
 
             results = []
@@ -336,8 +338,8 @@ class EnhancedResearcherAgent(BaseAgent):
                     "metadata": {
                         "chunk_index": chunk.chunk_index,
                         "chunk_type": chunk.chunk_type,
-                        "document_id": chunk.document_id
-                    }
+                        "document_id": chunk.document_id,
+                    },
                 }
                 results.append(result)
 
@@ -365,10 +367,9 @@ class EnhancedResearcherAgent(BaseAgent):
             logger.debug(f"Searching web: {query}")
 
             # Perform web search
-            search_result = await self.search_tool.run({
-                "query": query,
-                "num_results": 5
-            })
+            search_result = await self.search_tool.run(
+                {"query": query, "num_results": 5}
+            )
 
             if search_result.status.value != "success":
                 logger.warning(f"Web search failed: {search_result.error}")
@@ -384,12 +385,13 @@ class EnhancedResearcherAgent(BaseAgent):
                     "snippet": web_result.get("snippet", ""),
                     "content": web_result.get("snippet", ""),  # Use snippet as content
                     "source": web_result.get("url", ""),
-                    "score": 1.0 - (web_result.get("rank", 1) * 0.1),  # Simple ranking score
+                    "score": 1.0
+                    - (web_result.get("rank", 1) * 0.1),  # Simple ranking score
                     "type": "web",
                     "metadata": {
                         "rank": web_result.get("rank"),
-                        "search_provider": search_data.get("provider_used")
-                    }
+                        "search_provider": search_data.get("provider_used"),
+                    },
                 }
                 results.append(result)
 
@@ -400,7 +402,9 @@ class EnhancedResearcherAgent(BaseAgent):
             logger.error(f"Web search failed: {e}")
             return []
 
-    async def _synthesize_results(self, query: str, results: List[Dict[str, Any]]) -> str:
+    async def _synthesize_results(
+        self, query: str, results: List[Dict[str, Any]]
+    ) -> str:
         """Synthesize search results into a coherent response.
 
         Args:
@@ -420,7 +424,7 @@ class EnhancedResearcherAgent(BaseAgent):
             for i, result in enumerate(results[:8]):  # Limit to 8 results
                 source_type = result.get("type", "unknown").upper()
                 content = result.get("content", result.get("snippet", ""))[:500]
-                title = result.get("title", f"Source {i+1}")
+                title = result.get("title", f"Source {i + 1}")
 
                 context_parts.append(f"[{source_type}] {title}:\n{content}")
 
@@ -480,10 +484,7 @@ class EnhancedResearcherAgent(BaseAgent):
         if not results:
             return "No relevant information found for your query."
 
-        response_parts = [
-            f"Here's what I found regarding '{query}':",
-            ""
-        ]
+        response_parts = [f"Here's what I found regarding '{query}':", ""]
 
         for i, result in enumerate(results[:5], 1):
             title = result.get("title", f"Result {i}")
@@ -497,10 +498,7 @@ class EnhancedResearcherAgent(BaseAgent):
         # Add source URLs if available
         web_sources = [r for r in results if r.get("type") == "web" and r.get("url")]
         if web_sources:
-            response_parts.extend([
-                "Web Sources:",
-                ""
-            ])
+            response_parts.extend(["Web Sources:", ""])
             for i, result in enumerate(web_sources, 1):
                 response_parts.append(f"{i}. {result['title']} - {result['url']}")
 
@@ -547,13 +545,13 @@ class ResearcherAgent(EnhancedResearcherAgent):
                 name="researcher_agent",
                 role=AgentRole.RESEARCHER,
                 description="Research agent (legacy wrapper)",
-                tools=["web_search", "rag_retrieval"]
+                tools=["web_search", "rag_retrieval"],
             )
 
         super().__init__(
             config=config,
             enable_web_search=True,
             enable_rag_retrieval=True,
-            fallback_strategy="web_on_empty"
+            fallback_strategy="web_on_empty",
         )
         logger.info("Initialized legacy ResearcherAgent wrapper")

@@ -22,6 +22,7 @@ from ..rag.pipeline import RAGPipeline
 # OAuth2 and RBAC Models
 class TokenData(BaseModel):
     """Token payload data model."""
+
     username: Optional[str] = None
     user_id: Optional[str] = None
     roles: List[str] = []
@@ -30,6 +31,7 @@ class TokenData(BaseModel):
 
 class UserInDB(BaseModel):
     """User model for database storage."""
+
     username: str
     user_id: str
     email: Optional[str] = None
@@ -43,6 +45,7 @@ class UserInDB(BaseModel):
 
 class CurrentUser(BaseModel):
     """Current authenticated user model."""
+
     user_id: str
     username: str
     email: Optional[str] = None
@@ -57,8 +60,8 @@ oauth2_scheme = OAuth2PasswordBearer(
     scopes={
         "read": "Read access",
         "write": "Write access",
-        "admin": "Administrative access"
-    }
+        "admin": "Administrative access",
+    },
 )
 
 # Password hashing
@@ -67,6 +70,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Mock database for users (in production, use real database)
 # Use lazy initialization to avoid bcrypt issues during module import
 _USERS_DB: Optional[Dict[str, UserInDB]] = None
+
 
 def get_users_db() -> Dict[str, UserInDB]:
     """Get user database, initializing if needed."""
@@ -79,10 +83,12 @@ def get_users_db() -> Dict[str, UserInDB]:
                 user_id="admin_001",
                 email="admin@aegisisle.com",
                 full_name="System Administrator",
-                hashed_password=pwd_context.hash(os.getenv("ADMIN_PASSWORD", "admin123")),
+                hashed_password=pwd_context.hash(
+                    os.getenv("ADMIN_PASSWORD", "admin123")
+                ),
                 roles=["user", "admin", "super_admin"],
                 is_active=True,
-                created_at=datetime.utcnow()
+                created_at=datetime.utcnow(),
             ),
             # Default test user
             "testuser": UserInDB(
@@ -93,8 +99,8 @@ def get_users_db() -> Dict[str, UserInDB]:
                 hashed_password=pwd_context.hash("testpass123"),
                 roles=["user"],
                 is_active=True,
-                created_at=datetime.utcnow()
-            )
+                created_at=datetime.utcnow(),
+            ),
         }
     return _USERS_DB
 
@@ -124,7 +130,7 @@ def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
             action="login_attempt",
             username=username,
             outcome="failure",
-            error_message="User not found"
+            error_message="User not found",
         )
         return None
     if not verify_password(password, user.hashed_password):
@@ -133,7 +139,7 @@ def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
             action="login_attempt",
             username=username,
             outcome="failure",
-            error_message="Invalid password"
+            error_message="Invalid password",
         )
         return None
     if not user.is_active:
@@ -142,7 +148,7 @@ def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
             action="login_attempt",
             username=username,
             outcome="failure",
-            error_message="User account is inactive"
+            error_message="User account is inactive",
         )
         return None
 
@@ -151,15 +157,15 @@ def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
 
     # Log successful authentication
     audit_logger.log_authentication(
-        action="login_success",
-        username=username,
-        outcome="success"
+        action="login_success", username=username, outcome="success"
     )
 
     return user
 
 
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
     """Create JWT access token.
 
     Args:
@@ -177,16 +183,16 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
         if expires_delta:
             expire = datetime.utcnow() + expires_delta
         else:
-            expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+            expire = datetime.utcnow() + timedelta(
+                minutes=settings.access_token_expire_minutes
+            )
 
         to_encode.update({"exp": expire})
 
         # Add token metadata
-        to_encode.update({
-            "iat": datetime.utcnow(),
-            "iss": "aegis-isle",
-            "type": "access_token"
-        })
+        to_encode.update(
+            {"iat": datetime.utcnow(), "iss": "aegis-isle", "type": "access_token"}
+        )
 
         encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm="HS256")
 
@@ -197,7 +203,7 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
         logger.error(f"Failed to create access token: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not create access token"
+            detail="Could not create access token",
         )
 
 
@@ -242,12 +248,7 @@ def verify_token(token: str) -> TokenData:
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        token_data = TokenData(
-            username=username,
-            user_id=user_id,
-            roles=roles,
-            exp=exp
-        )
+        token_data = TokenData(username=username, user_id=user_id, roles=roles, exp=exp)
 
         logger.debug(f"Token verified for user: {username}")
         return token_data
@@ -288,8 +289,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> CurrentUser:
     if not user.is_active:
         logger.warning(f"Inactive user attempted access: {user.username}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive"
+            status_code=status.HTTP_403_FORBIDDEN, detail="User account is inactive"
         )
 
     return CurrentUser(
@@ -298,7 +298,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> CurrentUser:
         email=user.email,
         full_name=user.full_name,
         roles=user.roles,
-        is_active=user.is_active
+        is_active=user.is_active,
     )
 
 
@@ -311,7 +311,10 @@ def require_role(required_roles: List[str]):
     Returns:
         Dependency function for FastAPI
     """
-    def role_checker(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+
+    def role_checker(
+        current_user: CurrentUser = Depends(get_current_user),
+    ) -> CurrentUser:
         if not any(role in current_user.roles for role in required_roles):
             logger.warning(
                 f"Access denied for user {current_user.username}. "
@@ -319,7 +322,7 @@ def require_role(required_roles: List[str]):
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Access denied. Required roles: {required_roles}"
+                detail=f"Access denied. Required roles: {required_roles}",
             )
         return current_user
 
@@ -346,7 +349,7 @@ def require_admin(current_user: CurrentUser = Depends(get_current_user)) -> Curr
             username=current_user.username,
             resource="admin_endpoints",
             outcome="failure",
-            required_permissions=["admin"]
+            required_permissions=["admin"],
         )
 
         logger.warning(
@@ -355,7 +358,7 @@ def require_admin(current_user: CurrentUser = Depends(get_current_user)) -> Curr
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Administrative privileges required"
+            detail="Administrative privileges required",
         )
 
     # Log successful authorization
@@ -365,14 +368,16 @@ def require_admin(current_user: CurrentUser = Depends(get_current_user)) -> Curr
         username=current_user.username,
         resource="admin_endpoints",
         outcome="success",
-        required_permissions=["admin"]
+        required_permissions=["admin"],
     )
 
     logger.info(f"Admin access granted to user: {current_user.username}")
     return current_user
 
 
-def require_super_admin(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+def require_super_admin(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> CurrentUser:
     """Require super admin role for access.
 
     Args:
@@ -392,7 +397,7 @@ def require_super_admin(current_user: CurrentUser = Depends(get_current_user)) -
             username=current_user.username,
             resource="super_admin_endpoints",
             outcome="failure",
-            required_permissions=["super_admin"]
+            required_permissions=["super_admin"],
         )
 
         logger.warning(
@@ -401,7 +406,7 @@ def require_super_admin(current_user: CurrentUser = Depends(get_current_user)) -
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Super administrative privileges required"
+            detail="Super administrative privileges required",
         )
 
     # Log successful authorization
@@ -411,7 +416,7 @@ def require_super_admin(current_user: CurrentUser = Depends(get_current_user)) -
         username=current_user.username,
         resource="super_admin_endpoints",
         outcome="success",
-        required_permissions=["super_admin"]
+        required_permissions=["super_admin"],
     )
 
     logger.info(f"Super admin access granted to user: {current_user.username}")
@@ -428,7 +433,7 @@ def get_rag_pipeline(request: Request) -> RAGPipeline:
         logger.error("RAG pipeline not initialized")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="RAG pipeline not available"
+            detail="RAG pipeline not available",
         )
     return pipeline
 
@@ -440,7 +445,7 @@ def get_agent_router(request: Request) -> AgentRouter:
         logger.error("Agent router not initialized")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Agent router not available"
+            detail="Agent router not available",
         )
     return router
 
@@ -452,7 +457,7 @@ def get_agent_orchestrator(request: Request) -> AgentOrchestrator:
         logger.error("Agent orchestrator not initialized")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Agent orchestrator not available"
+            detail="Agent orchestrator not available",
         )
     return orchestrator
 
@@ -463,7 +468,7 @@ def get_metrics_middleware(request: Request):
     if middleware is None:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Metrics not available"
+            detail="Metrics not available",
         )
     return middleware
 

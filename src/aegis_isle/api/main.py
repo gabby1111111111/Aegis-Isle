@@ -16,9 +16,8 @@ from .routers import (
     agents_router,
     health_router,
     admin_router,
-    admin_router,
     auth_router,
-    openai_compat
+    openai_compat,
 )
 from .routers.memory import router as memory_router
 
@@ -32,6 +31,7 @@ async def lifespan(app: FastAPI):
     # Initialize RAG pipeline
     try:
         from ..rag.pipeline import initialize_default_pipeline
+
         pipeline = await initialize_default_pipeline()
         app.state.rag_pipeline = pipeline
         logger.info("RAG pipeline initialized successfully")
@@ -76,7 +76,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/docs" if settings.debug else None,
         redoc_url="/redoc" if settings.debug else None,
-        lifespan=lifespan
+        lifespan=lifespan,
     )
 
     # Add CORS middleware
@@ -93,63 +93,28 @@ def create_app() -> FastAPI:
     setup_middleware(app)
 
     # Include routers
-    app.include_router(
-        health_router,
-        prefix="/api/v1/health",
-        tags=["health"]
-    )
+    app.include_router(health_router, prefix="/api/v1/health", tags=["health"])
 
-    app.include_router(
-        auth_router,
-        prefix="/api/v1",
-        tags=["authentication"]
-    )
+    app.include_router(auth_router, prefix="/api/v1", tags=["authentication"])
 
     # OpenAI Compatible API
-    app.include_router(
-        openai_compat.router,
-        prefix="/v1",
-        tags=["openai"]
-    )
+    app.include_router(openai_compat.router, prefix="/v1", tags=["openai"])
 
-    app.include_router(
-        documents_router,
-        prefix="/api/v1/documents",
-        tags=["documents"]
-    )
+    app.include_router(documents_router, prefix="/api/v1/documents", tags=["documents"])
 
-    app.include_router(
-        query_router,
-        prefix="/api/v1/query",
-        tags=["query"]
-    )
+    app.include_router(query_router, prefix="/api/v1/query", tags=["query"])
 
-    app.include_router(
-        agents_router,
-        prefix="/api/v1/agents",
-        tags=["agents"]
-    )
+    app.include_router(agents_router, prefix="/api/v1/agents", tags=["agents"])
 
-    app.include_router(
-        admin_router,
-        prefix="/api/v1/admin",
-        tags=["admin"]
-    )
+    app.include_router(admin_router, prefix="/api/v1/admin", tags=["admin"])
 
     # 🌟 长线记忆 API（供 SillyTavern 插件调用）
-    app.include_router(
-        memory_router,
-        prefix="/v1",
-        tags=["memory"]
-    )
+    app.include_router(memory_router, prefix="/v1", tags=["memory"])
 
     # 🌌 世界线管理器 API
     from .routers.universe_manager import router as universe_router
-    app.include_router(
-        universe_router,
-        prefix="/v1",
-        tags=["universe"]
-    )
+
+    app.include_router(universe_router, prefix="/v1", tags=["universe"])
 
     @app.get("/")
     async def root():
@@ -158,7 +123,7 @@ def create_app() -> FastAPI:
             "message": "Welcome to AegisIsle RAG API",
             "version": "0.1.0",
             "docs": "/docs" if settings.debug else "disabled",
-            "health": "/api/v1/health"
+            "health": "/api/v1/health",
         }
 
     @app.get("/info")
@@ -173,8 +138,8 @@ def create_app() -> FastAPI:
                 "rag": True,
                 "multi_agent": True,
                 "multimodal": settings.enable_multimodal,
-                "metrics": settings.enable_metrics
-            }
+                "metrics": settings.enable_metrics,
+            },
         }
 
     return app

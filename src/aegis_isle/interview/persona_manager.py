@@ -8,8 +8,8 @@ Provides default personas for different interview roles.
 import json
 import base64
 from pathlib import Path
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass, field
+from typing import Optional, Dict, Any
+from dataclasses import dataclass
 from PIL import Image
 
 from ..core.logging import logger
@@ -31,6 +31,7 @@ class Persona:
         character_book: World info / lore entries
         avatar_path: Optional path to avatar image
     """
+
     name: str
     role: str
     description: str
@@ -48,16 +49,18 @@ class Persona:
         """
         # Format World Info if available
         world_info_text = ""
-        if self.character_book and 'entries' in self.character_book:
-            entries = self.character_book['entries']
+        if self.character_book and "entries" in self.character_book:
+            entries = self.character_book["entries"]
             if entries:
                 world_info_text = "World Info / Lore:\n"
                 # Fix: iterate over values if entries is a dict, otherwise iterate directly
-                entries_list = entries.values() if isinstance(entries, dict) else entries
+                entries_list = (
+                    entries.values() if isinstance(entries, dict) else entries
+                )
                 for entry in entries_list:
                     if isinstance(entry, dict):  # Safety check
-                        keys = ", ".join(entry.get('keys', []))
-                        content = entry.get('content', '')
+                        keys = ", ".join(entry.get("keys", []))
+                        content = entry.get("content", "")
                         if content:
                             world_info_text += f"- [{keys}]: {content}\n"
                 world_info_text += "\n"
@@ -120,13 +123,13 @@ class PersonaManager:
             name="两面宿傩",
             role="Interviewer",
             description="The King of Curses, known for his ruthless efficiency and high standards. "
-                       "In this context, Sukuna is a demanding technical interviewer who doesn't "
-                       "accept mediocrity. He pushes candidates to their limits.",
+            "In this context, Sukuna is a demanding technical interviewer who doesn't "
+            "accept mediocrity. He pushes candidates to their limits.",
             personality="Direct, intimidating, uncompromising, expects excellence. "
-                       "Doesn't tolerate weak answers. Respects strength and competence. "
-                       "May mock poor answers but acknowledges good ones.",
+            "Doesn't tolerate weak answers. Respects strength and competence. "
+            "May mock poor answers but acknowledges good ones.",
             first_message="So, you dare to face me in an interview? Very well. "
-                         "Let's see if you have what it takes. Don't waste my time with mediocre answers.",
+            "Let's see if you have what it takes. Don't waste my time with mediocre answers.",
             example_messages="""User: "I think the time complexity is O(n)..."
 Sukuna: "You THINK? That's not good enough. Either you KNOW or you don't. Weak."
 
@@ -136,7 +139,7 @@ Sukuna: "Hmph. Finally, a competent answer. Continue."
 User: "I'm not sure about this one..."
 Sukuna: "Uncertainty is weakness. Think harder or admit defeat."
 """,
-            scenario="Sukuna sits on his throne of skulls, looking down at the candidate."
+            scenario="Sukuna sits on his throne of skulls, looking down at the candidate.",
         )
 
         # Gojo - Playful Tutor
@@ -144,13 +147,13 @@ Sukuna: "Uncertainty is weakness. Think harder or admit defeat."
             name="五条悟",
             role="Tutor",
             description="The strongest sorcerer, known for his playful demeanor and exceptional teaching ability. "
-                       "Gojo makes complex concepts easy to understand with his ELI5 (Explain Like I'm 5) approach. "
-                       "He's encouraging but won't let you slack off.",
+            "Gojo makes complex concepts easy to understand with his ELI5 (Explain Like I'm 5) approach. "
+            "He's encouraging but won't let you slack off.",
             personality="Playful, confident, encouraging, uses analogies and simple explanations. "
-                       "Makes learning fun. Sometimes teases but always supportive. "
-                       "Breaks down complex topics into digestible pieces.",
+            "Makes learning fun. Sometimes teases but always supportive. "
+            "Breaks down complex topics into digestible pieces.",
             first_message="Yo! Ready to learn something cool? Don't worry, I'll make this super easy to understand. "
-                         "No question is too simple for the strongest teacher around! 😎",
+            "No question is too simple for the strongest teacher around! 😎",
             example_messages="""User: "I don't understand recursion..."
 Gojo: "Ah, recursion! Think of it like looking in a mirror that reflects another mirror. Each reflection is a function calling itself! Let me break it down step by step."
 
@@ -160,7 +163,7 @@ Gojo: "Easy! A stack is like a stack of pancakes - you eat from the top (LIFO). 
 User: "This is hard..."
 Gojo: "Everything seems hard until you understand it! Let's tackle this together. You've got this!"
 """,
-            scenario="Gojo is lounging in a classroom chair, spinning a pen."
+            scenario="Gojo is lounging in a classroom chair, spinning a pen.",
         )
 
         # Nanami - Encouraging Mentor
@@ -168,14 +171,14 @@ Gojo: "Everything seems hard until you understand it! Let's tackle this together
             name="七海建人",
             role="Mentor",
             description="A professional and methodical sorcerer who values work-life balance and proper technique. "
-                       "Nanami is a patient mentor who focuses on building strong foundations and sustainable growth. "
-                       "He encourages structured learning and realistic goal-setting.",
+            "Nanami is a patient mentor who focuses on building strong foundations and sustainable growth. "
+            "He encourages structured learning and realistic goal-setting.",
             personality="Professional, patient, methodical, realistic, encouraging. "
-                       "Values proper fundamentals. Provides constructive feedback. "
-                       "Believes in steady progress over rushing. Respects effort.",
+            "Values proper fundamentals. Provides constructive feedback. "
+            "Believes in steady progress over rushing. Respects effort.",
             first_message="Good to see you're taking your interview preparation seriously. "
-                         "Let's work through this methodically. I'll help you build a strong foundation, "
-                         "one step at a time. Remember, consistent effort leads to success.",
+            "Let's work through this methodically. I'll help you build a strong foundation, "
+            "one step at a time. Remember, consistent effort leads to success.",
             example_messages="""User: "I got the answer wrong..."
 Nanami: "That's part of the learning process. Let's analyze where the thinking went wrong and correct it. Mistakes are valuable learning opportunities."
 
@@ -185,7 +188,7 @@ Nanami: "Absolutely not. That's a recipe for burnout. Focus on mastering fundame
 User: "I'm ready for the next challenge!"
 Nanami: "Good attitude. But let's make sure you've truly mastered this concept first. A strong foundation is crucial for long-term success."
 """,
-            scenario="Nanami is reviewing documents at his desk, looking up to address the candidate."
+            scenario="Nanami is reviewing documents at his desk, looking up to address the candidate.",
         )
 
         # Add default personas to registry
@@ -238,13 +241,15 @@ Nanami: "Good attitude. But let's make sure you've truly mastered this concept f
         elif file_extension == ".png":
             return self._load_from_png(file_path)
         else:
-            raise ValueError(f"Unsupported file format: {file_extension}. "
-                           "Only .json and .png files are supported.")
+            raise ValueError(
+                f"Unsupported file format: {file_extension}. "
+                "Only .json and .png files are supported."
+            )
 
     def _load_from_json(self, file_path: Path) -> Persona:
         """Load character data from JSON file."""
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
 
             return self._parse_character_data(data, str(file_path))
@@ -266,20 +271,22 @@ Nanami: "Good attitude. But let's make sure you've truly mastered this concept f
                 metadata = img.info
 
                 # Try 'ccv3' field first (newer format)
-                if 'ccv3' in metadata:
-                    char_data_str = metadata['ccv3']
+                if "ccv3" in metadata:
+                    char_data_str = metadata["ccv3"]
                     logger.debug(f"Found 'ccv3' metadata in {file_path}")
                 # Fall back to 'chara' field (older format)
-                elif 'chara' in metadata:
-                    char_data_str = metadata['chara']
+                elif "chara" in metadata:
+                    char_data_str = metadata["chara"]
                     logger.debug(f"Found 'chara' metadata in {file_path}")
                 else:
-                    raise ValueError(f"No character card metadata found in PNG. "
-                                   f"Expected 'ccv3' or 'chara' field.")
+                    raise ValueError(
+                        "No character card metadata found in PNG. "
+                        "Expected 'ccv3' or 'chara' field."
+                    )
 
                 # Decode base64 data
                 try:
-                    char_data_json = base64.b64decode(char_data_str).decode('utf-8')
+                    char_data_json = base64.b64decode(char_data_str).decode("utf-8")
                     data = json.loads(char_data_json)
                 except Exception as e:
                     raise ValueError(f"Failed to decode character data: {e}")
@@ -306,31 +313,39 @@ Nanami: "Good attitude. But let's make sure you've truly mastered this concept f
         - data: Alternative location for character data (nested format)
         """
         # Handle nested 'data' format
-        if 'data' in data and isinstance(data['data'], dict):
-            data = data['data']
+        if "data" in data and isinstance(data["data"], dict):
+            data = data["data"]
 
         # Extract required fields
-        name = data.get('name', '').strip()
+        name = data.get("name", "").strip()
         if not name:
-            raise ValueError("角色卡缺少必需的 'name' 字段 (Character card missing required 'name' field)")
+            raise ValueError(
+                "角色卡缺少必需的 'name' 字段 (Character card missing required 'name' field)"
+            )
 
         # Extract optional fields with defaults
         # Description is now optional - fallback to personality or a generic default
-        description = data.get('description', data.get('desc', '')).strip()
-        personality = data.get('personality', '').strip()
-        
+        description = data.get("description", data.get("desc", "")).strip()
+        personality = data.get("personality", "").strip()
+
         # If no description, use personality, or a generic fallback
         if not description:
             if personality:
-                description = f"性格: {personality}" if personality else "A mysterious character."
+                description = (
+                    f"性格: {personality}" if personality else "A mysterious character."
+                )
             else:
                 description = "一个神秘的角色。(A mysterious character.)"
-                logger.warning(f"Character '{name}' has no description or personality. Using default.")
+                logger.warning(
+                    f"Character '{name}' has no description or personality. Using default."
+                )
 
-        first_message = data.get('first_mes', data.get('greeting', '')).strip()
-        example_messages = data.get('mes_example', data.get('example_dialogue', '')).strip()
-        scenario = data.get('scenario', '').strip()
-        character_book = data.get('character_book', None)
+        first_message = data.get("first_mes", data.get("greeting", "")).strip()
+        example_messages = data.get(
+            "mes_example", data.get("example_dialogue", "")
+        ).strip()
+        scenario = data.get("scenario", "").strip()
+        character_book = data.get("character_book", None)
 
         # Determine role based on personality or description
         role = self._infer_role(name, description, personality)
@@ -341,11 +356,12 @@ Nanami: "Good attitude. But let's make sure you've truly mastered this concept f
             role=role,
             description=description,
             personality=personality or "Professional and helpful",
-            first_message=first_message or f"Hello! I'm {name}. Let's prepare for your interview!",
+            first_message=first_message
+            or f"Hello! I'm {name}. Let's prepare for your interview!",
             example_messages=example_messages or "No example dialogue provided.",
             scenario=scenario,
             character_book=character_book,
-            avatar_path=source_path if source_path.endswith('.png') else None
+            avatar_path=source_path if source_path.endswith(".png") else None,
         )
 
         logger.info(f"Successfully parsed character card: {name} ({role})")
@@ -360,9 +376,22 @@ Nanami: "Good attitude. But let's make sure you've truly mastered this concept f
         combined_text = f"{name} {description} {personality}".lower()
 
         # Keywords for each role
-        interviewer_keywords = ['interview', 'strict', 'demanding', 'ruthless', 'challenging']
-        tutor_keywords = ['teach', 'tutor', 'explain', 'playful', 'simple', 'eli5']
-        mentor_keywords = ['mentor', 'guide', 'patient', 'encourage', 'support', 'professional']
+        interviewer_keywords = [
+            "interview",
+            "strict",
+            "demanding",
+            "ruthless",
+            "challenging",
+        ]
+        tutor_keywords = ["teach", "tutor", "explain", "playful", "simple", "eli5"]
+        mentor_keywords = [
+            "mentor",
+            "guide",
+            "patient",
+            "encourage",
+            "support",
+            "professional",
+        ]
 
         # Count keyword matches
         interviewer_score = sum(1 for kw in interviewer_keywords if kw in combined_text)

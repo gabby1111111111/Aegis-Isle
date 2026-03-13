@@ -94,9 +94,7 @@ class ProcessedDocument(BaseModel):
     def __post_init__(self):
         """Calculate content hash after initialization."""
         if not self.content_hash and self.content:
-            self.content_hash = hashlib.sha256(
-                self.content.encode('utf-8')
-            ).hexdigest()
+            self.content_hash = hashlib.sha256(self.content.encode("utf-8")).hexdigest()
 
 
 class EnhancedDocumentProcessor:
@@ -107,7 +105,7 @@ class EnhancedDocumentProcessor:
         enable_ocr: bool = True,
         text_threshold: int = 100,  # Minimum text length before switching to OCR
         enable_table_extraction: bool = True,
-        enable_image_description: bool = True
+        enable_image_description: bool = True,
     ):
         """Initialize enhanced document processor.
 
@@ -126,17 +124,17 @@ class EnhancedDocumentProcessor:
         self.pdf_strategies = [
             self._process_pdf_fast,
             self._process_pdf_with_pdfplumber,
-            self._process_pdf_with_ocr
+            self._process_pdf_with_ocr,
         ]
 
         self.supported_types = {
-            '.pdf': self._process_pdf_hybrid,
-            '.docx': self._process_docx,
-            '.doc': self._process_doc,
-            '.txt': self._process_text,
-            '.md': self._process_markdown,
-            '.html': self._process_html,
-            '.htm': self._process_html,
+            ".pdf": self._process_pdf_hybrid,
+            ".docx": self._process_docx,
+            ".doc": self._process_doc,
+            ".txt": self._process_text,
+            ".md": self._process_markdown,
+            ".html": self._process_html,
+            ".htm": self._process_html,
         }
 
         logger.info(
@@ -145,9 +143,7 @@ class EnhancedDocumentProcessor:
         )
 
     async def process_file(
-        self,
-        file_path: Union[str, Path],
-        metadata: Optional[Dict[str, Any]] = None
+        self, file_path: Union[str, Path], metadata: Optional[Dict[str, Any]] = None
     ) -> ProcessedDocument:
         """Process a file with enhanced multi-modal extraction."""
         file_path = Path(file_path)
@@ -171,44 +167,53 @@ class EnhancedDocumentProcessor:
         enhanced_result = await processor(file_path)
 
         processing_time = time.time() - start_time
-        enhanced_result.metadata['processing_time'] = processing_time
+        enhanced_result.metadata["processing_time"] = processing_time
 
         # Update document metadata
-        doc_metadata.extraction_method = enhanced_result.metadata.get('extraction_method', 'unknown')
-        doc_metadata.ocr_used = enhanced_result.metadata.get('ocr_used', False)
+        doc_metadata.extraction_method = enhanced_result.metadata.get(
+            "extraction_method", "unknown"
+        )
+        doc_metadata.ocr_used = enhanced_result.metadata.get("ocr_used", False)
 
         # Create processed document with enhanced content
         content = enhanced_result.text
 
         # Append table information to content
         if enhanced_result.tables:
-            table_content = "\n\n".join([
-                f"Table {i+1}:\n{table.content}"
-                for i, table in enumerate(enhanced_result.tables)
-            ])
+            table_content = "\n\n".join(
+                [
+                    f"Table {i + 1}:\n{table.content}"
+                    for i, table in enumerate(enhanced_result.tables)
+                ]
+            )
             content += f"\n\n=== TABLES ===\n{table_content}"
 
         # Append image descriptions to content
         if enhanced_result.images:
-            image_content = "\n\n".join([
-                f"Image {i+1}: {img.description or 'No description available'}"
-                for i, img in enumerate(enhanced_result.images) if img.description
-            ])
+            image_content = "\n\n".join(
+                [
+                    f"Image {i + 1}: {img.description or 'No description available'}"
+                    for i, img in enumerate(enhanced_result.images)
+                    if img.description
+                ]
+            )
             if image_content:
                 content += f"\n\n=== IMAGES ===\n{image_content}"
 
         document = ProcessedDocument(
             content=content,
             metadata=doc_metadata,
-            processing_stats=enhanced_result.metadata
+            processing_stats=enhanced_result.metadata,
         )
 
         # Store enhanced data in processing stats for chunker access
-        document.processing_stats.update({
-            'tables': [table.dict() for table in enhanced_result.tables],
-            'images': [img.dict() for img in enhanced_result.images],
-            'enhanced_result': enhanced_result.dict()
-        })
+        document.processing_stats.update(
+            {
+                "tables": [table.dict() for table in enhanced_result.tables],
+                "images": [img.dict() for img in enhanced_result.images],
+                "enhanced_result": enhanced_result.dict(),
+            }
+        )
 
         logger.info(
             f"Enhanced processing completed: {len(content)} chars, "
@@ -228,13 +233,17 @@ class EnhancedDocumentProcessor:
 
                 # Check if we got enough text
                 if len(result.text.strip()) >= self.text_threshold:
-                    strategy_name = ['fast_text', 'pdfplumber', 'ocr'][i]
-                    result.metadata['extraction_method'] = strategy_name
-                    result.metadata['strategy_index'] = i
-                    logger.info(f"PDF processing succeeded with {strategy_name} strategy")
+                    strategy_name = ["fast_text", "pdfplumber", "ocr"][i]
+                    result.metadata["extraction_method"] = strategy_name
+                    result.metadata["strategy_index"] = i
+                    logger.info(
+                        f"PDF processing succeeded with {strategy_name} strategy"
+                    )
                     return result
                 else:
-                    logger.debug(f"Strategy {i} produced insufficient text ({len(result.text)} chars)")
+                    logger.debug(
+                        f"Strategy {i} produced insufficient text ({len(result.text)} chars)"
+                    )
 
             except Exception as e:
                 logger.warning(f"PDF processing strategy {i} failed: {e}")
@@ -244,7 +253,7 @@ class EnhancedDocumentProcessor:
         logger.error(f"All PDF processing strategies failed for {file_path}")
         return EnhancedDocumentResult(
             text="Failed to extract text from PDF",
-            metadata={'extraction_method': 'failed', 'error': 'All strategies failed'}
+            metadata={"extraction_method": "failed", "error": "All strategies failed"},
         )
 
     async def _process_pdf_fast(self, file_path: Path) -> EnhancedDocumentResult:
@@ -254,7 +263,7 @@ class EnhancedDocumentProcessor:
         try:
             import PyPDF2
 
-            with open(file_path, 'rb') as file:
+            with open(file_path, "rb") as file:
                 reader = PyPDF2.PdfReader(file)
                 content_parts = []
 
@@ -271,15 +280,17 @@ class EnhancedDocumentProcessor:
                         "total_pages": len(reader.pages),
                         "processing_time": time.time() - start_time,
                         "extraction_method": "fast_text",
-                        "library": "PyPDF2"
-                    }
+                        "library": "PyPDF2",
+                    },
                 )
 
         except Exception as e:
             logger.debug(f"Fast PDF extraction failed: {e}")
             raise
 
-    async def _process_pdf_with_pdfplumber(self, file_path: Path) -> EnhancedDocumentResult:
+    async def _process_pdf_with_pdfplumber(
+        self, file_path: Path
+    ) -> EnhancedDocumentResult:
         """Enhanced PDF processing with pdfplumber for better text and table extraction."""
         start_time = time.time()
 
@@ -308,24 +319,21 @@ class EnhancedDocumentProcessor:
                                     content=markdown_table,
                                     position=page_num,
                                     metadata={
-                                        'page': page_num,
-                                        'table_index': table_idx,
-                                        'rows': len(table_data),
-                                        'cols': len(table_data[0]) if table_data else 0
-                                    }
+                                        "page": page_num,
+                                        "table_index": table_idx,
+                                        "rows": len(table_data),
+                                        "cols": len(table_data[0]) if table_data else 0,
+                                    },
                                 )
                                 tables.append(table)
 
                     # Extract images (basic info only)
-                    if self.enable_image_description and hasattr(page, 'images'):
+                    if self.enable_image_description and hasattr(page, "images"):
                         for img_idx, img in enumerate(page.images):
                             parsed_img = ParsedImage(
                                 description=f"Image on page {page_num + 1}",
                                 position=page_num,
-                                metadata={
-                                    'page': page_num,
-                                    'image_index': img_idx
-                                }
+                                metadata={"page": page_num, "image_index": img_idx},
                             )
                             images.append(parsed_img)
 
@@ -340,8 +348,8 @@ class EnhancedDocumentProcessor:
                     "processing_time": time.time() - start_time,
                     "extraction_method": "pdfplumber",
                     "tables_extracted": len(tables),
-                    "images_found": len(images)
-                }
+                    "images_found": len(images),
+                },
             )
 
         except Exception as e:
@@ -358,7 +366,6 @@ class EnhancedDocumentProcessor:
         try:
             import pdf2image
             import pytesseract
-            from PIL import Image
 
             # Convert PDF to images
             images_list = pdf2image.convert_from_path(str(file_path))
@@ -367,7 +374,7 @@ class EnhancedDocumentProcessor:
 
             for page_num, image in enumerate(images_list):
                 # Extract text using OCR
-                text = pytesseract.image_to_string(image, lang='eng+chi_sim')
+                text = pytesseract.image_to_string(image, lang="eng+chi_sim")
                 if text.strip():
                     content_parts.append(text)
 
@@ -378,12 +385,12 @@ class EnhancedDocumentProcessor:
                         description=img_desc,
                         position=page_num,
                         size=(image.width, image.height),
-                        format='PIL_Image',
+                        format="PIL_Image",
                         metadata={
-                            'page': page_num,
-                            'ocr_extracted': True,
-                            'text_length': len(text)
-                        }
+                            "page": page_num,
+                            "ocr_extracted": True,
+                            "text_length": len(text),
+                        },
                     )
                     parsed_images.append(parsed_img)
 
@@ -398,8 +405,8 @@ class EnhancedDocumentProcessor:
                     "extraction_method": "ocr",
                     "ocr_used": True,
                     "ocr_language": "eng+chi_sim",
-                    "images_processed": len(images_list)
-                }
+                    "images_processed": len(images_list),
+                },
             )
 
         except Exception as e:
@@ -415,7 +422,9 @@ class EnhancedDocumentProcessor:
 
         # Header row
         header = table_data[0]
-        markdown_rows.append("| " + " | ".join(str(cell or "") for cell in header) + " |")
+        markdown_rows.append(
+            "| " + " | ".join(str(cell or "") for cell in header) + " |"
+        )
 
         # Separator row
         separator = "|" + "|".join(" --- " for _ in header) + "|"
@@ -430,16 +439,14 @@ class EnhancedDocumentProcessor:
         return "\n".join(markdown_rows)
 
     def _create_metadata(
-        self,
-        file_path: Path,
-        custom_metadata: Dict[str, Any]
+        self, file_path: Path, custom_metadata: Dict[str, Any]
     ) -> DocumentMetadata:
         """Create enhanced metadata for a file."""
         stat = file_path.stat()
         mime_type, _ = mimetypes.guess_type(str(file_path))
-        custom_metadata.pop('filename', None)
-        custom_metadata.pop('file_path', None)
-        custom_metadata.pop('file_size', None)
+        custom_metadata.pop("filename", None)
+        custom_metadata.pop("file_path", None)
+        custom_metadata.pop("file_size", None)
         return DocumentMetadata(
             filename=file_path.name,
             file_path=str(file_path),
@@ -447,7 +454,7 @@ class EnhancedDocumentProcessor:
             mime_type=mime_type,
             created_at=datetime.fromtimestamp(stat.st_ctime),
             modified_at=datetime.fromtimestamp(stat.st_mtime),
-            **custom_metadata
+            **custom_metadata,
         )
 
 
@@ -464,16 +471,14 @@ class DocumentProcessor(EnhancedDocumentProcessor):
             enable_ocr=True,
             text_threshold=100,
             enable_table_extraction=True,
-            enable_image_description=True
+            enable_image_description=True,
         )
 
         # Legacy attribute for compatibility
         self.ocr_enabled = self.enable_ocr
 
     async def process_text(
-        self,
-        content: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, content: str, metadata: Optional[Dict[str, Any]] = None
     ) -> ProcessedDocument:
         """Process raw text content."""
         doc_metadata = DocumentMetadata(
@@ -481,21 +486,19 @@ class DocumentProcessor(EnhancedDocumentProcessor):
             mime_type="text/plain",
             source="text_input",
             extraction_method="direct_text",
-            **(metadata or {})
+            **(metadata or {}),
         )
 
         document = ProcessedDocument(
             content=content,
             metadata=doc_metadata,
-            processing_stats={"content_length": len(content)}
+            processing_stats={"content_length": len(content)},
         )
 
         return document
 
     async def process_url(
-        self,
-        url: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, url: str, metadata: Optional[Dict[str, Any]] = None
     ) -> ProcessedDocument:
         """Process content from a URL."""
         import aiohttp
@@ -506,24 +509,22 @@ class DocumentProcessor(EnhancedDocumentProcessor):
                     content = await response.text()
 
             doc_metadata = DocumentMetadata(
-                filename=url.split('/')[-1] or "webpage",
+                filename=url.split("/")[-1] or "webpage",
                 source="url",
-                mime_type=response.headers.get('content-type', 'text/html'),
+                mime_type=response.headers.get("content-type", "text/html"),
                 extraction_method="web_scraping",
                 **(metadata or {}),
-                custom_fields={"url": url}
+                custom_fields={"url": url},
             )
 
             # Process HTML content
-            if 'html' in doc_metadata.mime_type:
+            if "html" in doc_metadata.mime_type:
                 content, stats = await self._process_html_content(content)
             else:
                 stats = {"content_length": len(content)}
 
             document = ProcessedDocument(
-                content=content,
-                metadata=doc_metadata,
-                processing_stats=stats
+                content=content, metadata=doc_metadata, processing_stats=stats
             )
 
             return document
@@ -561,10 +562,10 @@ class DocumentProcessor(EnhancedDocumentProcessor):
                         content=markdown_table,
                         position=table_idx,
                         metadata={
-                            'table_index': table_idx,
-                            'rows': len(table_data),
-                            'cols': len(table_data[0]) if table_data else 0
-                        }
+                            "table_index": table_idx,
+                            "rows": len(table_data),
+                            "cols": len(table_data[0]) if table_data else 0,
+                        },
                     )
                     tables.append(parsed_table)
 
@@ -577,8 +578,8 @@ class DocumentProcessor(EnhancedDocumentProcessor):
                     "total_paragraphs": len(doc.paragraphs),
                     "total_tables": len(tables),
                     "processing_time": time.time() - start_time,
-                    "extraction_method": "docx"
-                }
+                    "extraction_method": "docx",
+                },
             )
 
         except Exception as e:
@@ -597,7 +598,7 @@ class DocumentProcessor(EnhancedDocumentProcessor):
         start_time = time.time()
 
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
+            with open(file_path, "r", encoding="utf-8") as file:
                 content = file.read()
 
             return EnhancedDocumentResult(
@@ -606,15 +607,15 @@ class DocumentProcessor(EnhancedDocumentProcessor):
                     "content_length": len(content),
                     "processing_time": time.time() - start_time,
                     "extraction_method": "text",
-                    "encoding": "utf-8"
-                }
+                    "encoding": "utf-8",
+                },
             )
 
         except UnicodeDecodeError:
             # Try different encodings
-            for encoding in ['latin-1', 'cp1252', 'iso-8859-1']:
+            for encoding in ["latin-1", "cp1252", "iso-8859-1"]:
                 try:
-                    with open(file_path, 'r', encoding=encoding) as file:
+                    with open(file_path, "r", encoding=encoding) as file:
                         content = file.read()
 
                     return EnhancedDocumentResult(
@@ -623,8 +624,8 @@ class DocumentProcessor(EnhancedDocumentProcessor):
                             "content_length": len(content),
                             "processing_time": time.time() - start_time,
                             "extraction_method": "text",
-                            "encoding": encoding
-                        }
+                            "encoding": encoding,
+                        },
                     )
                 except UnicodeDecodeError:
                     continue
@@ -639,7 +640,7 @@ class DocumentProcessor(EnhancedDocumentProcessor):
         """Process HTML file."""
         start_time = time.time()
 
-        with open(file_path, 'r', encoding='utf-8') as file:
+        with open(file_path, "r", encoding="utf-8") as file:
             html_content = file.read()
 
         content, additional_stats = await self._process_html_content(html_content)
@@ -649,16 +650,18 @@ class DocumentProcessor(EnhancedDocumentProcessor):
             metadata={
                 "processing_time": time.time() - start_time,
                 "extraction_method": "html",
-                **additional_stats
-            }
+                **additional_stats,
+            },
         )
 
-    async def _process_html_content(self, html_content: str) -> Tuple[str, Dict[str, Any]]:
+    async def _process_html_content(
+        self, html_content: str
+    ) -> Tuple[str, Dict[str, Any]]:
         """Extract text from HTML content."""
         try:
             from bs4 import BeautifulSoup
 
-            soup = BeautifulSoup(html_content, 'html.parser')
+            soup = BeautifulSoup(html_content, "html.parser")
 
             # Remove script and style elements
             for script in soup(["script", "style"]):
@@ -675,7 +678,7 @@ class DocumentProcessor(EnhancedDocumentProcessor):
             stats = {
                 "original_length": len(html_content),
                 "extracted_length": len(content),
-                "extraction_method": "BeautifulSoup"
+                "extraction_method": "BeautifulSoup",
             }
 
             return content, stats
@@ -685,13 +688,13 @@ class DocumentProcessor(EnhancedDocumentProcessor):
             import re
 
             # Simple regex-based HTML tag removal
-            clean = re.compile('<.*?>')
-            content = re.sub(clean, '', html_content)
+            clean = re.compile("<.*?>")
+            content = re.sub(clean, "", html_content)
 
             stats = {
                 "original_length": len(html_content),
                 "extracted_length": len(content),
-                "extraction_method": "regex"
+                "extraction_method": "regex",
             }
 
             return content, stats

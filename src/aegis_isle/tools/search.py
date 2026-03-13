@@ -3,16 +3,11 @@ Search Tool for external web search integration.
 Supports multiple search providers with fallback mechanisms.
 """
 
-import asyncio
-import json
-import re
 from typing import Any, Dict, List, Optional, Union
-from urllib.parse import quote
 
 import aiohttp
 
 from .base import BaseTool, ToolConfig, ToolError, ToolResult, ToolStatus
-from ..core.config import settings
 from ..core.logging import logger
 
 
@@ -20,21 +15,12 @@ class SearchResult(Dict[str, Any]):
     """Search result with standardized structure."""
 
     def __init__(
-        self,
-        title: str,
-        url: str,
-        snippet: str,
-        source: str = "unknown",
-        **kwargs
+        self, title: str, url: str, snippet: str, source: str = "unknown", **kwargs
     ):
         super().__init__()
-        self.update({
-            "title": title,
-            "url": url,
-            "snippet": snippet,
-            "source": source,
-            **kwargs
-        })
+        self.update(
+            {"title": title, "url": url, "snippet": snippet, "source": source, **kwargs}
+        )
 
     @property
     def title(self) -> str:
@@ -61,10 +47,7 @@ class SearchProvider:
         self.api_key = api_key
 
     async def search(
-        self,
-        query: str,
-        num_results: int = 10,
-        **kwargs
+        self, query: str, num_results: int = 10, **kwargs
     ) -> List[SearchResult]:
         """Perform search and return results.
 
@@ -90,19 +73,16 @@ class DuckDuckGoProvider(SearchProvider):
         self.base_url = "https://api.duckduckgo.com/"
 
     async def search(
-        self,
-        query: str,
-        num_results: int = 10,
-        **kwargs
+        self, query: str, num_results: int = 10, **kwargs
     ) -> List[SearchResult]:
         """Search using DuckDuckGo API."""
         try:
             params = {
-                'q': query,
-                'format': 'json',
-                'no_redirect': '1',
-                'no_html': '1',
-                'skip_disambig': '1'
+                "q": query,
+                "format": "json",
+                "no_redirect": "1",
+                "no_html": "1",
+                "skip_disambig": "1",
             }
 
             async with aiohttp.ClientSession() as session:
@@ -115,32 +95,33 @@ class DuckDuckGoProvider(SearchProvider):
             results = []
 
             # Process instant answer
-            if data.get('AbstractText'):
-                results.append(SearchResult(
-                    title="DuckDuckGo Instant Answer",
-                    url=data.get('AbstractURL', ''),
-                    snippet=data['AbstractText'],
-                    source="duckduckgo_instant"
-                ))
+            if data.get("AbstractText"):
+                results.append(
+                    SearchResult(
+                        title="DuckDuckGo Instant Answer",
+                        url=data.get("AbstractURL", ""),
+                        snippet=data["AbstractText"],
+                        source="duckduckgo_instant",
+                    )
+                )
 
             # Process related topics
-            for topic in data.get('RelatedTopics', [])[:num_results]:
-                if isinstance(topic, dict) and 'Text' in topic:
+            for topic in data.get("RelatedTopics", [])[:num_results]:
+                if isinstance(topic, dict) and "Text" in topic:
                     # Extract URL from FirstURL if available
-                    url = topic.get('FirstURL', '')
-                    text = topic['Text']
+                    url = topic.get("FirstURL", "")
+                    text = topic["Text"]
 
                     # Try to extract title from text (usually before " - ")
-                    title_match = text.split(' - ', 1)
+                    title_match = text.split(" - ", 1)
                     title = title_match[0] if len(title_match) > 1 else text[:100]
                     snippet = title_match[1] if len(title_match) > 1 else text
 
-                    results.append(SearchResult(
-                        title=title,
-                        url=url,
-                        snippet=snippet,
-                        source="duckduckgo"
-                    ))
+                    results.append(
+                        SearchResult(
+                            title=title, url=url, snippet=snippet, source="duckduckgo"
+                        )
+                    )
 
             return results[:num_results]
 
@@ -158,47 +139,48 @@ class GoogleCustomSearchProvider(SearchProvider):
         self.base_url = "https://www.googleapis.com/customsearch/v1"
 
     async def search(
-        self,
-        query: str,
-        num_results: int = 10,
-        **kwargs
+        self, query: str, num_results: int = 10, **kwargs
     ) -> List[SearchResult]:
         """Search using Google Custom Search API."""
         try:
             params = {
-                'key': self.api_key,
-                'cx': self.search_engine_id,
-                'q': query,
-                'num': min(num_results, 10),  # Google CSE max is 10
-                'safe': 'medium'
+                "key": self.api_key,
+                "cx": self.search_engine_id,
+                "q": query,
+                "num": min(num_results, 10),  # Google CSE max is 10
+                "safe": "medium",
             }
 
             # Add additional parameters
-            if 'site' in kwargs:
-                params['siteSearch'] = kwargs['site']
+            if "site" in kwargs:
+                params["siteSearch"] = kwargs["site"]
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(self.base_url, params=params) as response:
                     if response.status != 200:
                         error_data = await response.text()
-                        raise ToolError(f"Google API returned {response.status}: {error_data}")
+                        raise ToolError(
+                            f"Google API returned {response.status}: {error_data}"
+                        )
 
                     data = await response.json()
 
-            if 'error' in data:
-                error_msg = data['error'].get('message', 'Unknown error')
+            if "error" in data:
+                error_msg = data["error"].get("message", "Unknown error")
                 raise ToolError(f"Google API error: {error_msg}")
 
             results = []
-            for item in data.get('items', []):
-                results.append(SearchResult(
-                    title=item.get('title', ''),
-                    url=item.get('link', ''),
-                    snippet=item.get('snippet', ''),
-                    source="google",
-                    display_link=item.get('displayLink', ''),
-                    formatted_url=item.get('formattedUrl', '')
-                ))
+            for item in data.get("items", []):
+                results.append(
+                    SearchResult(
+                        title=item.get("title", ""),
+                        url=item.get("link", ""),
+                        snippet=item.get("snippet", ""),
+                        source="google",
+                        display_link=item.get("displayLink", ""),
+                        formatted_url=item.get("formattedUrl", ""),
+                    )
+                )
 
             return results
 
@@ -215,51 +197,48 @@ class BingSearchProvider(SearchProvider):
         self.base_url = "https://api.bing.microsoft.com/v7.0/search"
 
     async def search(
-        self,
-        query: str,
-        num_results: int = 10,
-        **kwargs
+        self, query: str, num_results: int = 10, **kwargs
     ) -> List[SearchResult]:
         """Search using Bing Search API."""
         try:
             params = {
-                'q': query,
-                'count': min(num_results, 50),  # Bing max is 50
-                'offset': 0,
-                'mkt': 'en-US',
-                'safesearch': 'Moderate'
+                "q": query,
+                "count": min(num_results, 50),  # Bing max is 50
+                "offset": 0,
+                "mkt": "en-US",
+                "safesearch": "Moderate",
             }
 
-            headers = {
-                'Ocp-Apim-Subscription-Key': self.api_key
-            }
+            headers = {"Ocp-Apim-Subscription-Key": self.api_key}
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    self.base_url,
-                    params=params,
-                    headers=headers
+                    self.base_url, params=params, headers=headers
                 ) as response:
                     if response.status != 200:
                         error_data = await response.text()
-                        raise ToolError(f"Bing API returned {response.status}: {error_data}")
+                        raise ToolError(
+                            f"Bing API returned {response.status}: {error_data}"
+                        )
 
                     data = await response.json()
 
-            if 'error' in data:
-                error_msg = data['error'].get('message', 'Unknown error')
+            if "error" in data:
+                error_msg = data["error"].get("message", "Unknown error")
                 raise ToolError(f"Bing API error: {error_msg}")
 
             results = []
-            for item in data.get('webPages', {}).get('value', []):
-                results.append(SearchResult(
-                    title=item.get('name', ''),
-                    url=item.get('url', ''),
-                    snippet=item.get('snippet', ''),
-                    source="bing",
-                    display_url=item.get('displayUrl', ''),
-                    date_last_crawled=item.get('dateLastCrawled', '')
-                ))
+            for item in data.get("webPages", {}).get("value", []):
+                results.append(
+                    SearchResult(
+                        title=item.get("name", ""),
+                        url=item.get("url", ""),
+                        snippet=item.get("snippet", ""),
+                        source="bing",
+                        display_url=item.get("displayUrl", ""),
+                        date_last_crawled=item.get("dateLastCrawled", ""),
+                    )
+                )
 
             return results
 
@@ -276,47 +255,43 @@ class SerperProvider(SearchProvider):
         self.base_url = "https://google.serper.dev/search"
 
     async def search(
-        self,
-        query: str,
-        num_results: int = 10,
-        **kwargs
+        self, query: str, num_results: int = 10, **kwargs
     ) -> List[SearchResult]:
         """Search using Serper API."""
         try:
             payload = {
-                'q': query,
-                'num': min(num_results, 100)  # Serper max is 100
+                "q": query,
+                "num": min(num_results, 100),  # Serper max is 100
             }
 
-            headers = {
-                'X-API-KEY': self.api_key,
-                'Content-Type': 'application/json'
-            }
+            headers = {"X-API-KEY": self.api_key, "Content-Type": "application/json"}
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    self.base_url,
-                    json=payload,
-                    headers=headers
+                    self.base_url, json=payload, headers=headers
                 ) as response:
                     if response.status != 200:
                         error_data = await response.text()
-                        raise ToolError(f"Serper API returned {response.status}: {error_data}")
+                        raise ToolError(
+                            f"Serper API returned {response.status}: {error_data}"
+                        )
 
                     data = await response.json()
 
             results = []
 
             # Process organic results
-            for item in data.get('organic', []):
-                results.append(SearchResult(
-                    title=item.get('title', ''),
-                    url=item.get('link', ''),
-                    snippet=item.get('snippet', ''),
-                    source="serper",
-                    position=item.get('position'),
-                    domain=item.get('domain', '')
-                ))
+            for item in data.get("organic", []):
+                results.append(
+                    SearchResult(
+                        title=item.get("title", ""),
+                        url=item.get("link", ""),
+                        snippet=item.get("snippet", ""),
+                        source="serper",
+                        position=item.get("position"),
+                        domain=item.get("domain", ""),
+                    )
+                )
 
             return results
 
@@ -334,7 +309,7 @@ class SearchTool(BaseTool):
         primary_provider: str = "duckduckgo",
         providers_config: Optional[Dict[str, Dict[str, str]]] = None,
         enable_fallback: bool = True,
-        max_results: int = 10
+        max_results: int = 10,
     ):
         """Initialize search tool.
 
@@ -350,7 +325,7 @@ class SearchTool(BaseTool):
                 name="web_search",
                 description="Search the web using multiple search providers",
                 timeout=30,
-                max_retries=2
+                max_retries=2,
             )
 
         super().__init__(config)
@@ -369,9 +344,7 @@ class SearchTool(BaseTool):
         )
 
     def _initialize_providers(
-        self,
-        primary_provider: str,
-        providers_config: Dict[str, Dict[str, str]]
+        self, primary_provider: str, providers_config: Dict[str, Dict[str, str]]
     ) -> None:
         """Initialize search providers.
 
@@ -387,8 +360,7 @@ class SearchTool(BaseTool):
             config = providers_config["google"]
             if "api_key" in config and "search_engine_id" in config:
                 self.providers["google"] = GoogleCustomSearchProvider(
-                    config["api_key"],
-                    config["search_engine_id"]
+                    config["api_key"], config["search_engine_id"]
                 )
 
         if "bing" in providers_config:
@@ -405,12 +377,16 @@ class SearchTool(BaseTool):
         if primary_provider in self.providers:
             self.provider_order = [primary_provider]
             # Add other providers for fallback
-            other_providers = [p for p in self.providers.keys() if p != primary_provider]
+            other_providers = [
+                p for p in self.providers.keys() if p != primary_provider
+            ]
             self.provider_order.extend(other_providers)
         else:
             self.provider_order = list(self.providers.keys())
 
-    async def _execute(self, validated_input: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+    async def _execute(
+        self, validated_input: Union[str, Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Execute web search.
 
         Args:
@@ -464,8 +440,7 @@ class SearchTool(BaseTool):
                 logger.debug(f"Attempting search with provider: {provider_name}")
 
                 provider_results = await search_provider.search(
-                    query=query,
-                    num_results=num_results
+                    query=query, num_results=num_results
                 )
 
                 if provider_results:
@@ -492,7 +467,7 @@ class SearchTool(BaseTool):
             raise ToolError(
                 f"All search providers failed. Errors: {all_errors}",
                 self.name,
-                {"errors": errors, "query": query}
+                {"errors": errors, "query": query},
             )
 
         # Format results for output
@@ -518,13 +493,14 @@ class SearchTool(BaseTool):
             "results": formatted_results,
             "total_results": len(formatted_results),
             "provider_used": successful_provider,
-            "providers_tried": search_order[:len(errors) + (1 if successful_provider else 0)],
-            "errors": errors if errors else None
+            "providers_tried": search_order[
+                : len(errors) + (1 if successful_provider else 0)
+            ],
+            "errors": errors if errors else None,
         }
 
     async def _validate_input(
-        self,
-        tool_input: Union[str, Dict[str, Any]]
+        self, tool_input: Union[str, Dict[str, Any]]
     ) -> Union[str, Dict[str, Any]]:
         """Validate search input.
 
@@ -545,7 +521,9 @@ class SearchTool(BaseTool):
             if not query:
                 raise ToolError("Search query cannot be empty", self.name)
             if len(query) > 1000:
-                raise ToolError("Search query too long (max 1000 characters)", self.name)
+                raise ToolError(
+                    "Search query too long (max 1000 characters)", self.name
+                )
             return query
 
         if isinstance(tool_input, dict):
@@ -553,7 +531,9 @@ class SearchTool(BaseTool):
             if not query:
                 raise ToolError("Search query cannot be empty", self.name)
             if len(query) > 1000:
-                raise ToolError("Search query too long (max 1000 characters)", self.name)
+                raise ToolError(
+                    "Search query too long (max 1000 characters)", self.name
+                )
 
             # Validate num_results
             num_results = tool_input.get("num_results")
@@ -568,7 +548,7 @@ class SearchTool(BaseTool):
                     available = list(self.providers.keys())
                     raise ToolError(
                         f"Provider '{provider}' not available. Available: {available}",
-                        self.name
+                        self.name,
                     )
 
             return tool_input
@@ -604,8 +584,8 @@ class SearchTool(BaseTool):
                         metadata={
                             "test_query": test_query,
                             "provider_used": content.get("provider_used"),
-                            "results_count": content.get("total_results", 0)
-                        }
+                            "results_count": content.get("total_results", 0),
+                        },
                     )
 
             return ToolResult(
@@ -613,7 +593,7 @@ class SearchTool(BaseTool):
                 status=ToolStatus.ERROR,
                 content="Search tool test failed",
                 error="Test search did not return expected results",
-                metadata={"test_result": result.content}
+                metadata={"test_result": result.content},
             )
 
         except Exception as e:
@@ -622,5 +602,5 @@ class SearchTool(BaseTool):
                 status=ToolStatus.ERROR,
                 content="Search tool test failed",
                 error=str(e),
-                metadata={"test_query": test_query}
+                metadata={"test_query": test_query},
             )

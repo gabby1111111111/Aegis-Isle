@@ -1,10 +1,12 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
+
 
 class ChatChunk(BaseModel):
     """
     Represents a chunk of conversation from a SillyTavern JSONL file.
     """
+
     text: str
     character_name: str
     chat_file: str

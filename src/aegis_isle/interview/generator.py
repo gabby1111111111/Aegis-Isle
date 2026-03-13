@@ -7,7 +7,7 @@ Orchestrates the interaction between the Persona, the Question, and the LLM.
 
 import json
 import re
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 
 from ..core.logging import logger
 from ..core.config import settings
@@ -28,9 +28,7 @@ class Generator:
 
     def __init__(self):
         self.config = GenerationConfig(
-            model=settings.default_llm_model,
-            max_tokens=2000,
-            temperature=0.7
+            model=settings.default_llm_model, max_tokens=2000, temperature=0.7
         )
         self.llm = LLMGenerator(self.config, provider=settings.llm_provider)
 
@@ -39,7 +37,7 @@ class Generator:
         persona: Persona,
         question: Question,
         jd_context: str = "",
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """
         Generate the "Polyphonic Question" object.
@@ -56,22 +54,32 @@ class Generator:
         system_prompt = persona.get_system_prompt()
 
         lang_instruction = "English" if language == "en" else "Chinese (Simplified)"
-        
+
         # Extract world lore for ELI5
         world_lore = ""
-        if persona.character_book and isinstance(persona.character_book, dict) and 'entries' in persona.character_book:
+        if (
+            persona.character_book
+            and isinstance(persona.character_book, dict)
+            and "entries" in persona.character_book
+        ):
             try:
                 # Get first 3 lore entries (handle both list and dict formats)
-                entries_data = persona.character_book['entries']
-                
-                if hasattr(entries_data, 'values'):
+                entries_data = persona.character_book["entries"]
+
+                if hasattr(entries_data, "values"):
                     entries = list(entries_data.values())[:3]
                 elif isinstance(entries_data, list):
                     entries = entries_data[:3]
                 else:
                     entries = []
-                    
-                world_lore = " ".join([e.get('content', '') for e in entries if isinstance(e, dict) and 'content' in e])[:500]
+
+                world_lore = " ".join(
+                    [
+                        e.get("content", "")
+                        for e in entries
+                        if isinstance(e, dict) and "content" in e
+                    ]
+                )[:500]
             except Exception as e:
                 print(f"Error processing character_book: {e}")
                 world_lore = ""
@@ -134,13 +142,19 @@ Output ONLY the JSON object, no markdown blocks.
         except Exception as e:
             logger.error(f"Error generating question interaction: {e}")
             # Fallback
-            fallback_lore = f"{persona.name} 审视着你。" if language == "zh" else f"{persona.name} gazes at you."
+            fallback_lore = (
+                f"{persona.name} 审视着你。"
+                if language == "zh"
+                else f"{persona.name} gazes at you."
+            )
             return {
                 "lore_flavor": fallback_lore,
                 "original_question": question.content,
                 "tech_hint": "N/A",
-                "eli5_hint": "暂无类比。" if language == "zh" else "No analogy available.",
-                "encouragement": "回答。" if language == "zh" else "Answer."
+                "eli5_hint": "暂无类比。"
+                if language == "zh"
+                else "No analogy available.",
+                "encouragement": "回答。" if language == "zh" else "Answer.",
             }
 
     async def generate_dual_question_interaction(
@@ -149,11 +163,11 @@ Output ONLY the JSON object, no markdown blocks.
         tutor_persona: Persona,
         question: Question,
         jd_context: str = "",
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Generate concurrent question interaction from both Emperor and a Tutor."""
         lang_instruction = "English" if language == "en" else "Chinese (Simplified)"
-        
+
         # 1. Emperor Prompt (Strict Questioning)
         emp_sys = emperor_persona.get_system_prompt()
         emp_user = f"""YOU ARE THE SCENARIO ENGINE. The character ({emperor_persona.name}) is the SUPREME EXAMINER.
@@ -187,33 +201,41 @@ Must be in {lang_instruction}. Output ONLY JSON.
 """
 
         import asyncio
-        import json
-        
+
         async def fetch_emp():
             try:
                 res = await self.llm.generate(f"{emp_sys}\n\nUser: {emp_user}")
                 return self._parse_json_response(res.generated_text)
             except Exception:
-                fallback_lore = emperor_persona.name + "：（凝视着你）\"回答这个问题。\""
-                return {"lore_flavor": fallback_lore, "original_question": question.content}
+                fallback_lore = emperor_persona.name + '：（凝视着你）"回答这个问题。"'
+                return {
+                    "lore_flavor": fallback_lore,
+                    "original_question": question.content,
+                }
 
         async def fetch_tut():
             try:
                 res = await self.llm.generate(f"{tut_sys}\n\nUser: {tut_user}")
                 return self._parse_json_response(res.generated_text)
             except Exception:
-                fallback_lore = tutor_persona.name + "：（拍拍你的肩膀）\"别紧张，发挥你的实力。\""
-                return {"lore_flavor": fallback_lore, "tech_hint": "N/A", "eli5_hint": "N/A"}
+                fallback_lore = (
+                    tutor_persona.name + '：（拍拍你的肩膀）"别紧张，发挥你的实力。"'
+                )
+                return {
+                    "lore_flavor": fallback_lore,
+                    "tech_hint": "N/A",
+                    "eli5_hint": "N/A",
+                }
 
         emp_res, tut_res = await asyncio.gather(fetch_emp(), fetch_tut())
-        
+
         # Combine results
         return {
             "emperor_flavor": emp_res.get("lore_flavor", ""),
             "original_question": emp_res.get("original_question", question.content),
             "tutor_flavor": tut_res.get("lore_flavor", ""),
             "tech_hint": tut_res.get("tech_hint", ""),
-            "eli5_hint": tut_res.get("eli5_hint", "")
+            "eli5_hint": tut_res.get("eli5_hint", ""),
         }
 
     async def generate_story_node(
@@ -221,7 +243,7 @@ Must be in {lang_instruction}. Output ONLY JSON.
         persona: Persona,
         node_type: str,
         success_rate: float,
-        language: str = "zh"
+        language: str = "zh",
     ) -> Dict[str, Any]:
         """
         Generate story node content for dramatic moments.
@@ -235,7 +257,7 @@ Must be in {lang_instruction}. Output ONLY JSON.
         Returns:
             JSON with story content
         """
-        system_prompt = persona.get_system_prompt()
+        persona.get_system_prompt()
         lang_instruction = "Chinese (Simplified)" if language == "zh" else "English"
 
         if node_type == "node_a":
@@ -254,7 +276,9 @@ Output only the story text, no JSON."""
         else:  # node_b
             if success_rate >= 0.8:
                 outcome = "ascension"
-                prompt_detail = "triumphantly inducted as a full Astartes/honored warrior"
+                prompt_detail = (
+                    "triumphantly inducted as a full Astartes/honored warrior"
+                )
             elif success_rate >= 0.5:
                 outcome = "survival"
                 prompt_detail = "barely survives, scarred but accepted as a scout"
@@ -280,7 +304,11 @@ Output only the story text, no JSON."""
             return {"story_content": result.generated_text}
         except Exception as e:
             logger.error(f"Error generating story node: {e}")
-            return {"story_content": f"{persona.name} 凝视着你，沉默不语。" if language == "zh" else f"{persona.name} gazes at you in silence."}
+            return {
+                "story_content": f"{persona.name} 凝视着你，沉默不语。"
+                if language == "zh"
+                else f"{persona.name} gazes at you in silence."
+            }
 
     async def generate_feedback(
         self,
@@ -288,7 +316,7 @@ Output only the story text, no JSON."""
         question: Question,
         user_answer: str,
         evaluation: Dict[str, Any],
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """
         Generate the "Three-Fold Judgment" feedback.
@@ -366,10 +394,10 @@ Output ONLY the JSON object, no markdown blocks.
             return {
                 "verdict": {
                     "status": "partial",
-                    "comment": "无法评估。" if language == "zh" else "Cannot evaluate."
+                    "comment": "无法评估。" if language == "zh" else "Cannot evaluate.",
                 },
                 "standard_answer": question.answer_key or "N/A",
-                "servitor_explanation": "暂无解释。" if language == "zh" else "N/A"
+                "servitor_explanation": "暂无解释。" if language == "zh" else "N/A",
             }
 
     async def generate_dual_feedback(
@@ -379,15 +407,17 @@ Output ONLY the JSON object, no markdown blocks.
         question: Question,
         user_answer: str,
         evaluation: Dict[str, Any],
-        language: str = "en"
+        language: str = "en",
     ) -> Dict[str, Any]:
         """Generate concurrent feedback from Emperor (Verdict) and Tutor (Explanation)."""
         lang_instruction = "English" if language == "en" else "Chinese (Simplified)"
 
         # Context Extraction
         # Fall back to answer_key if specific context doesn't exist
-        pro_context = getattr(question, 'pro_context', None) or question.answer_key
-        gabriella_context = getattr(question, 'gabriella_context', None) or question.answer_key
+        pro_context = getattr(question, "pro_context", None) or question.answer_key
+        gabriella_context = (
+            getattr(question, "gabriella_context", None) or question.answer_key
+        )
 
         # 1. Emperor Prompt (Verdict Only)
         emp_sys = emperor_persona.get_system_prompt()
@@ -430,7 +460,7 @@ Must be in {lang_instruction}. Output ONLY JSON.
 """
 
         import asyncio
-        
+
         async def fetch_emp():
             try:
                 res = await self.llm.generate(f"{emp_sys}\n\nUser: {emp_user}")
@@ -444,29 +474,32 @@ Must be in {lang_instruction}. Output ONLY JSON.
                 res = await self.llm.generate(f"{tut_sys}\n\nUser: {tut_user}")
                 return self._parse_json_response(res.generated_text)
             except Exception:
-                return {"standard_answer": question.answer_key, "servitor_explanation": "网络断开中..."}
+                return {
+                    "standard_answer": question.answer_key,
+                    "servitor_explanation": "网络断开中...",
+                }
 
         emp_res, tut_res = await asyncio.gather(fetch_emp(), fetch_tut())
-        
+
         # Combine
         return {
             "verdict": emp_res.get("verdict", {"status": "partial", "comment": ""}),
             "standard_answer": tut_res.get("standard_answer", question.answer_key),
-            "servitor_explanation": tut_res.get("servitor_explanation", "")
+            "servitor_explanation": tut_res.get("servitor_explanation", ""),
         }
 
     def _parse_json_response(self, text: str) -> Dict[str, Any]:
         """Extract and parse JSON from LLM response."""
         try:
             # Remove markdown code blocks if present
-            text = re.sub(r'```json\s*', '', text)
-            text = re.sub(r'```\s*', '', text)
+            text = re.sub(r"```json\s*", "", text)
+            text = re.sub(r"```\s*", "", text)
             text = text.strip()
             return json.loads(text)
         except json.JSONDecodeError:
             logger.warning(f"Failed to parse JSON from LLM: {text[:100]}...")
             # Try to find JSON-like structure
-            match = re.search(r'\{.*\}', text, re.DOTALL)
+            match = re.search(r"\{.*\}", text, re.DOTALL)
             if match:
                 try:
                     return json.loads(match.group(0))

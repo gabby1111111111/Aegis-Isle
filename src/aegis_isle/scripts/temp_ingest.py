@@ -1,5 +1,3 @@
-import sys
-import argparse
 import os
 
 file_path = "E:/SillyTaven/SillyTavern/data/default-user/chats/邹峥1/邹峥 - 2026-02-27@17h23m32s.jsonl"
@@ -11,6 +9,7 @@ index_path = f"data/vectorstore/st_memory/{character}.index"
 os.makedirs(index_path, exist_ok=True)
 
 import aegis_isle.rag.st_memory_manager
+
 manager = aegis_isle.rag.st_memory_manager.STMemoryManager()
 from aegis_isle.scripts.ingest_st_chats import logger, parse_st_chat_log
 

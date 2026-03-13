@@ -12,7 +12,7 @@ from .routers import (
     agents_router,
     health_router,
     admin_router,
-    auth_router
+    auth_router,
 )
 from .middleware import setup_middleware
 from .dependencies import get_rag_pipeline, get_agent_orchestrator

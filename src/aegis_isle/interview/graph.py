@@ -20,6 +20,7 @@ from ..core.logging import logger
 # State Definition
 # ============================================================================
 
+
 class InterviewState(TypedDict):
     """
     State for the interview workflow.
@@ -37,6 +38,7 @@ class InterviewState(TypedDict):
         persona_mode: Which persona to use for generation/evaluation
         next_action: Next action to take in the workflow
     """
+
     question: Optional[Question]
     user_answer: str
     jd_context: str
@@ -51,10 +53,9 @@ class InterviewState(TypedDict):
 # LLM Helper Functions
 # ============================================================================
 
+
 async def _call_llm_with_persona(
-    system_prompt: str,
-    user_message: str,
-    temperature: float = 0.7
+    system_prompt: str, user_message: str, temperature: float = 0.7
 ) -> str:
     """
     Call LLM with persona-based system prompt.
@@ -70,9 +71,7 @@ async def _call_llm_with_persona(
     try:
         # Initialize text generator
         config = GenerationConfig(
-            model=settings.default_llm_model,
-            max_tokens=1500,
-            temperature=temperature
+            model=settings.default_llm_model, max_tokens=1500, temperature=temperature
         )
 
         generator = LLMGenerator(config, provider=settings.llm_provider)
@@ -98,6 +97,7 @@ Response:"""
 # ============================================================================
 # Node Functions
 # ============================================================================
+
 
 async def generate_node(state: InterviewState) -> InterviewState:
     """
@@ -130,10 +130,9 @@ async def generate_node(state: InterviewState) -> InterviewState:
         history_text = ""
         if history:
             recent_history = history[-3:]  # Last 3 exchanges
-            history_text = "\n".join([
-                f"{msg['role']}: {msg['content'][:100]}..."
-                for msg in recent_history
-            ])
+            history_text = "\n".join(
+                [f"{msg['role']}: {msg['content'][:100]}..." for msg in recent_history]
+            )
 
         user_message = f"""Generate a single challenging interview question based on the following job description.
 
@@ -164,7 +163,7 @@ Now, give me a question worthy of my standards."""
         response = await _call_llm_with_persona(
             system_prompt=system_prompt,
             user_message=user_message,
-            temperature=0.8  # Higher temperature for variety
+            temperature=0.8,  # Higher temperature for variety
         )
 
         # Parse response
@@ -173,7 +172,7 @@ Now, give me a question worthy of my standards."""
         difficulty = 3
         category = "general"
 
-        lines = response.split('\n')
+        lines = response.split("\n")
         for line in lines:
             line = line.strip()
             if line.startswith("QUESTION:"):
@@ -190,6 +189,7 @@ Now, give me a question worthy of my standards."""
 
         # Create Question object
         from datetime import datetime
+
         question_id = f"gen_{datetime.utcnow().timestamp()}"
 
         question = Question(
@@ -199,15 +199,14 @@ Now, give me a question worthy of my standards."""
             difficulty=difficulty,
             category=category,
             tags=[],
-            source="sukuna_generated"
+            source="sukuna_generated",
         )
 
         # Update state
         state["question"] = question
-        state["history"].append({
-            "role": "interviewer",
-            "content": f"Question: {question.content}"
-        })
+        state["history"].append(
+            {"role": "interviewer", "content": f"Question: {question.content}"}
+        )
 
         logger.info(f"Generated question: {question.content[:80]}...")
         return state
@@ -218,7 +217,7 @@ Now, give me a question worthy of my standards."""
         state["evaluation"] = {
             "is_correct": False,
             "comment": f"Failed to generate question: {str(e)}",
-            "error": True
+            "error": True,
         }
         return state
 
@@ -258,7 +257,7 @@ async def evaluate_node(state: InterviewState) -> InterviewState:
             state["evaluation"] = {
                 "is_correct": False,
                 "comment": "You dare remain silent? Pathetic. At least attempt an answer.",
-                "score": 0
+                "score": 0,
             }
             return state
 
@@ -293,7 +292,7 @@ Remember your standards. Don't accept mediocrity."""
         response = await _call_llm_with_persona(
             system_prompt=system_prompt,
             user_message=user_message,
-            temperature=0.3  # Lower temperature for consistent evaluation
+            temperature=0.3,  # Lower temperature for consistent evaluation
         )
 
         # Parse response
@@ -301,7 +300,7 @@ Remember your standards. Don't accept mediocrity."""
         score = 0
         feedback = response  # Default to full response
 
-        lines = response.split('\n')
+        lines = response.split("\n")
         for line in lines:
             line = line.strip()
             if line.startswith("CORRECT:"):
@@ -318,20 +317,16 @@ Remember your standards. Don't accept mediocrity."""
         state["evaluation"] = {
             "is_correct": is_correct,
             "comment": feedback,
-            "score": score
+            "score": score,
         }
 
-        state["history"].append({
-            "role": "user",
-            "content": user_answer
-        })
+        state["history"].append({"role": "user", "content": user_answer})
 
-        state["history"].append({
-            "role": "interviewer",
-            "content": feedback
-        })
+        state["history"].append({"role": "interviewer", "content": feedback})
 
-        logger.info(f"Evaluation: {'correct' if is_correct else 'incorrect'}, score={score}")
+        logger.info(
+            f"Evaluation: {'correct' if is_correct else 'incorrect'}, score={score}"
+        )
         return state
 
     except Exception as e:
@@ -340,7 +335,7 @@ Remember your standards. Don't accept mediocrity."""
             "is_correct": False,
             "comment": f"Evaluation failed: {str(e)}",
             "score": 0,
-            "error": True
+            "error": True,
         }
         return state
 
@@ -389,7 +384,7 @@ Their Answer:
 {user_answer}
 
 Evaluation:
-{evaluation.get('comment', 'Incorrect')}
+{evaluation.get("comment", "Incorrect")}
 
 Provide:
 1. A simple explanation using analogies
@@ -405,15 +400,12 @@ Make it fun and easy to understand! Use your teaching superpowers!"""
         response = await _call_llm_with_persona(
             system_prompt=system_prompt,
             user_message=user_message,
-            temperature=0.8  # Higher temperature for creative analogies
+            temperature=0.8,  # Higher temperature for creative analogies
         )
 
         # Update state
         state["feedback"] = response
-        state["history"].append({
-            "role": "tutor",
-            "content": response
-        })
+        state["history"].append({"role": "tutor", "content": response})
 
         logger.info("Tutor feedback provided (Gojo)")
         return state
@@ -468,7 +460,7 @@ Their Answer:
 Score: {score}/10
 
 Evaluation:
-{evaluation.get('comment', 'Correct')}
+{evaluation.get("comment", "Correct")}
 
 Provide:
 1. Recognition of their correct answer
@@ -485,15 +477,12 @@ Be professional, patient, and methodical in your feedback."""
         response = await _call_llm_with_persona(
             system_prompt=system_prompt,
             user_message=user_message,
-            temperature=0.6  # Moderate temperature for balanced feedback
+            temperature=0.6,  # Moderate temperature for balanced feedback
         )
 
         # Update state
         state["feedback"] = response
-        state["history"].append({
-            "role": "mentor",
-            "content": response
-        })
+        state["history"].append({"role": "mentor", "content": response})
 
         logger.info("Mentor feedback provided (Nanami)")
         return state
@@ -507,6 +496,7 @@ Be professional, patient, and methodical in your feedback."""
 # ============================================================================
 # Conditional Edge Functions
 # ============================================================================
+
 
 def should_tutor_or_mentor(state: InterviewState) -> Literal["tutor", "mentor"]:
     """
@@ -532,6 +522,7 @@ def should_tutor_or_mentor(state: InterviewState) -> Literal["tutor", "mentor"]:
 # ============================================================================
 # Graph Construction
 # ============================================================================
+
 
 def build_interview_graph() -> CompiledStateGraph:
     """
@@ -562,12 +553,7 @@ def build_interview_graph() -> CompiledStateGraph:
 
     # Add conditional edge based on evaluation result
     workflow.add_conditional_edges(
-        "evaluate",
-        should_tutor_or_mentor,
-        {
-            "tutor": "tutor",
-            "mentor": "mentor"
-        }
+        "evaluate", should_tutor_or_mentor, {"tutor": "tutor", "mentor": "mentor"}
     )
 
     # Add edges to END

@@ -39,7 +39,9 @@ class ToolResult(BaseModel):
 class ToolError(Exception):
     """Base exception for tool-related errors."""
 
-    def __init__(self, message: str, tool_name: str = "", details: Optional[Dict] = None):
+    def __init__(
+        self, message: str, tool_name: str = "", details: Optional[Dict] = None
+    ):
         super().__init__(message)
         self.tool_name = tool_name
         self.details = details or {}
@@ -115,7 +117,7 @@ class BaseTool(ABC):
                 tool_name=self.name,
                 status=ToolStatus.ERROR,
                 content=None,
-                error="Tool is disabled"
+                error="Tool is disabled",
             )
 
         # Check rate limiting
@@ -124,7 +126,7 @@ class BaseTool(ABC):
                 tool_name=self.name,
                 status=ToolStatus.ERROR,
                 content=None,
-                error="Rate limit exceeded"
+                error="Rate limit exceeded",
             )
 
         start_time = time.time()
@@ -152,8 +154,8 @@ class BaseTool(ABC):
                 metadata={
                     "execution_id": execution_id,
                     "execution_count": self.execution_count,
-                    "input_type": type(tool_input).__name__
-                }
+                    "input_type": type(tool_input).__name__,
+                },
             )
 
             logger.debug(
@@ -174,14 +176,16 @@ class BaseTool(ABC):
                 content=None,
                 error=error_msg,
                 execution_time=execution_time,
-                metadata={"execution_id": execution_id}
+                metadata={"execution_id": execution_id},
             )
 
         except ToolError as e:
             execution_time = time.time() - start_time
             error_msg = str(e)
 
-            logger.error(f"Tool {self.name} execution {execution_id} failed: {error_msg}")
+            logger.error(
+                f"Tool {self.name} execution {execution_id} failed: {error_msg}"
+            )
 
             return ToolResult(
                 tool_name=self.name,
@@ -189,10 +193,7 @@ class BaseTool(ABC):
                 content=None,
                 error=error_msg,
                 execution_time=execution_time,
-                metadata={
-                    "execution_id": execution_id,
-                    "error_details": e.details
-                }
+                metadata={"execution_id": execution_id, "error_details": e.details},
             )
 
         except Exception as e:
@@ -201,7 +202,7 @@ class BaseTool(ABC):
 
             logger.error(
                 f"Tool {self.name} execution {execution_id} failed with unexpected error: {e}",
-                exc_info=True
+                exc_info=True,
             )
 
             return ToolResult(
@@ -210,10 +211,7 @@ class BaseTool(ABC):
                 content=None,
                 error=error_msg,
                 execution_time=execution_time,
-                metadata={
-                    "execution_id": execution_id,
-                    "error_type": type(e).__name__
-                }
+                metadata={"execution_id": execution_id, "error_type": type(e).__name__},
             )
 
     @abstractmethod
@@ -262,7 +260,7 @@ class BaseTool(ABC):
             raise ToolError(
                 f"Invalid input type: {type(tool_input).__name__}",
                 self.name,
-                {"input_type": type(tool_input).__name__, "conversion_error": str(e)}
+                {"input_type": type(tool_input).__name__, "conversion_error": str(e)},
             )
 
     async def _execute_with_timeout(self, validated_input: Any) -> Any:
@@ -281,11 +279,12 @@ class BaseTool(ABC):
 
         try:
             return await asyncio.wait_for(
-                self._execute(validated_input),
-                timeout=self.config.timeout
+                self._execute(validated_input), timeout=self.config.timeout
             )
         except asyncio.TimeoutError:
-            raise TimeoutError(f"Tool execution exceeded {self.config.timeout}s timeout")
+            raise TimeoutError(
+                f"Tool execution exceeded {self.config.timeout}s timeout"
+            )
 
     def _check_rate_limit(self) -> bool:
         """Check if tool execution is within rate limits.
@@ -307,7 +306,9 @@ class BaseTool(ABC):
         # Check current minute
         current_count = self._rate_limiter.get(minute_key, 0)
         if current_count >= self.config.rate_limit:
-            logger.warning(f"Rate limit exceeded for tool {self.name}: {current_count}/{self.config.rate_limit}")
+            logger.warning(
+                f"Rate limit exceeded for tool {self.name}: {current_count}/{self.config.rate_limit}"
+            )
             return False
 
         # Update counter
@@ -326,9 +327,11 @@ class BaseTool(ABC):
             "description": self.description,
             "enabled": self.is_enabled,
             "execution_count": self.execution_count,
-            "last_execution": self.last_execution.isoformat() if self.last_execution else None,
+            "last_execution": self.last_execution.isoformat()
+            if self.last_execution
+            else None,
             "created_at": self.created_at.isoformat(),
-            "config": self.config.dict()
+            "config": self.config.dict(),
         }
 
     async def test_connection(self) -> ToolResult:
@@ -343,7 +346,7 @@ class BaseTool(ABC):
             tool_name=self.name,
             status=ToolStatus.SUCCESS,
             content="Tool connection test passed",
-            metadata={"test": "basic_connectivity"}
+            metadata={"test": "basic_connectivity"},
         )
 
     async def initialize(self) -> bool:

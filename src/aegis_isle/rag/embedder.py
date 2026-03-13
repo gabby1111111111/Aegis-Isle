@@ -5,8 +5,7 @@ Supports text and image embeddings with unified vector output format.
 
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Union, Tuple
-import numpy as np
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -55,7 +54,7 @@ class TextEmbedder(BaseEmbedder):
         self,
         model_name: str = "BAAI/bge-large-zh-v1.5",
         provider: str = "sentence_transformers",
-        **kwargs
+        **kwargs,
     ):
         """Initialize text embedder.
 
@@ -139,8 +138,8 @@ class TextEmbedder(BaseEmbedder):
                 metadata={
                     "provider": self.provider,
                     "input_count": len(texts),
-                    "total_tokens": sum(len(text.split()) for text in texts)
-                }
+                    "total_tokens": sum(len(text.split()) for text in texts),
+                },
             )
 
         except Exception as e:
@@ -152,14 +151,14 @@ class TextEmbedder(BaseEmbedder):
         result = await self.embed_texts([query])
         return result.embeddings[0]
 
-    async def _embed_with_sentence_transformer(self, texts: List[str]) -> List[List[float]]:
+    async def _embed_with_sentence_transformer(
+        self, texts: List[str]
+    ) -> List[List[float]]:
         """Generate embeddings using sentence transformers."""
         try:
             # Encode texts
             embeddings = self._model.encode(
-                texts,
-                convert_to_tensor=False,
-                normalize_embeddings=True
+                texts, convert_to_tensor=False, normalize_embeddings=True
             )
             return embeddings.tolist()
 
@@ -171,8 +170,7 @@ class TextEmbedder(BaseEmbedder):
         """Generate embeddings using OpenAI API."""
         try:
             response = await self._client.embeddings.create(
-                model=self.model_name,
-                input=texts
+                model=self.model_name, input=texts
             )
             return [item.embedding for item in response.data]
 
@@ -188,7 +186,7 @@ class ImageEmbedder(BaseEmbedder):
         self,
         model_name: str = "openai/clip-vit-base-patch32",
         device: str = "auto",
-        **kwargs
+        **kwargs,
     ):
         """Initialize image embedder.
 
@@ -235,12 +233,12 @@ class ImageEmbedder(BaseEmbedder):
             images = []
             for path in image_paths:
                 try:
-                    image = Image.open(path).convert('RGB')
+                    image = Image.open(path).convert("RGB")
                     images.append(image)
                 except Exception as e:
                     logger.warning(f"Failed to load image {path}: {e}")
                     # Add a placeholder (could be a blank image)
-                    images.append(Image.new('RGB', (224, 224), color='white'))
+                    images.append(Image.new("RGB", (224, 224), color="white"))
 
             # Process images
             inputs = self._processor(images=images, return_tensors="pt").to(self.device)
@@ -249,7 +247,9 @@ class ImageEmbedder(BaseEmbedder):
             with torch.no_grad():
                 image_features = self._model.get_image_features(**inputs)
                 # Normalize embeddings
-                image_features = image_features / image_features.norm(p=2, dim=-1, keepdim=True)
+                image_features = image_features / image_features.norm(
+                    p=2, dim=-1, keepdim=True
+                )
 
             embeddings = image_features.cpu().numpy().tolist()
 
@@ -262,8 +262,8 @@ class ImageEmbedder(BaseEmbedder):
                 metadata={
                     "provider": "clip",
                     "device": self.device,
-                    "input_count": len(images)
-                }
+                    "input_count": len(images),
+                },
             )
 
         except Exception as e:
@@ -278,13 +278,17 @@ class ImageEmbedder(BaseEmbedder):
             import torch
 
             # Process texts
-            inputs = self._processor(text=texts, return_tensors="pt", padding=True).to(self.device)
+            inputs = self._processor(text=texts, return_tensors="pt", padding=True).to(
+                self.device
+            )
 
             # Generate embeddings
             with torch.no_grad():
                 text_features = self._model.get_text_features(**inputs)
                 # Normalize embeddings
-                text_features = text_features / text_features.norm(p=2, dim=-1, keepdim=True)
+                text_features = text_features / text_features.norm(
+                    p=2, dim=-1, keepdim=True
+                )
 
             embeddings = text_features.cpu().numpy().tolist()
 
@@ -297,8 +301,8 @@ class ImageEmbedder(BaseEmbedder):
                 metadata={
                     "provider": "clip",
                     "device": self.device,
-                    "input_count": len(texts)
-                }
+                    "input_count": len(texts),
+                },
             )
 
         except Exception as e:
@@ -319,7 +323,7 @@ class MultiModalEmbedder:
         text_model: str = "all-MiniLM-L6-v2",
         text_provider: str = "sentence_transformers",
         image_model: str = "openai/clip-vit-base-patch32",
-        use_unified_space: bool = False
+        use_unified_space: bool = False,
     ):
         """Initialize multi-modal embedder.
 
@@ -371,7 +375,7 @@ def get_embedder(
     embedder_type: str = "text",
     model_name: Optional[str] = None,
     provider: str = "sentence_transformers",
-    **kwargs
+    **kwargs,
 ) -> Union[TextEmbedder, ImageEmbedder, MultiModalEmbedder]:
     """Factory function to create embedders.
 
@@ -401,7 +405,7 @@ def get_embedder(
             text_model=text_model,
             text_provider=provider,
             image_model=image_model,
-            use_unified_space=use_unified
+            use_unified_space=use_unified,
         )
 
     else:
@@ -420,19 +424,10 @@ def get_qdrant_vector_config(embedder: MultiModalEmbedder) -> Dict[str, Any]:
     """
     if embedder.is_unified_space():
         # Single vector space for both text and images
-        return {
-            "size": embedder.get_text_dimension(),
-            "distance": "Cosine"
-        }
+        return {"size": embedder.get_text_dimension(), "distance": "Cosine"}
     else:
         # Multiple vector spaces
         return {
-            "text": {
-                "size": embedder.get_text_dimension(),
-                "distance": "Cosine"
-            },
-            "image": {
-                "size": embedder.get_image_dimension(),
-                "distance": "Cosine"
-            }
+            "text": {"size": embedder.get_text_dimension(), "distance": "Cosine"},
+            "image": {"size": embedder.get_image_dimension(), "distance": "Cosine"},
         }

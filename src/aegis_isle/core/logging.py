@@ -18,9 +18,18 @@ AuditLevel = Literal["info", "warning", "error", "critical"]
 
 # Audit event types
 AuditEventType = Literal[
-    "authentication", "authorization", "data_access", "data_modification",
-    "system_configuration", "user_management", "security_event", "api_access",
-    "file_operation", "model_inference", "agent_execution", "workflow_execution"
+    "authentication",
+    "authorization",
+    "data_access",
+    "data_modification",
+    "system_configuration",
+    "user_management",
+    "security_event",
+    "api_access",
+    "file_operation",
+    "model_inference",
+    "agent_execution",
+    "workflow_execution",
 ]
 
 
@@ -47,7 +56,7 @@ class AuditLogger:
             rotation="1 day",
             retention="365 days",  # Keep audit logs for 1 year
             filter=lambda record: record["extra"].get("audit", False),
-            serialize=False  # We handle JSON serialization ourselves
+            serialize=False,  # We handle JSON serialization ourselves
         )
 
     def _json_formatter(self, record: Dict[str, Any]) -> str:
@@ -72,7 +81,7 @@ class AuditLogger:
             "message": record["message"],
             "service": "aegis-isle",
             "environment": settings.environment,
-            **audit_data
+            **audit_data,
         }
 
         return json.dumps(log_entry, ensure_ascii=False) + "\n"
@@ -94,7 +103,7 @@ class AuditLogger:
         error_code: Optional[str] = None,
         error_message: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         Log a structured audit event.
@@ -163,7 +172,7 @@ class AuditLogger:
         # Create human-readable message
         message = f"{event_type.upper()}: {action}"
         if outcome == "failure":
-            message += f" - FAILED"
+            message += " - FAILED"
         if error_message:
             message += f" - {error_message}"
 
@@ -176,7 +185,7 @@ class AuditLogger:
             "message": message,
             "service": "aegis-isle",
             "environment": settings.environment,
-            **audit_data
+            **audit_data,
         }
 
         # Format as JSON and log
@@ -191,7 +200,7 @@ class AuditLogger:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
         error_message: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Log authentication events."""
         self.log_event(
@@ -203,7 +212,7 @@ class AuditLogger:
             user_agent=user_agent,
             error_message=error_message,
             level="warning" if outcome == "failure" else "info",
-            **kwargs
+            **kwargs,
         )
 
     def log_authorization(
@@ -214,7 +223,7 @@ class AuditLogger:
         resource: str,
         outcome: Literal["success", "failure"] = "success",
         required_permissions: Optional[list] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Log authorization events."""
         metadata = {}
@@ -230,7 +239,7 @@ class AuditLogger:
             outcome=outcome,
             metadata=metadata,
             level="warning" if outcome == "failure" else "info",
-            **kwargs
+            **kwargs,
         )
 
     def log_data_access(
@@ -241,7 +250,7 @@ class AuditLogger:
         resource: str,
         resource_id: Optional[str] = None,
         query: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Log data access events."""
         metadata = {}
@@ -256,7 +265,7 @@ class AuditLogger:
             resource=resource,
             resource_id=resource_id,
             metadata=metadata,
-            **kwargs
+            **kwargs,
         )
 
     def log_security_event(
@@ -266,7 +275,7 @@ class AuditLogger:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
         threat_type: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Log security events."""
         metadata = {}
@@ -280,7 +289,7 @@ class AuditLogger:
             ip_address=ip_address,
             user_agent=user_agent,
             metadata=metadata,
-            **kwargs
+            **kwargs,
         )
 
     def log_api_access(
@@ -293,7 +302,7 @@ class AuditLogger:
         status_code: Optional[int] = None,
         response_time_ms: Optional[float] = None,
         request_id: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """Log API access events."""
         metadata = {
@@ -316,7 +325,7 @@ class AuditLogger:
             request_id=request_id,
             outcome=outcome,
             metadata=metadata,
-            **kwargs
+            **kwargs,
         )
 
     def log_llm_call(
@@ -331,14 +340,14 @@ class AuditLogger:
         cost_usd: float = 0.0,
         outcome: Literal["success", "failure", "error"] = "success",
         error_message: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         记录 LLM API 调用的审计日志。
-        
+
         专为 SillyTavern 集成设计，记录每次 LLM 推理的元数据，
         包括 token 用量、延迟、费用和可选的角色卡 ID。
-        
+
         Args:
             model: LLM 模型名称 (如 Qwen/Qwen2.5-7B-Instruct)
             prompt_tokens: 输入 token 数
@@ -379,7 +388,7 @@ class AuditLogger:
             outcome=outcome,
             error_message=error_message,
             metadata=metadata,
-            **kwargs
+            **kwargs,
         )
 
 
@@ -393,11 +402,13 @@ def configure_logging():
         sys.stderr,
         level=settings.log_level,
         format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
-               "<level>{level: <8}</level> | "
-               "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-               "<level>{message}</level>",
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
+        "<level>{message}</level>",
         colorize=True,
-        filter=lambda record: not record["extra"].get("audit", False)  # Exclude audit logs
+        filter=lambda record: (
+            not record["extra"].get("audit", False)
+        ),  # Exclude audit logs
     )
 
     # Ensure log directory exists
@@ -411,7 +422,9 @@ def configure_logging():
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}",
         rotation="1 day",
         retention="30 days",
-        filter=lambda record: not record["extra"].get("audit", False)  # Exclude audit logs
+        filter=lambda record: (
+            not record["extra"].get("audit", False)
+        ),  # Exclude audit logs
     )
 
     # Add error-only handler for critical issues
@@ -421,7 +434,9 @@ def configure_logging():
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} | {message}\n{exception}",
         rotation="1 day",
         retention="90 days",
-        filter=lambda record: not record["extra"].get("audit", False)  # Exclude audit logs
+        filter=lambda record: (
+            not record["extra"].get("audit", False)
+        ),  # Exclude audit logs
     )
 
 

@@ -1,7 +1,7 @@
 """
 Unit tests for Session State Management (Context Injection).
 """
-import pytest
+
 from aegis_isle.core.state.context_injection import (
     inject_state_context,
     get_user_id_from_request,
@@ -13,7 +13,9 @@ class TestContextInjection:
 
     def test_inject_adds_system_message_when_empty(self):
         """Should add system message when messages list is empty."""
-        result = inject_state_context([], state_markdown="## 背包\n| 物品 | 数量 |\n|---|---|\n| 剑 | 1 |")
+        result = inject_state_context(
+            [], state_markdown="## 背包\n| 物品 | 数量 |\n|---|---|\n| 剑 | 1 |"
+        )
         assert len(result) > 0
         roles = [m["role"] for m in result]
         assert "system" in roles

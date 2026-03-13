@@ -10,7 +10,6 @@ import asyncio
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from dataclasses import dataclass, asdict
 from enum import IntEnum
 
 from pydantic import BaseModel, Field, field_validator
@@ -21,6 +20,7 @@ from ..core.config import settings
 
 class Difficulty(IntEnum):
     """Question difficulty levels."""
+
     VERY_EASY = 1
     EASY = 2
     MEDIUM = 3
@@ -30,6 +30,7 @@ class Difficulty(IntEnum):
 
 class ReviewBox(IntEnum):
     """Spaced repetition review boxes (0 = new, 1-5 = increasing intervals)."""
+
     NEW = 0
     BOX_1 = 1  # 1 day
     BOX_2 = 2  # 3 days
@@ -59,31 +60,41 @@ class Question(BaseModel):
 
     id: str = Field(..., description="Unique question identifier")
     content: str = Field(..., min_length=10, description="Question text")
-    answer_key: Optional[str] = Field(None, description="Reference answer or key points")
-    gabriella_context: Optional[str] = Field(None, description="Gabriella's Cyber Tea Party explanation")
-    pro_context: Optional[str] = Field(None, description="Professional interviewer perspective")
+    answer_key: Optional[str] = Field(
+        None, description="Reference answer or key points"
+    )
+    gabriella_context: Optional[str] = Field(
+        None, description="Gabriella's Cyber Tea Party explanation"
+    )
+    pro_context: Optional[str] = Field(
+        None, description="Professional interviewer perspective"
+    )
     difficulty: int = Field(..., ge=1, le=5, description="Difficulty level (1-5)")
-    review_box: int = Field(default=0, ge=0, le=5, description="Spaced repetition box (0-5)")
+    review_box: int = Field(
+        default=0, ge=0, le=5, description="Spaced repetition box (0-5)"
+    )
     next_review: str = Field(
         default_factory=lambda: datetime.utcnow().isoformat(),
-        description="Next review datetime (ISO format)"
+        description="Next review datetime (ISO format)",
     )
     created_at: str = Field(
         default_factory=lambda: datetime.utcnow().isoformat(),
-        description="Creation timestamp"
+        description="Creation timestamp",
     )
     category: str = Field(default="general", description="Question category")
     tags: List[str] = Field(default_factory=list, description="Associated tags")
     source: str = Field(default="unknown", description="Source of question")
     attempts: int = Field(default=0, ge=0, description="Number of attempts")
-    correct_answers: int = Field(default=0, ge=0, description="Number of correct answers")
+    correct_answers: int = Field(
+        default=0, ge=0, description="Number of correct answers"
+    )
 
-    @field_validator('next_review', 'created_at')
+    @field_validator("next_review", "created_at")
     @classmethod
     def validate_datetime_string(cls, v):
         """Validate datetime string format."""
         try:
-            datetime.fromisoformat(v.replace('Z', '+00:00'))
+            datetime.fromisoformat(v.replace("Z", "+00:00"))
             return v
         except ValueError:
             raise ValueError("DateTime must be in ISO format")
@@ -91,12 +102,12 @@ class Question(BaseModel):
     @property
     def next_review_datetime(self) -> datetime:
         """Get next_review as datetime object."""
-        return datetime.fromisoformat(self.next_review.replace('Z', '+00:00'))
+        return datetime.fromisoformat(self.next_review.replace("Z", "+00:00"))
 
     @property
     def created_at_datetime(self) -> datetime:
         """Get created_at as datetime object."""
-        return datetime.fromisoformat(self.created_at.replace('Z', '+00:00'))
+        return datetime.fromisoformat(self.created_at.replace("Z", "+00:00"))
 
     @property
     def success_rate(self) -> float:
@@ -130,7 +141,7 @@ class Question(BaseModel):
                 ReviewBox.BOX_2: timedelta(days=3),
                 ReviewBox.BOX_3: timedelta(days=7),
                 ReviewBox.BOX_4: timedelta(days=14),
-                ReviewBox.BOX_5: timedelta(days=30)
+                ReviewBox.BOX_5: timedelta(days=30),
             }
 
             next_interval = intervals.get(self.review_box, timedelta(days=1))
@@ -169,11 +180,11 @@ class KnowledgeEngine:
         """Load questions from JSON database file."""
         try:
             if self.db_path.exists():
-                with open(self.db_path, 'r', encoding='utf-8') as f:
+                with open(self.db_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
                 # Convert dict data to Question objects
-                for q_id, q_data in data.get('questions', {}).items():
+                for q_id, q_data in data.get("questions", {}).items():
                     try:
                         question = Question(**q_data)
                         self.questions[q_id] = question
@@ -198,14 +209,14 @@ class KnowledgeEngine:
 
             # Convert questions to serializable format
             data = {
-                'questions': {q_id: q.dict() for q_id, q in self.questions.items()},
-                'metadata': {
-                    'total_questions': len(self.questions),
-                    'last_updated': datetime.utcnow().isoformat()
-                }
+                "questions": {q_id: q.dict() for q_id, q in self.questions.items()},
+                "metadata": {
+                    "total_questions": len(self.questions),
+                    "last_updated": datetime.utcnow().isoformat(),
+                },
             }
 
-            with open(self.db_path, 'w', encoding='utf-8') as f:
+            with open(self.db_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2, ensure_ascii=False)
 
             logger.debug(f"Saved {len(self.questions)} questions to database")
@@ -213,7 +224,13 @@ class KnowledgeEngine:
         except Exception as e:
             logger.error(f"Failed to save question database: {e}")
 
-    async def ingest_data(self, text: str, jd_context: Optional[str] = None, use_cache: bool = True, language: str = "zh") -> List[Question]:
+    async def ingest_data(
+        self,
+        text: str,
+        jd_context: Optional[str] = None,
+        use_cache: bool = True,
+        language: str = "zh",
+    ) -> List[Question]:
         """
         Generate interview questions from text using LLM with chunking.
         Supports parallel processing and caching.
@@ -233,65 +250,72 @@ class KnowledgeEngine:
         try:
             # Check cache first
             import hashlib
+
             content_hash = hashlib.md5((text + (jd_context or "")).encode()).hexdigest()
             cache_path = Path(f"data/ingestion_cache_{content_hash}.json")
-            
+
             if use_cache and cache_path.exists():
                 logger.info(f"📦 Found cached ingestion data: {cache_path}")
                 try:
-                    with open(cache_path, 'r', encoding='utf-8') as f:
+                    with open(cache_path, "r", encoding="utf-8") as f:
                         cached_data = json.load(f)
                         questions = [Question(**q) for q in cached_data]
-                        
+
                     # Add to database
                     for question in questions:
                         self.questions[question.id] = question
                     self.save_database()
-                    
+
                     logger.info(f"✅ Loaded {len(questions)} questions from cache")
                     return questions
                 except Exception as e:
-                    logger.warning(f"Failed to load cache: {e}, proceeding with generation")
+                    logger.warning(
+                        f"Failed to load cache: {e}, proceeding with generation"
+                    )
 
             from ..rag.generator import LLMGenerator, GenerationConfig
             from langchain.text_splitter import RecursiveCharacterTextSplitter
 
             # Split text into chunks
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=2000,
-                chunk_overlap=200,
-                separators=["\n\n", "\n", " ", ""]
+                chunk_size=2000, chunk_overlap=200, separators=["\n\n", "\n", " ", ""]
             )
             chunks = text_splitter.split_text(text)
             total_chunks = len(chunks)
-            
-            logger.info(f"📚 Splitting text into {total_chunks} chunks for processing...")
+
+            logger.info(
+                f"📚 Splitting text into {total_chunks} chunks for processing..."
+            )
 
             # Initialize text generator
             config = GenerationConfig(
-                model=settings.default_llm_model,
-                max_tokens=2000,
-                temperature=0.7
+                model=settings.default_llm_model, max_tokens=2000, temperature=0.7
             )
             generator = LLMGenerator(config, provider=settings.llm_provider)
 
             # Process chunks in parallel with semaphore
-            semaphore = asyncio.Semaphore(10) # Limit concurrency to 10
-            
+            semaphore = asyncio.Semaphore(10)  # Limit concurrency to 10
+
             async def process_chunk(i, chunk):
                 async with semaphore:
                     logger.info(f"🔄 Processing Chunk {i}/{total_chunks}...")
                     try:
                         # Build prompt for this chunk
-                        prompt = self._build_question_generation_prompt(chunk, jd_context, language)
-                        
+                        prompt = self._build_question_generation_prompt(
+                            chunk, jd_context, language
+                        )
+
                         # Generate questions for this chunk
                         result = await generator.generate(prompt)
-                        
+
                         # Parse questions
-                        chunk_questions = self._parse_generated_questions(result.generated_text, jd_context)
-                        
-                        logger.info(f"✅ Processed Chunk {i}/{total_chunks}, found {len(chunk_questions)} questions")
+                        chunk_questions = self._parse_generated_questions(
+                            result.generated_text, jd_context
+                        )
+
+                        logger.info(
+                            f"✅ Processed Chunk {i}/{total_chunks}, found {len(chunk_questions)} questions"
+                        )
                         return chunk_questions
                     except Exception as e:
                         logger.error(f"❌ Failed to process chunk {i}: {e}")
@@ -299,10 +323,10 @@ class KnowledgeEngine:
 
             # Create tasks
             tasks = [process_chunk(i, chunk) for i, chunk in enumerate(chunks, 1)]
-            
+
             # Run parallel execution
             results = await asyncio.gather(*tasks)
-            
+
             # Flatten results
             all_questions = [q for sublist in results for q in sublist]
 
@@ -313,8 +337,13 @@ class KnowledgeEngine:
 
             # Save to cache
             try:
-                with open(cache_path, 'w', encoding='utf-8') as f:
-                    json.dump([q.dict() for q in deduplicated], f, indent=2, ensure_ascii=False)
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump(
+                        [q.dict() for q in deduplicated],
+                        f,
+                        indent=2,
+                        ensure_ascii=False,
+                    )
                 logger.info(f"💾 Saved ingestion cache to {cache_path}")
             except Exception as e:
                 logger.warning(f"Failed to save cache: {e}")
@@ -336,23 +365,25 @@ class KnowledgeEngine:
         """Remove duplicate questions based on content similarity."""
         unique_questions = []
         seen_contents = set()
-        
+
         for q in questions:
             # Normalize content for comparison
             normalized = q.content.lower().strip()
-            
+
             # Check for exact duplicates
             if normalized not in seen_contents:
                 seen_contents.add(normalized)
                 unique_questions.append(q)
             else:
                 logger.debug(f"Skipping duplicate: {q.content[:50]}...")
-        
+
         return unique_questions
 
-    def _build_question_generation_prompt(self, text: str, jd_context: Optional[str] = None, language: str = "zh") -> str:
+    def _build_question_generation_prompt(
+        self, text: str, jd_context: Optional[str] = None, language: str = "zh"
+    ) -> str:
         """Build prompt for LLM question generation."""
-        
+
         lang_instructions = {
             "zh": {
                 "instruction": "请用简体中文生成问题和答案",
@@ -365,7 +396,7 @@ class KnowledgeEngine:
 4. 提供简洁但准确的answer_key
 5. 使用相关的categories和tags
 6. 专注于实用知识和理解
-7. 问题应符合实际面试场景"""
+7. 问题应符合实际面试场景""",
             },
             "en": {
                 "instruction": "Generate questions and answers in English",
@@ -378,10 +409,10 @@ class KnowledgeEngine:
 4. Provide concise but accurate answer_key
 5. Use relevant categories and tags
 6. Focus on practical knowledge and understanding
-7. Make questions realistic for actual interviews"""
-            }
+7. Make questions realistic for actual interviews""",
+            },
         }
-        
+
         lang_cfg = lang_instructions.get(language, lang_instructions["zh"])
 
         context_section = ""
@@ -394,7 +425,7 @@ Job Description Context:
 Focus questions on skills and requirements mentioned in this job description.
 """
 
-        prompt = f"""{lang_cfg['instruction']}
+        prompt = f"""{lang_cfg["instruction"]}
 
 Based on the following text, generate relevant interview questions that could be asked about this topic.
 
@@ -408,8 +439,8 @@ Please generate 5-10 interview questions in the following JSON format:
 {{
   "questions": [
     {{
-      "content": "{lang_cfg['example_q']}",
-      "answer_key": "{lang_cfg['example_a']}",
+      "content": "{lang_cfg["example_q"]}",
+      "answer_key": "{lang_cfg["example_a"]}",
       "difficulty": 3,
       "category": "algorithms",
       "tags": ["binary_search", "time_complexity", "algorithms"]
@@ -418,13 +449,15 @@ Please generate 5-10 interview questions in the following JSON format:
 }}
 ```
 
-{lang_cfg['guidelines']}
+{lang_cfg["guidelines"]}
 
 Return only the JSON format, no additional text."""
 
         return prompt
 
-    def _parse_generated_questions(self, llm_output: str, source_context: Optional[str] = None) -> List[Question]:
+    def _parse_generated_questions(
+        self, llm_output: str, source_context: Optional[str] = None
+    ) -> List[Question]:
         """
         Parse LLM-generated questions from JSON output.
 
@@ -440,19 +473,22 @@ Return only the JSON format, no additional text."""
         try:
             # Extract JSON from LLM output
             import re
-            json_match = re.search(r'```json\s*(.*?)\s*```', llm_output, re.DOTALL)
+
+            json_match = re.search(r"```json\s*(.*?)\s*```", llm_output, re.DOTALL)
             if not json_match:
                 # Try to find JSON without code blocks
-                json_match = re.search(r'\{.*\}', llm_output, re.DOTALL)
+                json_match = re.search(r"\{.*\}", llm_output, re.DOTALL)
 
             if not json_match:
                 raise ValueError("No JSON found in LLM output")
 
-            json_text = json_match.group(1) if json_match.lastindex else json_match.group(0)
+            json_text = (
+                json_match.group(1) if json_match.lastindex else json_match.group(0)
+            )
             data = json.loads(json_text)
 
             # Parse questions from JSON
-            for i, q_data in enumerate(data.get('questions', [])):
+            for i, q_data in enumerate(data.get("questions", [])):
                 try:
                     # Generate unique ID
                     question_id = f"gen_{datetime.utcnow().timestamp()}_{i:02d}"
@@ -460,12 +496,12 @@ Return only the JSON format, no additional text."""
                     # Create Question object
                     question = Question(
                         id=question_id,
-                        content=q_data['content'],
-                        answer_key=q_data.get('answer_key', ''),
-                        difficulty=q_data.get('difficulty', 3),
-                        category=q_data.get('category', 'general'),
-                        tags=q_data.get('tags', []),
-                        source=source_context or "llm_generated"
+                        content=q_data["content"],
+                        answer_key=q_data.get("answer_key", ""),
+                        difficulty=q_data.get("difficulty", 3),
+                        category=q_data.get("category", "general"),
+                        tags=q_data.get("tags", []),
+                        source=source_context or "llm_generated",
                     )
 
                     questions.append(question)
@@ -478,7 +514,9 @@ Return only the JSON format, no additional text."""
             logger.error(f"Failed to parse LLM-generated questions: {e}")
         return questions
 
-    def get_next_question(self, exclude_ids: List[str] = None, preferred_difficulty: int = None) -> Optional[Question]:
+    def get_next_question(
+        self, exclude_ids: List[str] = None, preferred_difficulty: int = None
+    ) -> Optional[Question]:
         """
         Get next question with comprehensive balancing.
 
@@ -498,8 +536,7 @@ Return only the JSON format, no additional text."""
 
         # Filter out excluded questions
         available_questions = {
-            qid: q for qid, q in self.questions.items()
-            if qid not in exclude_ids
+            qid: q for qid, q in self.questions.items() if qid not in exclude_ids
         }
 
         if not available_questions:
@@ -511,25 +548,26 @@ Return only the JSON format, no additional text."""
 
         # Get questions due for review
         due_questions = [
-            q for q in available_questions.values()
+            q
+            for q in available_questions.values()
             if q.next_review_datetime <= now and q.review_box > ReviewBox.NEW
         ]
 
         if due_questions:
             # Filter out questions that exceeded 5 repetitions
             filtered_due = [q for q in due_questions if q.attempts < MAX_REPETITIONS]
-            
+
             if filtered_due:
                 # Score each question based on multiple factors
                 scored_questions = []
                 for q in filtered_due:
                     score = self._calculate_question_priority(q, now)
                     scored_questions.append((score, q))
-                
+
                 # Sort by score (lower is higher priority)
                 scored_questions.sort(key=lambda x: x[0])
                 selected = scored_questions[0][1]
-                
+
                 logger.debug(
                     f"Selected review question (Box {selected.review_box}, "
                     f"attempt {selected.attempts + 1}/{MAX_REPETITIONS}, "
@@ -538,50 +576,65 @@ Return only the JSON format, no additional text."""
                 return selected
             else:
                 # All due questions exceeded 5 repetitions
-                logger.warning("All due questions exceeded 5 repetitions, prioritizing new questions...")
+                logger.warning(
+                    "All due questions exceeded 5 repetitions, prioritizing new questions..."
+                )
                 # Fall through to new questions
 
         # Get new questions (never reviewed)
         new_questions = [
-            q for q in available_questions.values()
+            q
+            for q in available_questions.values()
             if q.review_box == ReviewBox.NEW and q.attempts < MAX_REPETITIONS
         ]
 
         if new_questions:
             # Filter by preferred difficulty if specified
             if preferred_difficulty:
-                difficulty_filtered = [q for q in new_questions if q.difficulty == preferred_difficulty]
+                difficulty_filtered = [
+                    q for q in new_questions if q.difficulty == preferred_difficulty
+                ]
                 if difficulty_filtered:
                     new_questions = difficulty_filtered
-            
+
             # Sort by: 1) difficulty (easy to hard), 2) fewer attempts, 3) creation date
             new_questions.sort(key=lambda q: (q.difficulty, q.attempts, q.created_at))
-            logger.debug(f"Selected new question (attempt 1/{MAX_REPETITIONS}): {new_questions[0].content[:50]}...")
+            logger.debug(
+                f"Selected new question (attempt 1/{MAX_REPETITIONS}): {new_questions[0].content[:50]}..."
+            )
             return new_questions[0]
 
         # Last resort: if all questions exceeded limit, return None
-        logger.info("No questions available - all exceeded 5 repetitions or are scheduled for future")
+        logger.info(
+            "No questions available - all exceeded 5 repetitions or are scheduled for future"
+        )
         return None
-    
-    def _calculate_question_priority(self, question: Question, current_time: datetime) -> float:
+
+    def _calculate_question_priority(
+        self, question: Question, current_time: datetime
+    ) -> float:
         """
         Calculate priority score for a question (lower = higher priority).
-        
+
         Factors:
         1. Forgetting curve urgency (最重要)
         2. Repetition count penalty
         3. Success rate bonus (high success = less urgent)
-        
+
         Returns:
             Priority score (lower is better)
         """
         # Factor 1: Urgency based on overdue time
-        overdue_hours = (current_time - question.next_review_datetime).total_seconds() / 3600
-        urgency_score = -overdue_hours  # Negative = more overdue = lower score = higher priority
-        
+        overdue_hours = (
+            current_time - question.next_review_datetime
+        ).total_seconds() / 3600
+        urgency_score = (
+            -overdue_hours
+        )  # Negative = more overdue = lower score = higher priority
+
         # Factor 2: Repetition penalty (more repetitions = higher score = lower priority)
         repetition_penalty = question.attempts * 10  # Each repetition adds 10 points
-        
+
         # Factor 3: Success rate bonus
         # High success (>80%) = already mastered = lower priority
         # Low success (<50%) = needs practice = higher priority (but capped by repetition limit)
@@ -592,13 +645,13 @@ Return only the JSON format, no additional text."""
             success_bonus = 0  # Moderate, neutral
         else:
             success_bonus = -15  # Struggling, prioritize (but not too much)
-        
+
         # Combine factors
         # Urgency is most important (weight 1.0)
         # Repetition penalty is secondary (weight 1.0)
         # Success bonus is tertiary (weight 1.0)
         total_score = urgency_score + repetition_penalty + success_bonus
-        
+
         return total_score
 
     def update_progress(self, question_id: str, is_correct: bool) -> bool:
@@ -656,18 +709,20 @@ Return only the JSON format, no additional text."""
 
         if total_questions == 0:
             return {
-                'total_questions': 0,
-                'questions_by_box': {},
-                'due_for_review': 0,
-                'overall_success_rate': 0.0,
-                'questions_by_difficulty': {},
-                'questions_by_category': {}
+                "total_questions": 0,
+                "questions_by_box": {},
+                "due_for_review": 0,
+                "overall_success_rate": 0.0,
+                "questions_by_difficulty": {},
+                "questions_by_category": {},
             }
 
         # Count questions by review box
         box_counts = {}
         for i in range(6):  # Boxes 0-5
-            box_counts[f'box_{i}'] = len([q for q in self.questions.values() if q.review_box == i])
+            box_counts[f"box_{i}"] = len(
+                [q for q in self.questions.values() if q.review_box == i]
+            )
 
         # Count due questions
         due_count = len(self.get_questions_due_for_review())
@@ -675,25 +730,32 @@ Return only the JSON format, no additional text."""
         # Calculate overall success rate
         total_attempts = sum(q.attempts for q in self.questions.values())
         total_correct = sum(q.correct_answers for q in self.questions.values())
-        overall_success_rate = (total_correct / total_attempts) if total_attempts > 0 else 0.0
+        overall_success_rate = (
+            (total_correct / total_attempts) if total_attempts > 0 else 0.0
+        )
 
         # Count by difficulty
         difficulty_counts = {}
         for i in range(1, 6):
-            difficulty_counts[f'difficulty_{i}'] = len([q for q in self.questions.values() if q.difficulty == i])
+            difficulty_counts[f"difficulty_{i}"] = len(
+                [q for q in self.questions.values() if q.difficulty == i]
+            )
 
         # Count by category
         categories = set(q.category for q in self.questions.values())
-        category_counts = {cat: len([q for q in self.questions.values() if q.category == cat]) for cat in categories}
+        category_counts = {
+            cat: len([q for q in self.questions.values() if q.category == cat])
+            for cat in categories
+        }
 
         return {
-            'total_questions': total_questions,
-            'questions_by_box': box_counts,
-            'due_for_review': due_count,
-            'overall_success_rate': round(overall_success_rate, 3),
-            'questions_by_difficulty': difficulty_counts,
-            'questions_by_category': category_counts,
-            'last_updated': datetime.utcnow().isoformat()
+            "total_questions": total_questions,
+            "questions_by_box": box_counts,
+            "due_for_review": due_count,
+            "overall_success_rate": round(overall_success_rate, 3),
+            "questions_by_difficulty": difficulty_counts,
+            "questions_by_category": category_counts,
+            "last_updated": datetime.utcnow().isoformat(),
         }
 
     def search_questions(self, query: str, limit: int = 10) -> List[Question]:
@@ -712,23 +774,34 @@ Return only the JSON format, no additional text."""
 
         for question in self.questions.values():
             # Search in content, category, tags
-            if (query_lower in question.content.lower() or
-                query_lower in question.category.lower() or
-                any(query_lower in tag.lower() for tag in question.tags) or
-                (question.answer_key and query_lower in question.answer_key.lower())):
+            if (
+                query_lower in question.content.lower()
+                or query_lower in question.category.lower()
+                or any(query_lower in tag.lower() for tag in question.tags)
+                or (question.answer_key and query_lower in question.answer_key.lower())
+            ):
                 matches.append(question)
 
         # Sort by relevance (simple scoring)
-        matches.sort(key=lambda q: (
-            query_lower in q.content.lower(),
-            query_lower in q.category.lower(),
-            any(query_lower in tag.lower() for tag in q.tags)
-        ), reverse=True)
+        matches.sort(
+            key=lambda q: (
+                query_lower in q.content.lower(),
+                query_lower in q.category.lower(),
+                any(query_lower in tag.lower() for tag in q.tags),
+            ),
+            reverse=True,
+        )
 
         return matches[:limit]
 
-    def add_question(self, content: str, answer_key: str = "", difficulty: int = 3,
-                    category: str = "general", tags: List[str] = None) -> Question:
+    def add_question(
+        self,
+        content: str,
+        answer_key: str = "",
+        difficulty: int = 3,
+        category: str = "general",
+        tags: List[str] = None,
+    ) -> Question:
         """
         Manually add a question to the database.
 
@@ -745,7 +818,9 @@ Return only the JSON format, no additional text."""
         if tags is None:
             tags = []
 
-        question_id = f"manual_{datetime.utcnow().timestamp()}_{len(self.questions):04d}"
+        question_id = (
+            f"manual_{datetime.utcnow().timestamp()}_{len(self.questions):04d}"
+        )
 
         question = Question(
             id=question_id,
@@ -754,7 +829,7 @@ Return only the JSON format, no additional text."""
             difficulty=difficulty,
             category=category,
             tags=tags,
-            source="manual_entry"
+            source="manual_entry",
         )
 
         self.questions[question_id] = question

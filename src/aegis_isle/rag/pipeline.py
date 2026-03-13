@@ -3,16 +3,21 @@ Main RAG Pipeline - Orchestrates the entire retrieval-augmented generation proce
 """
 
 import time
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
 from ..core.config import settings
 from ..core.logging import logger
-from .chunker import BaseChunker, get_chunker
-from .document_processor import DocumentProcessor, ProcessedDocument
-from .generator import BaseGenerator, GenerationResult, get_generator
-from .retriever import BaseRetriever, VectorRetriever, HybridRetriever, EnhancedQueryResult
+from .chunker import get_chunker
+from .document_processor import DocumentProcessor
+from .generator import GenerationResult, get_generator
+from .retriever import (
+    BaseRetriever,
+    VectorRetriever,
+    HybridRetriever,
+    EnhancedQueryResult,
+)
 
 
 class RAGConfig(BaseModel):
@@ -62,7 +67,7 @@ class RAGPipeline:
         self.chunker = get_chunker(
             strategy=self.config.chunking_strategy,
             chunk_size=self.config.chunk_size,
-            chunk_overlap=self.config.chunk_overlap
+            chunk_overlap=self.config.chunk_overlap,
         )
 
         # Initialize retriever
@@ -73,7 +78,7 @@ class RAGPipeline:
             provider=self.config.generation_provider,
             model=self.config.generation_model,
             max_tokens=self.config.max_tokens,
-            temperature=self.config.temperature
+            temperature=self.config.temperature,
         )
 
         logger.info("RAG Pipeline initialized successfully")
@@ -83,22 +88,22 @@ class RAGPipeline:
         try:
             vector_retriever = VectorRetriever(
                 embedding_model=self.config.embedding_model,
-                vector_db_type=self.config.vector_db_type
+                vector_db_type=self.config.vector_db_type,
             )
 
             if self.config.retrieval_strategy == "hybrid":
                 return HybridRetriever(vector_retriever)
             else:
                 return vector_retriever
-        
+
         except Exception as e:
-            logger.warning(f"Failed to initialize retriever, falling back to pure LLM mode: {e}")
+            logger.warning(
+                f"Failed to initialize retriever, falling back to pure LLM mode: {e}"
+            )
             return None
 
     async def add_document(
-        self,
-        file_path: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, file_path: str, metadata: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Add a document to the RAG system."""
         try:
@@ -118,7 +123,7 @@ class RAGPipeline:
                     f"Successfully added document {document.id} with {len(chunks)} chunks"
                 )
             else:
-                logger.error(f"Failed to add document chunks to retriever")
+                logger.error("Failed to add document chunks to retriever")
 
             return success
 
@@ -127,9 +132,7 @@ class RAGPipeline:
             return False
 
     async def add_text(
-        self,
-        content: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, content: str, metadata: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Add raw text content to the RAG system."""
         try:
@@ -154,9 +157,7 @@ class RAGPipeline:
             return False
 
     async def add_url(
-        self,
-        url: str,
-        metadata: Optional[Dict[str, Any]] = None
+        self, url: str, metadata: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Add content from a URL to the RAG system."""
         try:
@@ -181,10 +182,7 @@ class RAGPipeline:
             return False
 
     async def query(
-        self,
-        query: str,
-        max_docs: Optional[int] = None,
-        **kwargs
+        self, query: str, max_docs: Optional[int] = None, **kwargs
     ) -> RAGResult:
         """Perform a complete RAG query."""
         start_time = time.time()
@@ -200,18 +198,18 @@ class RAGPipeline:
                 query,
                 limit=max_docs,
                 score_threshold=self.config.similarity_threshold,
-                **kwargs
+                **kwargs,
             )
             retrieval_time = time.time() - retrieval_start
 
-            logger.info(f"Retrieved {len(retrieval_result.results)} documents in {retrieval_time:.2f}s")
+            logger.info(
+                f"Retrieved {len(retrieval_result.results)} documents in {retrieval_time:.2f}s"
+            )
 
             # Generate response
             generation_start = time.time()
             generation_result = await self.generator.generate(
-                query,
-                retrieval_context=retrieval_result,
-                **kwargs
+                query, retrieval_context=retrieval_result, **kwargs
             )
             generation_time = time.time() - generation_start
 
@@ -224,7 +222,7 @@ class RAGPipeline:
                     "document_id": result.chunk.document_id,
                     "chunk_index": result.chunk.chunk_index,
                     "score": result.score,
-                    "metadata": result.chunk.metadata
+                    "metadata": result.chunk.metadata,
                 }
                 for result in retrieval_result.results
             ]
@@ -242,8 +240,8 @@ class RAGPipeline:
                     "retrieval_time": retrieval_time,
                     "generation_time": generation_time,
                     "config": self.config.dict(),
-                    "num_sources": len(sources)
-                }
+                    "num_sources": len(sources),
+                },
             )
 
         except Exception as e:
@@ -254,25 +252,22 @@ class RAGPipeline:
                 query=query,
                 answer=f"Sorry, I encountered an error while processing your query: {str(e)}",
                 sources=[],
-                retrieval_result=EnhancedQueryResult(query=query, results=[], total_time=0.0),
+                retrieval_result=EnhancedQueryResult(
+                    query=query, results=[], total_time=0.0
+                ),
                 generation_result=GenerationResult(
                     generated_text="",
                     model=self.config.generation_model,
-                    metadata={"error": str(e)}
+                    metadata={"error": str(e)},
                 ),
                 total_time=time.time() - start_time,
-                metadata={"error": str(e)}
+                metadata={"error": str(e)},
             )
 
-    async def query_stream(
-        self,
-        query: str,
-        max_docs: Optional[int] = None,
-        **kwargs
-    ):
+    async def query_stream(self, query: str, max_docs: Optional[int] = None, **kwargs):
         """Perform a streaming RAG query."""
         import json
-        
+
         logger.info(f"Processing stream query: {query}")
 
         max_docs = max_docs or self.config.max_retrieved_docs
@@ -285,7 +280,7 @@ class RAGPipeline:
                     query,
                     limit=max_docs,
                     score_threshold=self.config.similarity_threshold,
-                    **kwargs
+                    **kwargs,
                 )
             except Exception as e:
                 logger.error(f"Retrieval failed during stream: {e}")
@@ -296,7 +291,9 @@ class RAGPipeline:
         # 2. Check retrieval results and fallback
         if not retrieval_result or not retrieval_result.results:
             if self.retriever:
-                logger.warning("No relevant documents found. Proceeding without context.")
+                logger.warning(
+                    "No relevant documents found. Proceeding without context."
+                )
             retrieval_result = None
         else:
             # 3. Yield metadata block
@@ -304,7 +301,9 @@ class RAGPipeline:
                 {
                     "source": res.chunk.document_id,
                     "score": round(res.score, 4),
-                    "content_preview": res.chunk.content[:100] + "..." if res.chunk.content else ""
+                    "content_preview": res.chunk.content[:100] + "..."
+                    if res.chunk.content
+                    else "",
                 }
                 for res in retrieval_result.results[:3]
             ]
@@ -312,23 +311,18 @@ class RAGPipeline:
             metadata_packet = {
                 "type": "metadata",
                 "count": len(retrieval_result.results),
-                "sources": top_sources
+                "sources": top_sources,
             }
             yield json.dumps(metadata_packet)
 
         # 4. Generate streaming response
         async for chunk in self.generator.generate_stream(
-            query,
-            retrieval_context=retrieval_result,
-            **kwargs
+            query, retrieval_context=retrieval_result, **kwargs
         ):
             yield chunk
 
     async def batch_query(
-        self,
-        queries: List[str],
-        max_docs: Optional[int] = None,
-        **kwargs
+        self, queries: List[str], max_docs: Optional[int] = None, **kwargs
     ) -> List[RAGResult]:
         """Process multiple queries in batch."""
         logger.info(f"Processing {len(queries)} queries in batch")
@@ -368,7 +362,7 @@ class RAGPipeline:
                     "chunker": self.chunker.__class__.__name__,
                     "retriever": self.retriever.__class__.__name__,
                     "generator": self.generator.__class__.__name__,
-                }
+                },
             }
 
         except Exception as e:
@@ -389,7 +383,7 @@ class RAGPipeline:
         health_status = {
             "status": "healthy",
             "components": {},
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
 
         try:
@@ -398,13 +392,13 @@ class RAGPipeline:
             retrieval_result = await self.retriever.search(test_query, limit=1)
             health_status["components"]["retriever"] = {
                 "status": "healthy",
-                "search_time": retrieval_result.total_time
+                "search_time": retrieval_result.total_time,
             }
 
         except Exception as e:
             health_status["components"]["retriever"] = {
                 "status": "unhealthy",
-                "error": str(e)
+                "error": str(e),
             }
             health_status["status"] = "degraded"
 
@@ -413,13 +407,13 @@ class RAGPipeline:
             generation_result = await self.generator.generate("test prompt")
             health_status["components"]["generator"] = {
                 "status": "healthy",
-                "generation_time": generation_result.generation_time
+                "generation_time": generation_result.generation_time,
             }
 
         except Exception as e:
             health_status["components"]["generator"] = {
                 "status": "unhealthy",
-                "error": str(e)
+                "error": str(e),
             }
             health_status["status"] = "degraded"
 
@@ -453,7 +447,7 @@ async def initialize_default_pipeline() -> RAGPipeline:
         max_tokens=settings.max_tokens,
         temperature=settings.temperature,
         vector_db_type=settings.vector_db_type,
-        embedding_model=settings.embedding_model
+        embedding_model=settings.embedding_model,
     )
 
     pipeline = RAGPipeline(config)

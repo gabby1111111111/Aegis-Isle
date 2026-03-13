@@ -4,10 +4,9 @@ Supports advanced chart generation, data processing, and analysis using Python t
 """
 
 import json
-import uuid
 from typing import Any, Dict, List, Optional, Union
 
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
 from ..base import BaseAgent, AgentConfig, AgentMessage, AgentResponse, AgentRole
@@ -31,7 +30,7 @@ class EnhancedChartAgent(BaseAgent):
         self,
         config: Optional[AgentConfig] = None,
         enable_python_tools: bool = True,
-        chart_libraries: Optional[List[str]] = None
+        chart_libraries: Optional[List[str]] = None,
     ):
         """Initialize enhanced chart agent.
 
@@ -47,7 +46,7 @@ class EnhancedChartAgent(BaseAgent):
                 description="Enhanced chart generation agent with Python tool integration",
                 max_tokens=2000,
                 temperature=0.3,  # Lower temperature for more consistent code generation
-                tools=["python_repl"] if enable_python_tools else []
+                tools=["python_repl"] if enable_python_tools else [],
             )
 
         super().__init__(config)
@@ -79,28 +78,43 @@ class EnhancedChartAgent(BaseAgent):
                 # Create new tool with chart-specific configuration
                 chart_allowed_imports = {
                     # Core libraries
-                    'math', 'statistics', 'random', 'datetime', 'json', 're',
-                    'collections', 'itertools', 'functools', 'operator',
+                    "math",
+                    "statistics",
+                    "random",
+                    "datetime",
+                    "json",
+                    "re",
+                    "collections",
+                    "itertools",
+                    "functools",
+                    "operator",
                     # Data processing
-                    'numpy', 'pandas', 'scipy',
+                    "numpy",
+                    "pandas",
+                    "scipy",
                     # Visualization
-                    'matplotlib', 'seaborn', 'plotly',
+                    "matplotlib",
+                    "seaborn",
+                    "plotly",
                     # Utility
-                    'io', 'base64', 'urllib', 'textwrap'
+                    "io",
+                    "base64",
+                    "urllib",
+                    "textwrap",
                 }
 
                 tool_config = ToolConfig(
                     name="chart_python_repl",
                     description="Python REPL for chart generation and data analysis",
                     timeout=60,  # Longer timeout for chart generation
-                    max_retries=2
+                    max_retries=2,
                 )
 
                 self.python_tool = PythonREPLTool(
                     config=tool_config,
                     max_output_length=20000,  # Larger output for charts
                     allowed_imports=chart_allowed_imports,
-                    enable_matplotlib=True
+                    enable_matplotlib=True,
                 )
 
                 # Register the tool
@@ -114,13 +128,15 @@ class EnhancedChartAgent(BaseAgent):
     def _initialize_llm(self) -> None:
         """Initialize the language model for chart generation logic."""
         try:
-            model_name = self.config.model_name or getattr(settings, 'default_model', 'gpt-3.5-turbo')
+            model_name = self.config.model_name or getattr(
+                settings, "default_model", "gpt-3.5-turbo"
+            )
 
             self.llm = ChatOpenAI(
                 model=model_name,
                 temperature=self.config.temperature,
                 max_tokens=self.config.max_tokens,
-                openai_api_key=getattr(settings, 'openai_api_key', None)
+                openai_api_key=getattr(settings, "openai_api_key", None),
             )
 
             logger.debug(f"Initialized LLM: {model_name}")
@@ -140,16 +156,15 @@ class EnhancedChartAgent(BaseAgent):
         """
         start_time = 0.0
         import time
+
         start_time = time.time()
 
         try:
             # Extract message content
             if isinstance(message, AgentMessage):
                 content = message.content
-                sender_id = message.sender_id
             else:
                 content = str(message)
-                sender_id = "user"
 
             logger.info(f"Chart agent processing request: {content[:100]}...")
 
@@ -172,12 +187,14 @@ class EnhancedChartAgent(BaseAgent):
                     "chart_type": result.get("chart_type"),
                     "libraries_used": result.get("libraries_used", []),
                     "data_points": result.get("data_points"),
-                    "execution_details": result.get("execution_details", {})
-                }
+                    "execution_details": result.get("execution_details", {}),
+                },
             )
 
             if not result.get("success", True):
-                response.error = result.get("error", "Unknown error in chart generation")
+                response.error = result.get(
+                    "error", "Unknown error in chart generation"
+                )
 
             logger.info(f"Chart agent completed in {execution_time:.2f}s")
             return response
@@ -191,7 +208,7 @@ class EnhancedChartAgent(BaseAgent):
                 content="Chart generation failed",
                 success=False,
                 error=str(e),
-                execution_time=execution_time
+                execution_time=execution_time,
             )
 
     async def _generate_chart(self, request: str) -> Dict[str, Any]:
@@ -211,7 +228,7 @@ class EnhancedChartAgent(BaseAgent):
                 return {
                     "success": False,
                     "error": "Failed to analyze chart request",
-                    "content": "Unable to understand chart requirements"
+                    "content": "Unable to understand chart requirements",
                 }
 
             # Step 2: Generate Python code for the chart
@@ -230,8 +247,10 @@ class EnhancedChartAgent(BaseAgent):
                         "execution_details": {
                             "code_executed": python_code,
                             "execution_time": execution_result.execution_time,
-                            "variables_created": execution_result.content.get("variables_created", [])
-                        }
+                            "variables_created": execution_result.content.get(
+                                "variables_created", []
+                            ),
+                        },
                     }
                 else:
                     return {
@@ -240,8 +259,8 @@ class EnhancedChartAgent(BaseAgent):
                         "content": "Chart generation failed during code execution",
                         "execution_details": {
                             "code_attempted": python_code,
-                            "error_details": execution_result.content
-                        }
+                            "error_details": execution_result.content,
+                        },
                     }
             else:
                 # Fallback: return the generated code
@@ -251,8 +270,8 @@ class EnhancedChartAgent(BaseAgent):
                     "chart_type": chart_analysis.get("chart_type"),
                     "execution_details": {
                         "code_generated": python_code,
-                        "note": "Python tool not available - showing code only"
-                    }
+                        "note": "Python tool not available - showing code only",
+                    },
                 }
 
         except Exception as e:
@@ -260,7 +279,7 @@ class EnhancedChartAgent(BaseAgent):
             return {
                 "success": False,
                 "error": str(e),
-                "content": "An error occurred during chart generation"
+                "content": "An error occurred during chart generation",
             }
 
     async def _analyze_chart_request(self, request: str) -> Dict[str, Any]:
@@ -308,8 +327,8 @@ class EnhancedChartAgent(BaseAgent):
             # Parse JSON response
             analysis_text = response.content
             # Extract JSON from response (handle markdown code blocks)
-            json_start = analysis_text.find('{')
-            json_end = analysis_text.rfind('}') + 1
+            json_start = analysis_text.find("{")
+            json_end = analysis_text.rfind("}") + 1
 
             if json_start >= 0 and json_end > json_start:
                 json_str = analysis_text[json_start:json_end]
@@ -339,15 +358,22 @@ class EnhancedChartAgent(BaseAgent):
         chart_type = "bar"  # default
         if any(word in request_lower for word in ["line", "trend", "time", "series"]):
             chart_type = "line"
-        elif any(word in request_lower for word in ["scatter", "correlation", "relationship"]):
+        elif any(
+            word in request_lower for word in ["scatter", "correlation", "relationship"]
+        ):
             chart_type = "scatter"
         elif any(word in request_lower for word in ["pie", "proportion", "percentage"]):
             chart_type = "pie"
-        elif any(word in request_lower for word in ["histogram", "distribution", "frequency"]):
+        elif any(
+            word in request_lower for word in ["histogram", "distribution", "frequency"]
+        ):
             chart_type = "histogram"
         elif any(word in request_lower for word in ["box", "boxplot", "quartile"]):
             chart_type = "box"
-        elif any(word in request_lower for word in ["heatmap", "correlation matrix", "matrix"]):
+        elif any(
+            word in request_lower
+            for word in ["heatmap", "correlation matrix", "matrix"]
+        ):
             chart_type = "heatmap"
 
         # Determine libraries
@@ -366,7 +392,7 @@ class EnhancedChartAgent(BaseAgent):
             "y_axis": "y",
             "title": f"{chart_type.title()} Chart",
             "styling": "default",
-            "complexity": "simple"
+            "complexity": "simple",
         }
 
     def _generate_chart_code(self, analysis: Dict[str, Any]) -> str:
@@ -380,37 +406,31 @@ class EnhancedChartAgent(BaseAgent):
         """
         chart_type = analysis.get("chart_type", "bar")
         libraries = analysis.get("libraries", ["matplotlib"])
-        title = analysis.get("title", "Chart")
+        analysis.get("title", "Chart")
 
         # Base imports
-        code_parts = [
-            "import numpy as np",
-            "import pandas as pd"
-        ]
+        code_parts = ["import numpy as np", "import pandas as pd"]
 
         # Add library-specific imports
         if "matplotlib" in libraries:
-            code_parts.extend([
-                "import matplotlib.pyplot as plt",
-                "import matplotlib.style as style",
-                "plt.style.use('default')"
-            ])
+            code_parts.extend(
+                [
+                    "import matplotlib.pyplot as plt",
+                    "import matplotlib.style as style",
+                    "plt.style.use('default')",
+                ]
+            )
 
         if "seaborn" in libraries:
             code_parts.append("import seaborn as sns")
 
         if "plotly" in libraries:
-            code_parts.extend([
-                "import plotly.graph_objects as go",
-                "import plotly.express as px"
-            ])
+            code_parts.extend(
+                ["import plotly.graph_objects as go", "import plotly.express as px"]
+            )
 
         # Generate sample data
-        code_parts.extend([
-            "",
-            "# Generate sample data",
-            "np.random.seed(42)"
-        ])
+        code_parts.extend(["", "# Generate sample data", "np.random.seed(42)"])
 
         # Generate chart-specific code
         if chart_type == "line":
@@ -450,7 +470,7 @@ class EnhancedChartAgent(BaseAgent):
             "",
             "plt.tight_layout()",
             "plt.show()",
-            "print(f'Generated bar chart with {len(categories)} categories')"
+            "print(f'Generated bar chart with {len(categories)} categories')",
         ]
 
     def _generate_line_chart_code(self, analysis: Dict[str, Any]) -> List[str]:
@@ -470,7 +490,7 @@ class EnhancedChartAgent(BaseAgent):
             "plt.grid(True, alpha=0.3)",
             "plt.tight_layout()",
             "plt.show()",
-            "print(f'Generated line chart with {len(x)} data points')"
+            "print(f'Generated line chart with {len(x)} data points')",
         ]
 
     def _generate_scatter_chart_code(self, analysis: Dict[str, Any]) -> List[str]:
@@ -490,7 +510,7 @@ class EnhancedChartAgent(BaseAgent):
             "plt.grid(True, alpha=0.3)",
             "plt.tight_layout()",
             "plt.show()",
-            "print(f'Generated scatter plot with {n_points} points')"
+            "print(f'Generated scatter plot with {n_points} points')",
         ]
 
     def _generate_pie_chart_code(self, analysis: Dict[str, Any]) -> List[str]:
@@ -515,7 +535,7 @@ class EnhancedChartAgent(BaseAgent):
             "plt.axis('equal')",
             "plt.tight_layout()",
             "plt.show()",
-            "print(f'Generated pie chart with {len(labels)} categories')"
+            "print(f'Generated pie chart with {len(labels)} categories')",
         ]
 
     def _generate_histogram_code(self, analysis: Dict[str, Any]) -> List[str]:
@@ -539,7 +559,7 @@ class EnhancedChartAgent(BaseAgent):
             "plt.tight_layout()",
             "plt.show()",
             "print(f'Generated histogram with {len(data)} data points')",
-            "print(f'Mean: {mean_val:.2f}, Std: {std_val:.2f}')"
+            "print(f'Mean: {mean_val:.2f}, Std: {std_val:.2f}')",
         ]
 
     def _generate_box_chart_code(self, analysis: Dict[str, Any]) -> List[str]:
@@ -567,7 +587,7 @@ class EnhancedChartAgent(BaseAgent):
             "plt.grid(axis='y', alpha=0.3)",
             "plt.tight_layout()",
             "plt.show()",
-            "print(f'Generated box plot for {len(labels)} groups')"
+            "print(f'Generated box plot for {len(labels)} groups')",
         ]
 
     def _generate_heatmap_code(self, analysis: Dict[str, Any]) -> List[str]:
@@ -588,7 +608,7 @@ class EnhancedChartAgent(BaseAgent):
             f"plt.title('{analysis.get('title', 'Heatmap')}')",
             "plt.tight_layout()",
             "plt.show()",
-            "print(f'Generated heatmap with {correlation_matrix.shape[0]}x{correlation_matrix.shape[1]} matrix')"
+            "print(f'Generated heatmap with {correlation_matrix.shape[0]}x{correlation_matrix.shape[1]} matrix')",
         ]
 
     async def initialize(self) -> bool:
@@ -632,7 +652,7 @@ class ChartAgent(EnhancedChartAgent):
                 name="chart_agent",
                 role=AgentRole.CHART_GENERATOR,
                 description="Chart generation agent (legacy wrapper)",
-                tools=["python_repl"]
+                tools=["python_repl"],
             )
 
         super().__init__(config)

@@ -4,13 +4,12 @@ Enhanced with table-aware chunking, semantic segmentation, and multi-modal suppo
 """
 
 import re
-import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..core.config import settings
 from ..core.logging import logger
-from .document_processor import DocumentChunk, ProcessedDocument, ParsedTable, ParsedImage
+from .document_processor import DocumentChunk, ProcessedDocument
 
 
 class EnhancedChunker(ABC):
@@ -22,7 +21,7 @@ class EnhancedChunker(ABC):
         chunk_overlap: int = 200,
         preserve_tables: bool = True,
         preserve_images: bool = True,
-        **kwargs
+        **kwargs,
     ):
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
@@ -43,7 +42,7 @@ class EnhancedChunker(ABC):
         end_pos: int = 0,
         chunk_type: str = "text",
         source_element: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> DocumentChunk:
         """Create an enhanced DocumentChunk object."""
         return DocumentChunk(
@@ -54,22 +53,18 @@ class EnhancedChunker(ABC):
             end_pos=end_pos,
             chunk_type=chunk_type,
             source_element=source_element,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
     def _extract_enhanced_elements(self, document: ProcessedDocument) -> Dict[str, Any]:
         """Extract enhanced elements (tables, images) from document processing stats."""
-        enhanced_data = {
-            'tables': [],
-            'images': [],
-            'enhanced_result': None
-        }
+        enhanced_data = {"tables": [], "images": [], "enhanced_result": None}
 
-        if 'enhanced_result' in document.processing_stats:
-            enhanced_result = document.processing_stats['enhanced_result']
-            enhanced_data['tables'] = enhanced_result.get('tables', [])
-            enhanced_data['images'] = enhanced_result.get('images', [])
-            enhanced_data['enhanced_result'] = enhanced_result
+        if "enhanced_result" in document.processing_stats:
+            enhanced_result = document.processing_stats["enhanced_result"]
+            enhanced_data["tables"] = enhanced_result.get("tables", [])
+            enhanced_data["images"] = enhanced_result.get("images", [])
+            enhanced_data["enhanced_result"] = enhanced_result
 
         return enhanced_data
 
@@ -83,7 +78,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
         chunk_overlap: int = 200,
         separators: Optional[List[str]] = None,
         table_max_size: int = 2000,  # Max size for table chunks
-        **kwargs
+        **kwargs,
     ):
         super().__init__(chunk_size, chunk_overlap, **kwargs)
         self.table_max_size = table_max_size
@@ -91,14 +86,14 @@ class TableAwareRecursiveChunker(EnhancedChunker):
             "\n=== TABLES ===\n",  # Table section separator
             "\n=== IMAGES ===\n",  # Image section separator
             "\n\n",  # Double newline (paragraph breaks)
-            "\n",    # Single newline
-            ". ",    # Sentence endings
-            "! ",    # Exclamation sentences
-            "? ",    # Question sentences
-            "; ",    # Semicolons
-            ", ",    # Commas
-            " ",     # Spaces
-            ""       # Character level (fallback)
+            "\n",  # Single newline
+            ". ",  # Sentence endings
+            "! ",  # Exclamation sentences
+            "? ",  # Question sentences
+            "; ",  # Semicolons
+            ", ",  # Commas
+            " ",  # Spaces
+            "",  # Character level (fallback)
         ]
 
     def chunk_document(self, document: ProcessedDocument) -> List[DocumentChunk]:
@@ -106,7 +101,9 @@ class TableAwareRecursiveChunker(EnhancedChunker):
         if not document.content.strip():
             return []
 
-        logger.debug(f"Chunking document {document.id} with table-aware recursive strategy")
+        logger.debug(
+            f"Chunking document {document.id} with table-aware recursive strategy"
+        )
 
         # Extract enhanced elements
         enhanced_data = self._extract_enhanced_elements(document)
@@ -119,7 +116,9 @@ class TableAwareRecursiveChunker(EnhancedChunker):
         for section_type, section_content in content_sections:
             if section_type == "text":
                 # Regular text chunking
-                text_chunks = self._split_text_recursive(section_content, self.separators)
+                text_chunks = self._split_text_recursive(
+                    section_content, self.separators
+                )
                 for chunk_text in text_chunks:
                     if chunk_text.strip():
                         chunk = self._create_chunk(
@@ -131,8 +130,8 @@ class TableAwareRecursiveChunker(EnhancedChunker):
                                 "chunking_strategy": "table_aware_recursive",
                                 "chunk_size": self.chunk_size,
                                 "overlap": self.chunk_overlap,
-                                "section_type": "text"
-                            }
+                                "section_type": "text",
+                            },
                         )
                         all_chunks.append(chunk)
                         chunk_index += 1
@@ -140,7 +139,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
             elif section_type == "tables" and self.preserve_tables:
                 # Handle tables separately
                 table_chunks = self._chunk_tables(
-                    document.id, section_content, enhanced_data['tables'], chunk_index
+                    document.id, section_content, enhanced_data["tables"], chunk_index
                 )
                 all_chunks.extend(table_chunks)
                 chunk_index += len(table_chunks)
@@ -148,7 +147,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
             elif section_type == "images" and self.preserve_images:
                 # Handle images separately
                 image_chunks = self._chunk_images(
-                    document.id, section_content, enhanced_data['images'], chunk_index
+                    document.id, section_content, enhanced_data["images"], chunk_index
                 )
                 all_chunks.extend(image_chunks)
                 chunk_index += len(image_chunks)
@@ -170,7 +169,9 @@ class TableAwareRecursiveChunker(EnhancedChunker):
 
             table_image_parts = remaining.split("=== IMAGES ===")
             table_part = table_image_parts[0].replace("=== TABLES ===", "").strip()
-            image_part = table_image_parts[1].strip() if len(table_image_parts) > 1 else ""
+            image_part = (
+                table_image_parts[1].strip() if len(table_image_parts) > 1 else ""
+            )
 
             if text_part:
                 sections.append(("text", text_part))
@@ -209,7 +210,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
         document_id: str,
         table_section: str,
         tables_metadata: List[Dict],
-        start_index: int
+        start_index: int,
     ) -> List[DocumentChunk]:
         """Create chunks for tables, ensuring they're not broken."""
         chunks = []
@@ -235,13 +236,17 @@ class TableAwareRecursiveChunker(EnhancedChunker):
                         "chunking_strategy": "table_aware",
                         "is_complete_table": True,
                         "table_index": i,
-                        "original_table_metadata": tables_metadata[i] if i < len(tables_metadata) else None
-                    }
+                        "original_table_metadata": tables_metadata[i]
+                        if i < len(tables_metadata)
+                        else None,
+                    },
                 )
                 chunks.append(chunk)
             else:
                 # Table is too large, split by rows but mark as partial
-                logger.warning(f"Table {i} is large ({len(table_content)} chars), splitting by rows")
+                logger.warning(
+                    f"Table {i} is large ({len(table_content)} chars), splitting by rows"
+                )
                 table_chunks = self._split_large_table(
                     document_id, table_content, start_index + i, i
                 )
@@ -250,15 +255,11 @@ class TableAwareRecursiveChunker(EnhancedChunker):
         return chunks
 
     def _split_large_table(
-        self,
-        document_id: str,
-        table_content: str,
-        chunk_index: int,
-        table_index: int
+        self, document_id: str, table_content: str, chunk_index: int, table_index: int
     ) -> List[DocumentChunk]:
         """Split a large table while preserving structure."""
         chunks = []
-        lines = table_content.split('\n')
+        lines = table_content.split("\n")
 
         # Identify header and separator
         header_lines = []
@@ -266,7 +267,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
         in_data = False
 
         for line in lines:
-            if '---' in line and '|' in line:  # Separator line
+            if "---" in line and "|" in line:  # Separator line
                 header_lines.append(line)
                 in_data = True
             elif not in_data:
@@ -274,7 +275,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
             else:
                 data_lines.append(line)
 
-        header_text = '\n'.join(header_lines)
+        header_text = "\n".join(header_lines)
 
         # Split data lines into chunks
         current_chunk = []
@@ -285,7 +286,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
 
             if current_size + line_size > self.table_max_size and current_chunk:
                 # Create chunk with current data
-                chunk_content = header_text + '\n' + '\n'.join(current_chunk)
+                chunk_content = header_text + "\n" + "\n".join(current_chunk)
                 chunk = self._create_chunk(
                     document_id=document_id,
                     content=chunk_content,
@@ -297,8 +298,8 @@ class TableAwareRecursiveChunker(EnhancedChunker):
                         "is_complete_table": False,
                         "table_index": table_index,
                         "table_part": len(chunks),
-                        "has_header": True
-                    }
+                        "has_header": True,
+                    },
                 )
                 chunks.append(chunk)
 
@@ -312,7 +313,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
 
         # Add final chunk if there's remaining data
         if current_chunk:
-            chunk_content = header_text + '\n' + '\n'.join(current_chunk)
+            chunk_content = header_text + "\n" + "\n".join(current_chunk)
             chunk = self._create_chunk(
                 document_id=document_id,
                 content=chunk_content,
@@ -324,8 +325,8 @@ class TableAwareRecursiveChunker(EnhancedChunker):
                     "is_complete_table": False,
                     "table_index": table_index,
                     "table_part": len(chunks),
-                    "has_header": True
-                }
+                    "has_header": True,
+                },
             )
             chunks.append(chunk)
 
@@ -336,7 +337,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
         document_id: str,
         image_section: str,
         images_metadata: List[Dict],
-        start_index: int
+        start_index: int,
     ) -> List[DocumentChunk]:
         """Create chunks for image descriptions."""
         chunks = []
@@ -357,8 +358,10 @@ class TableAwareRecursiveChunker(EnhancedChunker):
                 metadata={
                     "chunking_strategy": "table_aware",
                     "image_index": i,
-                    "original_image_metadata": images_metadata[i] if i < len(images_metadata) else None
-                }
+                    "original_image_metadata": images_metadata[i]
+                    if i < len(images_metadata)
+                    else None,
+                },
             )
             chunks.append(chunk)
 
@@ -422,7 +425,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
         """Split text by characters when all other separators fail."""
         chunks = []
         for i in range(0, len(text), self.chunk_size):
-            chunk = text[i:i + self.chunk_size]
+            chunk = text[i : i + self.chunk_size]
             chunks.append(chunk)
         return chunks
 
@@ -439,7 +442,7 @@ class TableAwareRecursiveChunker(EnhancedChunker):
 
             # Add overlap from previous chunk
             if len(prev_chunk) >= self.chunk_overlap:
-                overlap = prev_chunk[-self.chunk_overlap:]
+                overlap = prev_chunk[-self.chunk_overlap :]
                 overlapped_chunk = overlap + " " + current_chunk
             else:
                 overlapped_chunk = current_chunk
@@ -458,7 +461,7 @@ class EnhancedSemanticChunker(EnhancedChunker):
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         similarity_threshold: float = 0.7,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(chunk_size, chunk_overlap, **kwargs)
         self.similarity_threshold = similarity_threshold
@@ -493,8 +496,8 @@ class EnhancedSemanticChunker(EnhancedChunker):
                             metadata={
                                 "chunking_strategy": "enhanced_semantic",
                                 "similarity_threshold": self.similarity_threshold,
-                                "section_type": "text"
-                            }
+                                "section_type": "text",
+                            },
                         )
                         all_chunks.append(chunk)
                         chunk_index += 1
@@ -502,7 +505,7 @@ class EnhancedSemanticChunker(EnhancedChunker):
             elif section_type == "tables" and self.preserve_tables:
                 # Handle tables using table-aware methods
                 table_chunks = self._chunk_tables(
-                    document.id, section_content, enhanced_data['tables'], chunk_index
+                    document.id, section_content, enhanced_data["tables"], chunk_index
                 )
                 all_chunks.extend(table_chunks)
                 chunk_index += len(table_chunks)
@@ -510,7 +513,7 @@ class EnhancedSemanticChunker(EnhancedChunker):
             elif section_type == "images" and self.preserve_images:
                 # Handle images
                 image_chunks = self._chunk_images(
-                    document.id, section_content, enhanced_data['images'], chunk_index
+                    document.id, section_content, enhanced_data["images"], chunk_index
                 )
                 all_chunks.extend(image_chunks)
                 chunk_index += len(image_chunks)
@@ -532,7 +535,9 @@ class EnhancedSemanticChunker(EnhancedChunker):
 
             table_image_parts = remaining.split("=== IMAGES ===")
             table_part = table_image_parts[0].replace("=== TABLES ===", "").strip()
-            image_part = table_image_parts[1].strip() if len(table_image_parts) > 1 else ""
+            image_part = (
+                table_image_parts[1].strip() if len(table_image_parts) > 1 else ""
+            )
 
             if text_part:
                 sections.append(("text", text_part))
@@ -590,7 +595,7 @@ class EnhancedSemanticChunker(EnhancedChunker):
         document_id: str,
         table_section: str,
         tables_metadata: List[Dict],
-        start_index: int
+        start_index: int,
     ) -> List[DocumentChunk]:
         """Create chunks for tables."""
         chunks = []
@@ -611,8 +616,10 @@ class EnhancedSemanticChunker(EnhancedChunker):
                     "chunking_strategy": "enhanced_semantic",
                     "is_complete_table": True,
                     "table_index": i,
-                    "original_table_metadata": tables_metadata[i] if i < len(tables_metadata) else None
-                }
+                    "original_table_metadata": tables_metadata[i]
+                    if i < len(tables_metadata)
+                    else None,
+                },
             )
             chunks.append(chunk)
 
@@ -623,7 +630,7 @@ class EnhancedSemanticChunker(EnhancedChunker):
         document_id: str,
         image_section: str,
         images_metadata: List[Dict],
-        start_index: int
+        start_index: int,
     ) -> List[DocumentChunk]:
         """Create chunks for image descriptions."""
         chunks = []
@@ -643,8 +650,10 @@ class EnhancedSemanticChunker(EnhancedChunker):
                 metadata={
                     "chunking_strategy": "enhanced_semantic",
                     "image_index": i,
-                    "original_image_metadata": images_metadata[i] if i < len(images_metadata) else None
-                }
+                    "original_image_metadata": images_metadata[i]
+                    if i < len(images_metadata)
+                    else None,
+                },
             )
             chunks.append(chunk)
 
@@ -652,7 +661,7 @@ class EnhancedSemanticChunker(EnhancedChunker):
 
     def _split_into_sentences(self, text: str) -> List[str]:
         """Split text into sentences."""
-        sentence_endings = re.compile(r'[.!?]+')
+        sentence_endings = re.compile(r"[.!?]+")
         sentences = sentence_endings.split(text)
 
         cleaned_sentences = []
@@ -686,9 +695,13 @@ class EnhancedSemanticChunker(EnhancedChunker):
                     current_group = [sentence]
                     current_length = sentence_length
                 else:
-                    group_embedding = embeddings[i-len(current_group):i].mean(axis=0)
+                    group_embedding = embeddings[i - len(current_group) : i].mean(
+                        axis=0
+                    )
                     sentence_embedding = embeddings[i]
-                    similarity = self._cosine_similarity(group_embedding, sentence_embedding)
+                    similarity = self._cosine_similarity(
+                        group_embedding, sentence_embedding
+                    )
 
                     if similarity >= self.similarity_threshold:
                         current_group.append(sentence)
@@ -734,8 +747,11 @@ class EnhancedSemanticChunker(EnhancedChunker):
         """Load sentence transformer model."""
         try:
             from sentence_transformers import SentenceTransformer
-            self._sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("Loaded sentence transformer model for enhanced semantic chunking")
+
+            self._sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
+            logger.info(
+                "Loaded sentence transformer model for enhanced semantic chunking"
+            )
         except ImportError:
             logger.warning(
                 "sentence-transformers not available, "
@@ -746,6 +762,7 @@ class EnhancedSemanticChunker(EnhancedChunker):
     def _cosine_similarity(self, a, b):
         """Calculate cosine similarity between two vectors."""
         import numpy as np
+
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
@@ -769,7 +786,7 @@ class BaseChunker(ABC):
         chunk_index: int,
         start_pos: int = 0,
         end_pos: int = 0,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> DocumentChunk:
         """Create a DocumentChunk object."""
         return DocumentChunk(
@@ -778,7 +795,7 @@ class BaseChunker(ABC):
             chunk_index=chunk_index,
             start_pos=start_pos,
             end_pos=end_pos,
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
 
@@ -792,19 +809,19 @@ class RecursiveChunker(BaseChunker):
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         separators: Optional[List[str]] = None,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(chunk_size, chunk_overlap, **kwargs)
         self.separators = separators or [
             "\n\n",  # Double newline (paragraph breaks)
-            "\n",    # Single newline
-            ". ",    # Sentence endings
-            "! ",    # Exclamation sentences
-            "? ",    # Question sentences
-            "; ",    # Semicolons
-            ", ",    # Commas
-            " ",     # Spaces
-            ""       # Character level (fallback)
+            "\n",  # Single newline
+            ". ",  # Sentence endings
+            "! ",  # Exclamation sentences
+            "? ",  # Question sentences
+            "; ",  # Semicolons
+            ", ",  # Commas
+            " ",  # Spaces
+            "",  # Character level (fallback)
         ]
 
     def chunk_document(self, document: ProcessedDocument) -> List[DocumentChunk]:
@@ -826,8 +843,8 @@ class RecursiveChunker(BaseChunker):
                     metadata={
                         "chunking_strategy": "recursive",
                         "chunk_size": self.chunk_size,
-                        "overlap": self.chunk_overlap
-                    }
+                        "overlap": self.chunk_overlap,
+                    },
                 )
                 chunks.append(chunk)
 
@@ -892,7 +909,7 @@ class RecursiveChunker(BaseChunker):
         """Split text by characters when all other separators fail."""
         chunks = []
         for i in range(0, len(text), self.chunk_size):
-            chunk = text[i:i + self.chunk_size]
+            chunk = text[i : i + self.chunk_size]
             chunks.append(chunk)
         return chunks
 
@@ -909,7 +926,7 @@ class RecursiveChunker(BaseChunker):
 
             # Add overlap from previous chunk
             if len(prev_chunk) >= self.chunk_overlap:
-                overlap = prev_chunk[-self.chunk_overlap:]
+                overlap = prev_chunk[-self.chunk_overlap :]
                 overlapped_chunk = overlap + " " + current_chunk
             else:
                 overlapped_chunk = current_chunk
@@ -930,7 +947,7 @@ class SemanticChunker(BaseChunker):
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         similarity_threshold: float = 0.7,
-        **kwargs
+        **kwargs,
     ):
         super().__init__(chunk_size, chunk_overlap, **kwargs)
         self.similarity_threshold = similarity_threshold
@@ -963,8 +980,8 @@ class SemanticChunker(BaseChunker):
                     metadata={
                         "chunking_strategy": "semantic",
                         "sentence_count": len(group),
-                        "similarity_threshold": self.similarity_threshold
-                    }
+                        "similarity_threshold": self.similarity_threshold,
+                    },
                 )
                 chunks.append(chunk)
 
@@ -974,7 +991,7 @@ class SemanticChunker(BaseChunker):
     def _split_into_sentences(self, text: str) -> List[str]:
         """Split text into sentences."""
         # Simple sentence splitting - could be improved with spaCy or NLTK
-        sentence_endings = re.compile(r'[.!?]+')
+        sentence_endings = re.compile(r"[.!?]+")
         sentences = sentence_endings.split(text)
 
         # Clean and filter sentences
@@ -1015,10 +1032,14 @@ class SemanticChunker(BaseChunker):
                     current_length = sentence_length
                 else:
                     # Check semantic similarity with current group
-                    group_embedding = embeddings[i-len(current_group):i].mean(axis=0)
+                    group_embedding = embeddings[i - len(current_group) : i].mean(
+                        axis=0
+                    )
                     sentence_embedding = embeddings[i]
 
-                    similarity = self._cosine_similarity(group_embedding, sentence_embedding)
+                    similarity = self._cosine_similarity(
+                        group_embedding, sentence_embedding
+                    )
 
                     if similarity >= self.similarity_threshold:
                         current_group.append(sentence)
@@ -1065,7 +1086,8 @@ class SemanticChunker(BaseChunker):
         """Load sentence transformer model."""
         try:
             from sentence_transformers import SentenceTransformer
-            self._sentence_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+            self._sentence_model = SentenceTransformer("all-MiniLM-L6-v2")
             logger.info("Loaded sentence transformer model for semantic chunking")
         except ImportError:
             logger.warning(
@@ -1077,6 +1099,7 @@ class SemanticChunker(BaseChunker):
     def _cosine_similarity(self, a, b):
         """Calculate cosine similarity between two vectors."""
         import numpy as np
+
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 
@@ -1108,8 +1131,8 @@ class FixedSizeChunker(BaseChunker):
                     metadata={
                         "chunking_strategy": "fixed_size",
                         "chunk_size": self.chunk_size,
-                        "overlap": self.chunk_overlap
-                    }
+                        "overlap": self.chunk_overlap,
+                    },
                 )
                 chunks.append(chunk)
 
@@ -1117,7 +1140,9 @@ class FixedSizeChunker(BaseChunker):
             if end >= len(text):
                 break
 
-        logger.info(f"Created {len(chunks)} fixed-size chunks for document {document.id}")
+        logger.info(
+            f"Created {len(chunks)} fixed-size chunks for document {document.id}"
+        )
         return chunks
 
 
@@ -1141,25 +1166,24 @@ def get_chunker(strategy: str = "table_aware_recursive", **kwargs) -> EnhancedCh
         chunker_class = enhanced_chunkers[strategy]
     elif strategy in legacy_chunkers:
         chunker_class = legacy_chunkers[strategy]
-        logger.warning(f"Using legacy chunking strategy '{strategy}'. Consider using enhanced versions.")
+        logger.warning(
+            f"Using legacy chunking strategy '{strategy}'. Consider using enhanced versions."
+        )
     else:
-        logger.warning(f"Unknown chunking strategy '{strategy}', using table_aware_recursive")
+        logger.warning(
+            f"Unknown chunking strategy '{strategy}', using table_aware_recursive"
+        )
         chunker_class = TableAwareRecursiveChunker
 
     # Use settings defaults if not provided
     chunk_size = kwargs.pop("chunk_size", settings.chunk_size)
     chunk_overlap = kwargs.pop("chunk_overlap", settings.chunk_overlap)
 
-    return chunker_class(
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        **kwargs
-    )
+    return chunker_class(chunk_size=chunk_size, chunk_overlap=chunk_overlap, **kwargs)
 
 
 def get_enhanced_chunker(
-    strategy: str = "table_aware_recursive",
-    **kwargs
+    strategy: str = "table_aware_recursive", **kwargs
 ) -> EnhancedChunker:
     """Factory function specifically for enhanced chunkers."""
     enhanced_chunkers = {
@@ -1170,16 +1194,16 @@ def get_enhanced_chunker(
     }
 
     if strategy not in enhanced_chunkers:
-        logger.warning(f"Unknown enhanced chunking strategy '{strategy}', using table_aware_recursive")
+        logger.warning(
+            f"Unknown enhanced chunking strategy '{strategy}', using table_aware_recursive"
+        )
         strategy = "table_aware_recursive"
 
     chunk_size = kwargs.get("chunk_size", settings.chunk_size)
     chunk_overlap = kwargs.get("chunk_overlap", settings.chunk_overlap)
 
     return enhanced_chunkers[strategy](
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        **kwargs
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap, **kwargs
     )
 
 
@@ -1193,14 +1217,14 @@ def get_legacy_chunker(strategy: str = "recursive", **kwargs) -> BaseChunker:
     }
 
     if strategy not in chunkers:
-        logger.warning(f"Unknown legacy chunking strategy '{strategy}', using recursive")
+        logger.warning(
+            f"Unknown legacy chunking strategy '{strategy}', using recursive"
+        )
         strategy = "recursive"
 
     chunk_size = kwargs.get("chunk_size", settings.chunk_size)
     chunk_overlap = kwargs.get("chunk_overlap", settings.chunk_overlap)
 
     return chunkers[strategy](
-        chunk_size=chunk_size,
-        chunk_overlap=chunk_overlap,
-        **kwargs
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap, **kwargs
     )

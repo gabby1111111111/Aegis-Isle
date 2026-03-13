@@ -6,7 +6,11 @@ from typing import Dict, Any
 
 from fastapi import APIRouter, Depends, Request
 
-from ..dependencies import get_rag_pipeline, get_agent_orchestrator, get_metrics_middleware
+from ..dependencies import (
+    get_rag_pipeline,
+    get_agent_orchestrator,
+    get_metrics_middleware,
+)
 from ...core.config import settings
 
 health_router = APIRouter()
@@ -19,7 +23,7 @@ async def health_check() -> Dict[str, Any]:
         "status": "healthy",
         "service": "AegisIsle RAG API",
         "version": "0.1.0",
-        "timestamp": "2024-01-01T00:00:00Z"
+        "timestamp": "2024-01-01T00:00:00Z",
     }
 
 
@@ -27,7 +31,7 @@ async def health_check() -> Dict[str, Any]:
 async def detailed_health_check(
     request: Request,
     pipeline=Depends(get_rag_pipeline),
-    orchestrator=Depends(get_agent_orchestrator)
+    orchestrator=Depends(get_agent_orchestrator),
 ) -> Dict[str, Any]:
     """Detailed health check including all components."""
 
@@ -54,8 +58,8 @@ async def detailed_health_check(
             "agents": {
                 "status": "healthy" if agent_status else "unhealthy",
                 "registered_agents": len(agent_status),
-                "agents": agent_status
-            }
+                "agents": agent_status,
+            },
         },
         "metrics": metrics,
         "configuration": {
@@ -64,9 +68,9 @@ async def detailed_health_check(
             "features": {
                 "multimodal": settings.enable_multimodal,
                 "metrics": settings.enable_metrics,
-                "agent_memory": settings.enable_memory
-            }
-        }
+                "agent_memory": settings.enable_memory,
+            },
+        },
     }
 
 
@@ -77,22 +81,12 @@ async def readiness_check(pipeline=Depends(get_rag_pipeline)) -> Dict[str, Any]:
         health = await pipeline.health_check()
         ready = health["status"] == "healthy"
 
-        return {
-            "ready": ready,
-            "status": "ready" if ready else "not_ready"
-        }
+        return {"ready": ready, "status": "ready" if ready else "not_ready"}
     except Exception as e:
-        return {
-            "ready": False,
-            "status": "not_ready",
-            "error": str(e)
-        }
+        return {"ready": False, "status": "not_ready", "error": str(e)}
 
 
 @health_router.get("/live")
 async def liveness_check() -> Dict[str, Any]:
     """Kubernetes-style liveness probe."""
-    return {
-        "alive": True,
-        "status": "alive"
-    }
+    return {"alive": True, "status": "alive"}

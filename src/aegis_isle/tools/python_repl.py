@@ -6,8 +6,6 @@ Provides sandboxed Python code execution with security restrictions.
 import ast
 import builtins
 import io
-import os
-import sys
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
 from typing import Any, Dict, List, Optional, Set, Union
@@ -21,32 +19,130 @@ class RestrictedPython:
 
     # Allowed built-in functions for safe execution
     SAFE_BUILTINS = {
-        'abs', 'all', 'any', 'ascii', 'bin', 'bool', 'bytearray', 'bytes',
-        'callable', 'chr', 'classmethod', 'complex', 'dict', 'dir', 'divmod',
-        'enumerate', 'filter', 'float', 'format', 'frozenset', 'getattr',
-        'hasattr', 'hash', 'hex', 'id', 'int', 'isinstance', 'issubclass',
-        'iter', 'len', 'list', 'map', 'max', 'min', 'next', 'oct', 'ord',
-        'pow', 'print', 'range', 'repr', 'reversed', 'round', 'set',
-        'setattr', 'slice', 'sorted', 'str', 'sum', 'tuple', 'type', 'vars',
-        'zip', 'help'
+        "abs",
+        "all",
+        "any",
+        "ascii",
+        "bin",
+        "bool",
+        "bytearray",
+        "bytes",
+        "callable",
+        "chr",
+        "classmethod",
+        "complex",
+        "dict",
+        "dir",
+        "divmod",
+        "enumerate",
+        "filter",
+        "float",
+        "format",
+        "frozenset",
+        "getattr",
+        "hasattr",
+        "hash",
+        "hex",
+        "id",
+        "int",
+        "isinstance",
+        "issubclass",
+        "iter",
+        "len",
+        "list",
+        "map",
+        "max",
+        "min",
+        "next",
+        "oct",
+        "ord",
+        "pow",
+        "print",
+        "range",
+        "repr",
+        "reversed",
+        "round",
+        "set",
+        "setattr",
+        "slice",
+        "sorted",
+        "str",
+        "sum",
+        "tuple",
+        "type",
+        "vars",
+        "zip",
+        "help",
     }
 
     # Dangerous modules and attributes to block
     BLOCKED_MODULES = {
-        'os', 'sys', 'subprocess', 'shutil', 'glob', 'tempfile', 'pickle',
-        'marshal', 'shelve', 'dbm', 'sqlite3', 'socket', 'urllib', 'http',
-        'ftplib', 'smtplib', 'imaplib', 'poplib', 'telnetlib', 'webbrowser',
-        'threading', 'multiprocessing', '_thread', 'thread', 'asyncio',
-        'ctypes', 'gc', 'weakref', '__builtin__', '__builtins__', 'builtins',
-        'importlib', 'imp', 'code', 'codeop', 'compile', 'eval', 'exec',
-        'memoryview', 'open', 'file', 'input', 'raw_input'
+        "os",
+        "sys",
+        "subprocess",
+        "shutil",
+        "glob",
+        "tempfile",
+        "pickle",
+        "marshal",
+        "shelve",
+        "dbm",
+        "sqlite3",
+        "socket",
+        "urllib",
+        "http",
+        "ftplib",
+        "smtplib",
+        "imaplib",
+        "poplib",
+        "telnetlib",
+        "webbrowser",
+        "threading",
+        "multiprocessing",
+        "_thread",
+        "thread",
+        "asyncio",
+        "ctypes",
+        "gc",
+        "weakref",
+        "__builtin__",
+        "__builtins__",
+        "builtins",
+        "importlib",
+        "imp",
+        "code",
+        "codeop",
+        "compile",
+        "eval",
+        "exec",
+        "memoryview",
+        "open",
+        "file",
+        "input",
+        "raw_input",
     }
 
     BLOCKED_ATTRIBUTES = {
-        '__import__', '__loader__', '__package__', '__spec__', '__file__',
-        '__cached__', '__doc__', '__name__', '__dict__', '__class__',
-        '__bases__', '__mro__', '__subclasses__', '__module__', '__globals__',
-        '__locals__', '__code__', '__closure__', '__defaults__', '__kwdefaults__'
+        "__import__",
+        "__loader__",
+        "__package__",
+        "__spec__",
+        "__file__",
+        "__cached__",
+        "__doc__",
+        "__name__",
+        "__dict__",
+        "__class__",
+        "__bases__",
+        "__mro__",
+        "__subclasses__",
+        "__module__",
+        "__globals__",
+        "__locals__",
+        "__code__",
+        "__closure__",
+        "__defaults__",
+        "__kwdefaults__",
     }
 
     def __init__(self, allowed_imports: Optional[Set[str]] = None):
@@ -56,12 +152,37 @@ class RestrictedPython:
             allowed_imports: Set of allowed module names for import
         """
         self.allowed_imports = allowed_imports or {
-            'math', 'statistics', 'random', 'datetime', 'time', 'json', 're',
-            'collections', 'itertools', 'functools', 'operator', 'string',
-            'decimal', 'fractions', 'uuid', 'hashlib', 'base64', 'binascii',
-            'calendar', 'heapq', 'bisect', 'array', 'copy', 'pprint',
+            "math",
+            "statistics",
+            "random",
+            "datetime",
+            "time",
+            "json",
+            "re",
+            "collections",
+            "itertools",
+            "functools",
+            "operator",
+            "string",
+            "decimal",
+            "fractions",
+            "uuid",
+            "hashlib",
+            "base64",
+            "binascii",
+            "calendar",
+            "heapq",
+            "bisect",
+            "array",
+            "copy",
+            "pprint",
             # Data science libraries (if available)
-            'numpy', 'pandas', 'matplotlib', 'seaborn', 'scipy', 'sklearn'
+            "numpy",
+            "pandas",
+            "matplotlib",
+            "seaborn",
+            "scipy",
+            "sklearn",
         }
 
     def is_safe_node(self, node: ast.AST) -> bool:
@@ -75,11 +196,11 @@ class RestrictedPython:
         """
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.split('.')[0] not in self.allowed_imports:
+                if alias.name.split(".")[0] not in self.allowed_imports:
                     return False
 
         elif isinstance(node, ast.ImportFrom):
-            if node.module and node.module.split('.')[0] not in self.allowed_imports:
+            if node.module and node.module.split(".")[0] not in self.allowed_imports:
                 return False
 
         elif isinstance(node, ast.Attribute):
@@ -121,11 +242,11 @@ class RestrictedPython:
         for node in ast.walk(tree):
             if not self.is_safe_node(node):
                 node_type = type(node).__name__
-                if hasattr(node, 'name'):
+                if hasattr(node, "name"):
                     detail = f"node '{node.name}'"
-                elif hasattr(node, 'id'):
+                elif hasattr(node, "id"):
                     detail = f"identifier '{node.id}'"
-                elif hasattr(node, 'attr'):
+                elif hasattr(node, "attr"):
                     detail = f"attribute '{node.attr}'"
                 else:
                     detail = f"node type {node_type}"
@@ -133,7 +254,7 @@ class RestrictedPython:
                 raise ToolError(
                     f"Unsafe code detected: {detail}",
                     "python_repl",
-                    {"node_type": node_type, "line": getattr(node, 'lineno', None)}
+                    {"node_type": node_type, "line": getattr(node, "lineno", None)},
                 )
 
     def create_safe_globals(self) -> Dict[str, Any]:
@@ -143,7 +264,7 @@ class RestrictedPython:
             Dictionary with safe global variables
         """
         safe_globals = {
-            '__builtins__': {
+            "__builtins__": {
                 name: getattr(builtins, name)
                 for name in self.SAFE_BUILTINS
                 if hasattr(builtins, name)
@@ -152,40 +273,47 @@ class RestrictedPython:
 
         # Add commonly used modules if they're in allowed imports
         try:
-            if 'math' in self.allowed_imports:
+            if "math" in self.allowed_imports:
                 import math
-                safe_globals['math'] = math
 
-            if 'random' in self.allowed_imports:
+                safe_globals["math"] = math
+
+            if "random" in self.allowed_imports:
                 import random
-                safe_globals['random'] = random
 
-            if 'datetime' in self.allowed_imports:
+                safe_globals["random"] = random
+
+            if "datetime" in self.allowed_imports:
                 import datetime
-                safe_globals['datetime'] = datetime
 
-            if 'json' in self.allowed_imports:
+                safe_globals["datetime"] = datetime
+
+            if "json" in self.allowed_imports:
                 import json
-                safe_globals['json'] = json
 
-            if 're' in self.allowed_imports:
+                safe_globals["json"] = json
+
+            if "re" in self.allowed_imports:
                 import re
-                safe_globals['re'] = re
+
+                safe_globals["re"] = re
 
             # Data science libraries (optional)
-            if 'numpy' in self.allowed_imports:
+            if "numpy" in self.allowed_imports:
                 try:
                     import numpy as np
-                    safe_globals['np'] = np
-                    safe_globals['numpy'] = np
+
+                    safe_globals["np"] = np
+                    safe_globals["numpy"] = np
                 except ImportError:
                     pass
 
-            if 'pandas' in self.allowed_imports:
+            if "pandas" in self.allowed_imports:
                 try:
                     import pandas as pd
-                    safe_globals['pd'] = pd
-                    safe_globals['pandas'] = pd
+
+                    safe_globals["pd"] = pd
+                    safe_globals["pandas"] = pd
                 except ImportError:
                     pass
 
@@ -207,7 +335,7 @@ class PythonREPLTool(BaseTool):
         config: Optional[ToolConfig] = None,
         max_output_length: int = 10000,
         allowed_imports: Optional[Set[str]] = None,
-        enable_matplotlib: bool = True
+        enable_matplotlib: bool = True,
     ):
         """Initialize Python REPL tool.
 
@@ -222,7 +350,7 @@ class PythonREPLTool(BaseTool):
                 name="python_repl",
                 description="Execute Python code in a secure sandbox environment",
                 timeout=30,
-                max_retries=1
+                max_retries=1,
             )
 
         super().__init__(config)
@@ -232,9 +360,13 @@ class PythonREPLTool(BaseTool):
         self.restricted_python = RestrictedPython(allowed_imports)
         self.execution_context = {}  # Persistent variables between executions
 
-        logger.info(f"Initialized Python REPL tool with max output: {max_output_length} chars")
+        logger.info(
+            f"Initialized Python REPL tool with max output: {max_output_length} chars"
+        )
 
-    async def _execute(self, validated_input: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+    async def _execute(
+        self, validated_input: Union[str, Dict[str, Any]]
+    ) -> Dict[str, Any]:
         """Execute Python code safely.
 
         Args:
@@ -250,7 +382,7 @@ class PythonREPLTool(BaseTool):
         if isinstance(validated_input, str):
             code = validated_input
         elif isinstance(validated_input, dict):
-            code = validated_input.get('code', '')
+            code = validated_input.get("code", "")
             if not code:
                 raise ToolError("No 'code' field found in input", self.name)
         else:
@@ -281,7 +413,7 @@ class PythonREPLTool(BaseTool):
             "error": None,
             "variables_created": [],
             "result": None,
-            "code": code
+            "code": code,
         }
 
         try:
@@ -313,7 +445,7 @@ class PythonREPLTool(BaseTool):
 
                     except Exception as e:
                         # Add statement context to error
-                        error_msg = f"Error in statement {i+1}: {str(e)}"
+                        error_msg = f"Error in statement {i + 1}: {str(e)}"
                         raise RuntimeError(error_msg) from e
 
             # Collect outputs
@@ -331,7 +463,9 @@ class PythonREPLTool(BaseTool):
 
             # Limit output length
             if len(full_output) > self.max_output_length:
-                full_output = full_output[:self.max_output_length] + "... (output truncated)"
+                full_output = (
+                    full_output[: self.max_output_length] + "... (output truncated)"
+                )
 
             execution_result["output"] = full_output
             execution_result["result"] = last_result
@@ -339,8 +473,10 @@ class PythonREPLTool(BaseTool):
             # Track new variables
             new_vars = []
             for key, value in safe_globals.items():
-                if (key not in self.restricted_python.create_safe_globals() and
-                    not key.startswith('_')):
+                if (
+                    key not in self.restricted_python.create_safe_globals()
+                    and not key.startswith("_")
+                ):
                     new_vars.append(key)
                     # Update persistent context
                     self.execution_context[key] = value
@@ -364,17 +500,19 @@ class PythonREPLTool(BaseTool):
 
             logger.warning(f"Python execution failed: {error_msg}")
 
-            execution_result.update({
-                "success": False,
-                "error": error_msg,
-                "traceback": error_traceback,
-                "output": stdout_buffer.getvalue()
-            })
+            execution_result.update(
+                {
+                    "success": False,
+                    "error": error_msg,
+                    "traceback": error_traceback,
+                    "output": stdout_buffer.getvalue(),
+                }
+            )
 
             raise ToolError(
                 f"Code execution failed: {error_msg}",
                 self.name,
-                {"traceback": error_traceback, "code": code}
+                {"traceback": error_traceback, "code": code},
             )
 
         finally:
@@ -397,11 +535,11 @@ class PythonREPLTool(BaseTool):
             for node in tree.body:
                 # Get the source code for each top-level statement
                 start_line = node.lineno - 1
-                end_line = getattr(node, 'end_lineno', node.lineno) - 1
+                end_line = getattr(node, "end_lineno", node.lineno) - 1
 
-                lines = code.split('\n')
+                lines = code.split("\n")
                 if end_line < len(lines):
-                    statement = '\n'.join(lines[start_line:end_line + 1])
+                    statement = "\n".join(lines[start_line : end_line + 1])
                     statements.append(statement)
 
             return statements if statements else [code]
@@ -410,7 +548,9 @@ class PythonREPLTool(BaseTool):
             # Fallback: return original code as single statement
             return [code]
 
-    async def _validate_input(self, tool_input: Union[str, Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
+    async def _validate_input(
+        self, tool_input: Union[str, Dict[str, Any]]
+    ) -> Union[str, Dict[str, Any]]:
         """Validate Python REPL input.
 
         Args:
@@ -431,10 +571,10 @@ class PythonREPLTool(BaseTool):
             return tool_input
 
         if isinstance(tool_input, dict):
-            if 'code' not in tool_input:
+            if "code" not in tool_input:
                 raise ToolError("Input dictionary must contain 'code' key", self.name)
 
-            code = tool_input.get('code', '')
+            code = tool_input.get("code", "")
             if not isinstance(code, str):
                 raise ToolError("Code must be a string", self.name)
 
@@ -459,7 +599,7 @@ class PythonREPLTool(BaseTool):
         return {
             name: type(value).__name__
             for name, value in self.execution_context.items()
-            if not name.startswith('_')
+            if not name.startswith("_")
         }
 
     async def test_connection(self) -> ToolResult:
@@ -480,7 +620,7 @@ class PythonREPLTool(BaseTool):
                         tool_name=self.name,
                         status=ToolStatus.SUCCESS,
                         content="Python REPL test passed",
-                        metadata={"test": "basic_calculation"}
+                        metadata={"test": "basic_calculation"},
                     )
 
             return ToolResult(
@@ -488,7 +628,7 @@ class PythonREPLTool(BaseTool):
                 status=ToolStatus.ERROR,
                 content="Python REPL test failed",
                 error="Test calculation did not produce expected output",
-                metadata={"test_result": result.content}
+                metadata={"test_result": result.content},
             )
 
         except Exception as e:
@@ -497,5 +637,5 @@ class PythonREPLTool(BaseTool):
                 status=ToolStatus.ERROR,
                 content="Python REPL test failed",
                 error=str(e),
-                metadata={"test": "basic_calculation"}
+                metadata={"test": "basic_calculation"},
             )

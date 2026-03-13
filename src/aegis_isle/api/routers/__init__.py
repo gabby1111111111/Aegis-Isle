@@ -15,5 +15,5 @@ __all__ = [
     "agents_router",
     "health_router",
     "admin_router",
-    "auth_router"
+    "auth_router",
 ]

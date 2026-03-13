@@ -17,6 +17,7 @@ query_router = APIRouter()
 
 class QueryRequest(BaseModel):
     """Request model for RAG queries."""
+
     query: str
     max_docs: Optional[int] = 5
     use_agents: bool = False
@@ -26,6 +27,7 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     """Response model for RAG queries."""
+
     query: str
     answer: str
     sources: List[Dict[str, Any]]
@@ -34,6 +36,7 @@ class QueryResponse(BaseModel):
 
 class BatchQueryRequest(BaseModel):
     """Request model for batch queries."""
+
     queries: List[str]
     max_docs: Optional[int] = 5
     use_agents: bool = False
@@ -42,6 +45,7 @@ class BatchQueryRequest(BaseModel):
 
 class BatchQueryResponse(BaseModel):
     """Response model for batch queries."""
+
     results: List[QueryResponse]
     total_queries: int
     total_time: float
@@ -53,15 +57,14 @@ async def process_query(
     request: QueryRequest,
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
     orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
-    request_id: str = Depends(get_request_id)
+    request_id: str = Depends(get_request_id),
 ) -> QueryResponse:
     """Process a single RAG query."""
 
     try:
         if not request.query.strip():
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Query cannot be empty"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Query cannot be empty"
             )
 
         logger.info(f"Processing query: {request.query[:100]}...")
@@ -70,7 +73,7 @@ async def process_query(
         if request.use_agents:
             workflow_result = await orchestrator.execute_workflow(
                 workflow_name=request.agent_workflow or "rag_query",
-                initial_input=request.query
+                initial_input=request.query,
             )
 
             if workflow_result["success"]:
@@ -81,12 +84,12 @@ async def process_query(
                     "workflow_id": workflow_result["workflow_id"],
                     "workflow_results": workflow_result["results"],
                     "agent_based": True,
-                    "request_id": request_id
+                    "request_id": request_id,
                 }
             else:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Agent workflow failed: {workflow_result.get('error', 'Unknown error')}"
+                    detail=f"Agent workflow failed: {workflow_result.get('error', 'Unknown error')}",
                 )
 
         else:
@@ -94,23 +97,22 @@ async def process_query(
             result = await pipeline.query(
                 query=request.query,
                 max_docs=request.max_docs,
-                **(request.metadata or {})
+                **(request.metadata or {}),
             )
 
             answer = result.answer
             sources = result.sources
             metadata = result.metadata
-            metadata.update({
-                "agent_based": False,
-                "request_id": request_id,
-                "total_time": result.total_time
-            })
+            metadata.update(
+                {
+                    "agent_based": False,
+                    "request_id": request_id,
+                    "total_time": result.total_time,
+                }
+            )
 
         return QueryResponse(
-            query=request.query,
-            answer=answer,
-            sources=sources,
-            metadata=metadata
+            query=request.query, answer=answer, sources=sources, metadata=metadata
         )
 
     except HTTPException:
@@ -119,7 +121,7 @@ async def process_query(
         logger.error(f"Error processing query: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
@@ -128,7 +130,7 @@ async def process_batch_queries(
     request: BatchQueryRequest,
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
     orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
-    request_id: str = Depends(get_request_id)
+    request_id: str = Depends(get_request_id),
 ) -> BatchQueryResponse:
     """Process multiple queries in batch."""
 
@@ -136,12 +138,13 @@ async def process_batch_queries(
         if not request.queries:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Queries list cannot be empty"
+                detail="Queries list cannot be empty",
             )
 
         logger.info(f"Processing {len(request.queries)} queries in batch")
 
         import time
+
         start_time = time.time()
         results = []
 
@@ -154,7 +157,7 @@ async def process_batch_queries(
                     # Use agent orchestration
                     workflow_result = await orchestrator.execute_workflow(
                         workflow_name=request.agent_workflow or "rag_query",
-                        initial_input=query
+                        initial_input=query,
                     )
 
                     if workflow_result["success"]:
@@ -163,7 +166,7 @@ async def process_batch_queries(
                         metadata = {
                             "workflow_id": workflow_result["workflow_id"],
                             "agent_based": True,
-                            "batch_index": i
+                            "batch_index": i,
                         }
                     else:
                         answer = f"Agent workflow failed: {workflow_result.get('error', 'Unknown error')}"
@@ -173,33 +176,30 @@ async def process_batch_queries(
                 else:
                     # Use standard RAG pipeline
                     result = await pipeline.query(
-                        query=query,
-                        max_docs=request.max_docs
+                        query=query, max_docs=request.max_docs
                     )
 
                     answer = result.answer
                     sources = result.sources
                     metadata = result.metadata
-                    metadata.update({
-                        "agent_based": False,
-                        "batch_index": i
-                    })
+                    metadata.update({"agent_based": False, "batch_index": i})
 
-                results.append(QueryResponse(
-                    query=query,
-                    answer=answer,
-                    sources=sources,
-                    metadata=metadata
-                ))
+                results.append(
+                    QueryResponse(
+                        query=query, answer=answer, sources=sources, metadata=metadata
+                    )
+                )
 
             except Exception as e:
                 logger.error(f"Error processing batch query {i}: {e}")
-                results.append(QueryResponse(
-                    query=query,
-                    answer=f"Error processing query: {str(e)}",
-                    sources=[],
-                    metadata={"error": True, "batch_index": i}
-                ))
+                results.append(
+                    QueryResponse(
+                        query=query,
+                        answer=f"Error processing query: {str(e)}",
+                        sources=[],
+                        metadata={"error": True, "batch_index": i},
+                    )
+                )
 
         total_time = time.time() - start_time
 
@@ -210,9 +210,11 @@ async def process_batch_queries(
             metadata={
                 "request_id": request_id,
                 "use_agents": request.use_agents,
-                "successful_queries": len([r for r in results if not r.metadata.get("error")]),
-                "failed_queries": len([r for r in results if r.metadata.get("error")])
-            }
+                "successful_queries": len(
+                    [r for r in results if not r.metadata.get("error")]
+                ),
+                "failed_queries": len([r for r in results if r.metadata.get("error")]),
+            },
         )
 
     except HTTPException:
@@ -221,7 +223,7 @@ async def process_batch_queries(
         logger.error(f"Error processing batch queries: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
@@ -232,19 +234,18 @@ async def get_query_history() -> Dict[str, Any]:
     return {
         "message": "Query history not implemented yet",
         "total_queries": 0,
-        "recent_queries": []
+        "recent_queries": [],
     }
 
 
 @query_router.post("/feedback")
 async def submit_query_feedback(
-    query_id: str,
-    feedback: Dict[str, Any]
+    query_id: str, feedback: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Submit feedback for a query result (placeholder)."""
     # TODO: Implement feedback collection system
     return {
         "message": "Feedback submitted successfully",
         "query_id": query_id,
-        "feedback": feedback
+        "feedback": feedback,
     }

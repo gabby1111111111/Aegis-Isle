@@ -8,7 +8,7 @@ import json
 from typing import Any, Dict, List, Optional, Union
 
 from .base import AgentMessage, AgentRole, BaseAgent
-from ..rag.generator import get_generator, GenerationResult
+from ..rag.generator import get_generator
 from ..core.logging import logger
 
 
@@ -19,7 +19,7 @@ class RoutingStrategy:
         self,
         message: AgentMessage,
         agents: Dict[str, BaseAgent],
-        context: Dict[str, Any]
+        context: Dict[str, Any],
     ) -> List[str]:
         """Route a message to appropriate agents."""
         raise NotImplementedError
@@ -50,7 +50,7 @@ class LLMRoutingStrategy(RoutingStrategy):
             AgentRole.SUMMARIZER: "Summarizes content, creates abstracts, provides overviews, and digests information",
             AgentRole.CHART_GENERATOR: "Creates charts, graphs, plots, visualizations, diagrams, and figures",
             AgentRole.TOOL_CALLER: "Executes functions, runs tools, calls APIs, and performs specific operations",
-            AgentRole.COORDINATOR: "Coordinates tasks, manages workflows, and provides general assistance"
+            AgentRole.COORDINATOR: "Coordinates tasks, manages workflows, and provides general assistance",
         }
 
         logger.info(f"Initialized LLM routing strategy with {provider} {model}")
@@ -59,7 +59,7 @@ class LLMRoutingStrategy(RoutingStrategy):
         self,
         message: AgentMessage,
         agents: Dict[str, BaseAgent],
-        context: Dict[str, Any]
+        context: Dict[str, Any],
     ) -> List[str]:
         """Route message using LLM intent analysis.
 
@@ -73,7 +73,9 @@ class LLMRoutingStrategy(RoutingStrategy):
         """
         try:
             # Get available agent roles
-            available_roles = [agent.role for agent in agents.values() if agent.config.enabled]
+            available_roles = [
+                agent.role for agent in agents.values() if agent.config.enabled
+            ]
             if not available_roles:
                 logger.warning("No enabled agents available for routing")
                 return []
@@ -88,8 +90,10 @@ class LLMRoutingStrategy(RoutingStrategy):
             # Map to actual agent IDs
             target_agents = self._map_to_agent_ids(routing_decision, agents)
 
-            logger.info(f"LLM router decision: {routing_decision.get('target_agent', 'unknown')} - "
-                       f"Reason: {routing_decision.get('reason', 'No reason provided')}")
+            logger.info(
+                f"LLM router decision: {routing_decision.get('target_agent', 'unknown')} - "
+                f"Reason: {routing_decision.get('reason', 'No reason provided')}"
+            )
 
             return target_agents
 
@@ -99,7 +103,9 @@ class LLMRoutingStrategy(RoutingStrategy):
             fallback_strategy = KeywordRoutingStrategy()
             return await fallback_strategy.route(message, agents, context)
 
-    def _build_routing_prompt(self, user_message: str, available_roles: List[AgentRole]) -> str:
+    def _build_routing_prompt(
+        self, user_message: str, available_roles: List[AgentRole]
+    ) -> str:
         """Build the routing prompt for LLM analysis.
 
         Args:
@@ -112,7 +118,9 @@ class LLMRoutingStrategy(RoutingStrategy):
         # Create role descriptions for available agents
         role_descriptions = []
         for role in available_roles:
-            description = self.agent_descriptions.get(role, f"Handles {role.value} tasks")
+            description = self.agent_descriptions.get(
+                role, f"Handles {role.value} tasks"
+            )
             role_descriptions.append(f"- {role.value}: {description}")
 
         prompt = f"""You are an intelligent routing system for a multi-agent AI system.
@@ -153,8 +161,8 @@ JSON Response:"""
             response_text = llm_response.strip()
 
             # Find JSON object in response
-            start_idx = response_text.find('{')
-            end_idx = response_text.rfind('}') + 1
+            start_idx = response_text.find("{")
+            end_idx = response_text.rfind("}") + 1
 
             if start_idx >= 0 and end_idx > start_idx:
                 json_text = response_text[start_idx:end_idx]
@@ -162,11 +170,14 @@ JSON Response:"""
 
                 return {
                     "target_agent": routing_data.get("target_agent", "coordinator"),
-                    "reason": routing_data.get("reason", "LLM routing decision")
+                    "reason": routing_data.get("reason", "LLM routing decision"),
                 }
             else:
                 logger.warning(f"No valid JSON found in LLM response: {response_text}")
-                return {"target_agent": "coordinator", "reason": "Failed to parse LLM response"}
+                return {
+                    "target_agent": "coordinator",
+                    "reason": "Failed to parse LLM response",
+                }
 
         except json.JSONDecodeError as e:
             logger.warning(f"JSON parsing failed: {e}. Response: {llm_response}")
@@ -175,7 +186,9 @@ JSON Response:"""
             logger.error(f"Error parsing LLM routing response: {e}")
             return {"target_agent": "coordinator", "reason": "Parsing error"}
 
-    def _map_to_agent_ids(self, routing_decision: Dict[str, str], agents: Dict[str, BaseAgent]) -> List[str]:
+    def _map_to_agent_ids(
+        self, routing_decision: Dict[str, str], agents: Dict[str, BaseAgent]
+    ) -> List[str]:
         """Map routing decision to actual agent IDs.
 
         Args:
@@ -214,19 +227,44 @@ class KeywordRoutingStrategy(RoutingStrategy):
     def __init__(self):
         self.role_keywords = {
             AgentRole.RESEARCHER: [
-                "research", "search", "find", "investigate", "explore", "study"
+                "research",
+                "search",
+                "find",
+                "investigate",
+                "explore",
+                "study",
             ],
             AgentRole.RETRIEVER: [
-                "retrieve", "fetch", "get", "load", "document", "knowledge"
+                "retrieve",
+                "fetch",
+                "get",
+                "load",
+                "document",
+                "knowledge",
             ],
             AgentRole.SUMMARIZER: [
-                "summarize", "summary", "brief", "overview", "digest", "abstract"
+                "summarize",
+                "summary",
+                "brief",
+                "overview",
+                "digest",
+                "abstract",
             ],
             AgentRole.CHART_GENERATOR: [
-                "chart", "graph", "plot", "visualization", "diagram", "figure"
+                "chart",
+                "graph",
+                "plot",
+                "visualization",
+                "diagram",
+                "figure",
             ],
             AgentRole.TOOL_CALLER: [
-                "execute", "run", "tool", "function", "api", "call"
+                "execute",
+                "run",
+                "tool",
+                "function",
+                "api",
+                "call",
             ],
         }
 
@@ -234,7 +272,7 @@ class KeywordRoutingStrategy(RoutingStrategy):
         self,
         message: AgentMessage,
         agents: Dict[str, BaseAgent],
-        context: Dict[str, Any]
+        context: Dict[str, Any],
     ) -> List[str]:
         """Route message based on keywords."""
         content = message.content.lower()
@@ -251,7 +289,8 @@ class KeywordRoutingStrategy(RoutingStrategy):
         # If no specific agents found, route to coordinator
         if not target_agents:
             coordinator_agents = [
-                agent_id for agent_id, agent in agents.items()
+                agent_id
+                for agent_id, agent in agents.items()
                 if agent.role == AgentRole.COORDINATOR and agent.config.enabled
             ]
             target_agents.extend(coordinator_agents)
@@ -278,11 +317,12 @@ class PriorityRoutingStrategy(RoutingStrategy):
         self,
         message: AgentMessage,
         agents: Dict[str, BaseAgent],
-        context: Dict[str, Any]
+        context: Dict[str, Any],
     ) -> List[str]:
         """Route message based on priority."""
         available_agents = [
-            (agent_id, agent) for agent_id, agent in agents.items()
+            (agent_id, agent)
+            for agent_id, agent in agents.items()
             if agent.config.enabled and agent.status != "busy"
         ]
 
@@ -302,7 +342,9 @@ class AgentRouter:
     Enhanced with LLM-based semantic routing by default, with keyword fallback.
     """
 
-    def __init__(self, strategy: Optional[RoutingStrategy] = None, use_llm_routing: bool = True):
+    def __init__(
+        self, strategy: Optional[RoutingStrategy] = None, use_llm_routing: bool = True
+    ):
         """Initialize the agent router.
 
         Args:
@@ -316,7 +358,9 @@ class AgentRouter:
                 self.strategy = LLMRoutingStrategy()
                 logger.info("Initialized router with LLM semantic routing")
             except Exception as e:
-                logger.warning(f"Failed to initialize LLM routing, falling back to keywords: {e}")
+                logger.warning(
+                    f"Failed to initialize LLM routing, falling back to keywords: {e}"
+                )
                 self.strategy = KeywordRoutingStrategy()
         else:
             self.strategy = KeywordRoutingStrategy()
@@ -324,7 +368,9 @@ class AgentRouter:
         self.agents: Dict[str, BaseAgent] = {}
         self.message_history: List[AgentMessage] = []
 
-    def upgrade_to_llm_routing(self, provider: str = "openai", model: str = "gpt-4") -> bool:
+    def upgrade_to_llm_routing(
+        self, provider: str = "openai", model: str = "gpt-4"
+    ) -> bool:
         """Upgrade to LLM-based routing strategy.
 
         Args:
@@ -361,14 +407,11 @@ class AgentRouter:
     async def route_message(
         self,
         message: Union[str, AgentMessage],
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
     ) -> List[str]:
         """Route a message to appropriate agents."""
         if isinstance(message, str):
-            message = AgentMessage(
-                sender_id="user",
-                content=message
-            )
+            message = AgentMessage(sender_id="user", content=message)
 
         context = context or {}
         self.message_history.append(message)
@@ -388,14 +431,11 @@ class AgentRouter:
     async def broadcast_message(
         self,
         message: Union[str, AgentMessage],
-        exclude_agents: Optional[List[str]] = None
+        exclude_agents: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Broadcast a message to all registered agents."""
         if isinstance(message, str):
-            message = AgentMessage(
-                sender_id="router",
-                content=message
-            )
+            message = AgentMessage(sender_id="router", content=message)
 
         exclude_agents = exclude_agents or []
         results = {}
@@ -419,16 +459,11 @@ class AgentRouter:
         return results
 
     async def send_to_agents(
-        self,
-        message: Union[str, AgentMessage],
-        target_agents: List[str]
+        self, message: Union[str, AgentMessage], target_agents: List[str]
     ) -> Dict[str, Any]:
         """Send a message to specific agents."""
         if isinstance(message, str):
-            message = AgentMessage(
-                sender_id="router",
-                content=message
-            )
+            message = AgentMessage(sender_id="router", content=message)
 
         results = {}
         tasks = []
@@ -451,7 +486,9 @@ class AgentRouter:
 
         return results
 
-    async def _send_to_agent(self, agent: BaseAgent, message: AgentMessage) -> Dict[str, Any]:
+    async def _send_to_agent(
+        self, agent: BaseAgent, message: AgentMessage
+    ) -> Dict[str, Any]:
         """Send a message to a specific agent."""
         try:
             agent.add_to_memory(message)
@@ -460,7 +497,7 @@ class AgentRouter:
                 "success": response.success,
                 "content": response.content,
                 "metadata": response.metadata,
-                "execution_time": response.execution_time
+                "execution_time": response.execution_time,
             }
         except Exception as e:
             logger.error(f"Error sending message to agent {agent.id}: {e}")
@@ -468,10 +505,7 @@ class AgentRouter:
 
     def get_agent_status(self) -> Dict[str, Dict[str, Any]]:
         """Get status of all registered agents."""
-        return {
-            agent_id: agent.get_info()
-            for agent_id, agent in self.agents.items()
-        }
+        return {agent_id: agent.get_info() for agent_id, agent in self.agents.items()}
 
     def set_routing_strategy(self, strategy: RoutingStrategy) -> None:
         """Set a new routing strategy."""
@@ -495,7 +529,9 @@ class LLMRouter(AgentRouter):
             model: Model name for intent analysis
         """
         strategy = LLMRoutingStrategy(provider=provider, model=model)
-        super().__init__(strategy=strategy, use_llm_routing=False)  # Skip auto-init since we provide strategy
+        super().__init__(
+            strategy=strategy, use_llm_routing=False
+        )  # Skip auto-init since we provide strategy
         logger.info(f"Initialized LLMRouter with {provider} {model}")
 
 

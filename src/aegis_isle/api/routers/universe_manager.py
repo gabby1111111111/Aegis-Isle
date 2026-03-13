@@ -6,7 +6,7 @@ Universe Manager 路由
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 import os
 import json
 import glob
@@ -24,6 +24,7 @@ CHUNKS_DIR = Path("debug/chunks")
 ALIASES_FILE = Path("data/universe_aliases.json")
 FEEDBACK_FILE = Path("data/universe_feedback.jsonl")
 
+
 def load_aliases() -> dict:
     if ALIASES_FILE.exists():
         try:
@@ -32,14 +33,18 @@ def load_aliases() -> dict:
             return {}
     return {}
 
+
 def save_aliases(aliases: dict):
     ALIASES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    ALIASES_FILE.write_text(json.dumps(aliases, ensure_ascii=False, indent=2), encoding="utf-8")
+    ALIASES_FILE.write_text(
+        json.dumps(aliases, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 # =====================
 # 接口一：列出某角色的所有宇宙
 # =====================
+
 
 @router.get("/universe/list")
 async def list_universes(character: str):
@@ -49,11 +54,11 @@ async def list_universes(character: str):
     try:
         if not CHUNKS_DIR.exists():
             return JSONResponse({"universes": []})
-        
+
         aliases = load_aliases()
 
         # 找出所有属于该角色的 universe_id（通过 episodes 文件名反推）
-        pattern = str(CHUNKS_DIR / f"*_episodes.jsonl")
+        pattern = str(CHUNKS_DIR / "*_episodes.jsonl")
         all_episode_files = glob.glob(pattern)
 
         universes = []
@@ -98,16 +103,18 @@ async def list_universes(character: str):
                 except Exception:
                     pass
 
-            universes.append({
-                "universe_id": universe_id,
-                "alias": aliases.get(universe_id, universe_id),
-                "character_name": char_name,
-                "episode_count": len(episodes),
-                "chunk_count": sub_chunk_count,
-                "serial_start": episodes[0].get("serial", ""),
-                "time_start": episodes[0].get("time_range", ""),
-                "universe_info": universe_info,
-            })
+            universes.append(
+                {
+                    "universe_id": universe_id,
+                    "alias": aliases.get(universe_id, universe_id),
+                    "character_name": char_name,
+                    "episode_count": len(episodes),
+                    "chunk_count": sub_chunk_count,
+                    "serial_start": episodes[0].get("serial", ""),
+                    "time_start": episodes[0].get("time_range", ""),
+                    "universe_info": universe_info,
+                }
+            )
 
         return JSONResponse({"universes": universes})
 
@@ -119,6 +126,7 @@ async def list_universes(character: str):
 # =====================
 # 接口二：获取某宇宙的 episode 章节列表
 # =====================
+
 
 @router.get("/universe/episodes")
 async def get_universe_episodes(universe_id: str):
@@ -146,8 +154,11 @@ async def get_universe_episodes(universe_id: str):
 # 接口三：获取某父 chunk 下的所有 sub_chunks
 # =====================
 
+
 @router.get("/universe/chunks")
-async def get_sub_chunks(universe_id: str, parent_chunk_id: Optional[str] = None, limit: int = 100):
+async def get_sub_chunks(
+    universe_id: str, parent_chunk_id: Optional[str] = None, limit: int = 100
+):
     """
     返回某宇宙的 sub_chunks。
     可通过 parent_chunk_id 过滤出某一章节的所有子切片。
@@ -162,7 +173,10 @@ async def get_sub_chunks(universe_id: str, parent_chunk_id: Optional[str] = None
             for line in f:
                 if line.strip():
                     chunk = json.loads(line)
-                    if parent_chunk_id and chunk.get("parent_chunk_id") != parent_chunk_id:
+                    if (
+                        parent_chunk_id
+                        and chunk.get("parent_chunk_id") != parent_chunk_id
+                    ):
                         continue
                     chunks.append(chunk)
                     if len(chunks) >= limit:
@@ -200,9 +214,11 @@ async def get_parent_chunks(universe_id: str):
 # 接口四：重命名宇宙（设置别名）
 # =====================
 
+
 class RenameRequest(BaseModel):
     universe_id: str
     alias: str
+
 
 @router.post("/universe/rename")
 async def rename_universe(req: RenameRequest):
@@ -210,7 +226,9 @@ async def rename_universe(req: RenameRequest):
         aliases = load_aliases()
         aliases[req.universe_id] = req.alias
         save_aliases(aliases)
-        return JSONResponse({"status": "ok", "universe_id": req.universe_id, "alias": req.alias})
+        return JSONResponse(
+            {"status": "ok", "universe_id": req.universe_id, "alias": req.alias}
+        )
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
@@ -218,6 +236,7 @@ async def rename_universe(req: RenameRequest):
 # =====================
 # 接口五：用 episode 摘要自动取名
 # =====================
+
 
 @router.post("/universe/auto_name")
 async def auto_name_universe(universe_id: str):
@@ -255,17 +274,25 @@ async def auto_name_universe(universe_id: str):
             aliases = load_aliases()
             aliases[universe_id] = fallback_name
             save_aliases(aliases)
-            return JSONResponse({"status": "ok", "alias": fallback_name, "method": "fallback"})
+            return JSONResponse(
+                {"status": "ok", "alias": fallback_name, "method": "fallback"}
+            )
 
         client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         response = await client.chat.completions.create(
             model="Qwen/Qwen2.5-7B-Instruct",
             messages=[
-                {"role": "system", "content": "你是一个擅长为故事命名的文案大师。用户会给你一段剧情摘要，请你给这段故事起一个10字以内、富有文学感的中文标题，只输出标题本身，不加任何标点解释。"},
-                {"role": "user", "content": f"以下是这段故事各章节的摘要：\n{combined_plots}\n\n请给这个故事起一个标题："}
+                {
+                    "role": "system",
+                    "content": "你是一个擅长为故事命名的文案大师。用户会给你一段剧情摘要，请你给这段故事起一个10字以内、富有文学感的中文标题，只输出标题本身，不加任何标点解释。",
+                },
+                {
+                    "role": "user",
+                    "content": f"以下是这段故事各章节的摘要：\n{combined_plots}\n\n请给这个故事起一个标题：",
+                },
             ],
             max_tokens=30,
-            temperature=0.7
+            temperature=0.7,
         )
         alias = response.choices[0].message.content.strip().strip("《》「」【】")
 
@@ -284,10 +311,12 @@ async def auto_name_universe(universe_id: str):
 # 接口六：用户对 chunk 打分（功能五）
 # =====================
 
+
 class FeedbackRequest(BaseModel):
     chunk_id: str
     query: str
     score: int  # 1-5
+
 
 @router.post("/universe/feedback")
 async def save_chunk_feedback(req: FeedbackRequest):
@@ -298,7 +327,7 @@ async def save_chunk_feedback(req: FeedbackRequest):
             "chunk_id": req.chunk_id,
             "query": req.query,
             "score": req.score,
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
         with open(FEEDBACK_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -311,13 +340,14 @@ async def save_chunk_feedback(req: FeedbackRequest):
 # 接口七：带打分的语义搜索（功能五）
 # =====================
 
+
 @router.get("/universe/search")
 async def search_with_score(
     query: str,
     character: str,
     k: int = 10,
     target_universes: Optional[str] = None,
-    human_weight: float = 0.4
+    human_weight: float = 0.4,
 ):
     """
     在指定角色的所有宇宙里进行语义搜索，返回 chunk 并附带历史平均打分。
@@ -329,40 +359,51 @@ async def search_with_score(
 
         # ── 1. 枚举该角色所有可用的 world_line ──
         vs_dir = memory_manager.vectorstore_dir  # e.g. "data/vectorstore/st_memory"
-        safe_char = re.sub(r'[^\w\u4e00-\u9fff \-_]', '', character).strip()
-        
+        safe_char = re.sub(r"[^\w\u4e00-\u9fff \-_]", "", character).strip()
+
         # 解析用户限定的目标宇宙 ID
         target_uids = set(target_universes.split(",")) if target_universes else set()
         index_pattern = os.path.join(vs_dir, f"{safe_char}*.index")
         index_files = glob.glob(index_pattern)
 
         if not index_files:
-            return JSONResponse({"results": [], "message": f"未找到角色 {character} 的任何 FAISS 索引文件，路径: {index_pattern}"})
+            return JSONResponse(
+                {
+                    "results": [],
+                    "message": f"未找到角色 {character} 的任何 FAISS 索引文件，路径: {index_pattern}",
+                }
+            )
 
         # 从文件名反推 world_line
         world_lines = []
         for fp in index_files:
             basename = os.path.basename(fp).replace(".index", "")
-            
+
             # 解析出 universe_id (恢复原始的 universe_id 作为匹配依据)
             # 由于索引文件名是 {safe_char}_{universe_id}.index
             wl = None
             if basename != safe_char:
-                wl = basename[len(safe_char):].lstrip("_")
-            
+                wl = basename[len(safe_char) :].lstrip("_")
+
             # 如果有限定宇宙，过滤掉不相干的
             if target_uids:
                 # 兼容：前端传来的 target_uid(即file_id) 可能带有 _20260306_211620 这种提取时间戳后缀
                 # 而 FAISS 中的 wl 是没有这个后缀的。
-                if not wl or not any(tuid == wl or tuid.startswith(wl + "_") for tuid in target_uids):
+                if not wl or not any(
+                    tuid == wl or tuid.startswith(wl + "_") for tuid in target_uids
+                ):
                     continue
 
             world_lines.append(wl)
 
         if not world_lines:
-            return JSONResponse({"results": [], "message": "过滤后没有匹配的宇宙索引要搜索"})
+            return JSONResponse(
+                {"results": [], "message": "过滤后没有匹配的宇宙索引要搜索"}
+            )
 
-        logger.info(f"[UniverseSearch] 角色={character} 找到 {len(world_lines)} 个索引，跨宇宙搜索...")
+        logger.info(
+            f"[UniverseSearch] 角色={character} 找到 {len(world_lines)} 个索引，跨宇宙搜索..."
+        )
 
         # ── 2. 读取历史打分数据 ──
         feedback_scores: dict = {}
@@ -373,8 +414,10 @@ async def search_with_score(
                         rec = json.loads(line)
                         cid = rec.get("chunk_id", "")
                         if cid:
-                            feedback_scores.setdefault(cid, []).append(rec.get("score", 3))
-        avg_scores = {cid: sum(v)/len(v) for cid, v in feedback_scores.items()}
+                            feedback_scores.setdefault(cid, []).append(
+                                rec.get("score", 3)
+                            )
+        avg_scores = {cid: sum(v) / len(v) for cid, v in feedback_scores.items()}
 
         # ── 3. 跨所有宇宙并发语义搜索 ──
         # 构造 comma-separated world_line 字符串让 search_memory 并发搜索
@@ -384,10 +427,15 @@ async def search_with_score(
         search_tasks = []
 
         import asyncio
+
         if None in world_lines:
-            search_tasks.append(memory_manager.search_memory(query, character, world_line=None, k=k))
+            search_tasks.append(
+                memory_manager.search_memory(query, character, world_line=None, k=k)
+            )
         if wl_str:
-            search_tasks.append(memory_manager.search_memory(query, character, world_line=wl_str, k=k))
+            search_tasks.append(
+                memory_manager.search_memory(query, character, world_line=wl_str, k=k)
+            )
 
         gathered = await asyncio.gather(*search_tasks, return_exceptions=True)
         for result in gathered:
@@ -395,7 +443,12 @@ async def search_with_score(
                 all_docs.extend(result)
 
         if not all_docs:
-            return JSONResponse({"results": [], "message": f"检索完成但无结果，共搜索 {len(world_lines)} 个宇宙索引"})
+            return JSONResponse(
+                {
+                    "results": [],
+                    "message": f"检索完成但无结果，共搜索 {len(world_lines)} 个宇宙索引",
+                }
+            )
 
         # ── 4. Re-ranking：向量相似度 + 人类偏好 ──
         sim_weight = 1.0 - human_weight
@@ -414,17 +467,21 @@ async def search_with_score(
             similarity = max(0.0, 1.0 - float(raw_dist) / 2.0)
             final_score = similarity * sim_weight + (human_score / 5.0) * human_weight
 
-            results.append({
-                "chunk_id": chunk_id,
-                "text": text,
-                "metadata": doc.metadata,
-                "similarity": round(similarity, 3),
-                "human_avg_score": round(human_score, 2),
-                "final_score": round(final_score, 3),
-            })
+            results.append(
+                {
+                    "chunk_id": chunk_id,
+                    "text": text,
+                    "metadata": doc.metadata,
+                    "similarity": round(similarity, 3),
+                    "human_avg_score": round(human_score, 2),
+                    "final_score": round(final_score, 3),
+                }
+            )
 
         results.sort(key=lambda x: x["final_score"], reverse=True)
-        return JSONResponse({"results": results[:k], "searched_universes": len(world_lines)})
+        return JSONResponse(
+            {"results": results[:k], "searched_universes": len(world_lines)}
+        )
 
     except Exception as e:
         logger.error(f"[UniverseManager] search_with_score 失败: {e}", exc_info=True)
@@ -435,9 +492,11 @@ async def search_with_score(
 # 接口八：数据清洗诊断（让用户上传一段原始预设文本，自动识别风格并预览清洗结果）
 # =====================
 
+
 class DiagnoseRequest(BaseModel):
-    raw_text: str             # 用户粘贴的原始 ST 聊天记录段落（AI 回复部分）
-    user_msg: str = ""        # 用户的触发消息（可选，辅助判断）
+    raw_text: str  # 用户粘贴的原始 ST 聊天记录段落（AI 回复部分）
+    user_msg: str = ""  # 用户的触发消息（可选，辅助判断）
+
 
 def _detect_preset_style(text: str) -> dict:
     """
@@ -445,39 +504,58 @@ def _detect_preset_style(text: str) -> dict:
     返回 {style_id, style_name, description, confidence}
     """
     import re
+
     scores = {}
-    
+
     # 旁白+对话 - 星号加粗格式
-    bold_matches = re.findall(r'\*{1,3}[^\*]{2,60}\*{1,3}', text)
+    bold_matches = re.findall(r"\*{1,3}[^\*]{2,60}\*{1,3}", text)
     scores["bold_action"] = len(bold_matches) * 2
 
     # 日式引号对话
-    jp_matches = re.findall(r'[「『].{2,60}[」』]', text)
+    jp_matches = re.findall(r"[「『].{2,60}[」』]", text)
     scores["japanese_quote"] = len(jp_matches) * 2
 
     # 括号内心戏
-    paren_matches = re.findall(r'[（(][^\)）]{2,40}[)）]', text)
+    paren_matches = re.findall(r"[（(][^\)）]{2,40}[)）]", text)
     scores["parenthesis_thought"] = len(paren_matches) * 2
 
     # 论坛/小剧场体（包含【】标记）
-    forum_matches = re.findall(r'[【\[].{2,20}[】\]]', text)
+    forum_matches = re.findall(r"[【\[].{2,20}[】\]]", text)
     scores["forum_style"] = len(forum_matches) * 3
 
     # 代码块/Markdown 混入
-    code_matches = re.findall(r'```[a-z]*', text)
+    code_matches = re.findall(r"```[a-z]*", text)
     scores["markdown_noise"] = len(code_matches) * 5
 
     # HTML 标签混入
-    html_matches = re.findall(r'<[a-zA-Z_]+[^>]*>', text)
+    html_matches = re.findall(r"<[a-zA-Z_]+[^>]*>", text)
     scores["html_noise"] = len(html_matches) * 4
 
     style_meta = {
-        "bold_action":         {"name": "旁白+对话（*星号*加粗）", "desc": "以 *动作* 表示行为，「」或常规引号表示对话，常见于 中文RP"},
-        "japanese_quote":      {"name": "日式引号纯对话体", "desc": "用「台词」表示对话，旁白为纯叙述"},
-        "parenthesis_thought": {"name": "括号内心戏", "desc": "用（内心想法）表示人物心理，常见于女性向等 RP"},
-        "forum_style":         {"name": "论坛体/小剧场", "desc": "含【小剧场】【标题】等 meta 标记，需整段过滤"},
-        "markdown_noise":      {"name": "含 Markdown 代码块", "desc": "混有 ```html 或 ```mermaid 等渲染块，必须清除"},
-        "html_noise":          {"name": "含 HTML 标签", "desc": "混有 <aurora_time> 等自定义标签"},
+        "bold_action": {
+            "name": "旁白+对话（*星号*加粗）",
+            "desc": "以 *动作* 表示行为，「」或常规引号表示对话，常见于 中文RP",
+        },
+        "japanese_quote": {
+            "name": "日式引号纯对话体",
+            "desc": "用「台词」表示对话，旁白为纯叙述",
+        },
+        "parenthesis_thought": {
+            "name": "括号内心戏",
+            "desc": "用（内心想法）表示人物心理，常见于女性向等 RP",
+        },
+        "forum_style": {
+            "name": "论坛体/小剧场",
+            "desc": "含【小剧场】【标题】等 meta 标记，需整段过滤",
+        },
+        "markdown_noise": {
+            "name": "含 Markdown 代码块",
+            "desc": "混有 ```html 或 ```mermaid 等渲染块，必须清除",
+        },
+        "html_noise": {
+            "name": "含 HTML 标签",
+            "desc": "混有 <aurora_time> 等自定义标签",
+        },
     }
 
     dominant = max(scores, key=scores.get) if any(scores.values()) else "plain"
@@ -495,30 +573,32 @@ def _detect_preset_style(text: str) -> dict:
 def _apply_clean(text: str, style: str) -> str:
     """根据探测到的风格，应用对应的清洗策略"""
     import re
-    
+
     # 通用：去除 HTML 注释、代码块、HTML 自定义标签
-    text = re.sub(r'<!--.*?-->', '', text, flags=re.DOTALL)
-    text = re.sub(r'```[\s\S]*?```', '', text, flags=re.DOTALL)
-    text = re.sub(r'</?(?:content|aurora_time|li|aurora)[^>]*>', '', text)
+    text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+    text = re.sub(r"```[\s\S]*?```", "", text, flags=re.DOTALL)
+    text = re.sub(r"</?(?:content|aurora_time|li|aurora)[^>]*>", "", text)
 
     if style == "forum_style":
         # 论坛体：整行过滤【】标记行（非正文）
-        text = re.sub(r'^[【\[].*?[】\]].*$', '', text, flags=re.MULTILINE)
+        text = re.sub(r"^[【\[].*?[】\]].*$", "", text, flags=re.MULTILINE)
 
     elif style == "bold_action":
         # 星号旁白：保留星号内容但去掉星号本身（保留语义）
-        text = re.sub(r'\*{1,3}(.+?)\*{1,3}', r'[\1]', text)
+        text = re.sub(r"\*{1,3}(.+?)\*{1,3}", r"[\1]", text)
 
     elif style == "parenthesis_thought":
         # 括号内心：改为 [内心:] 标记保留
-        text = re.sub(r'[（(]([^)）]{2,60})[)）]', r'[内心:\1]', text)
+        text = re.sub(r"[（(]([^)）]{2,60})[)）]", r"[内心:\1]", text)
 
     elif style == "markdown_noise":
-        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
 
     # 通用：去末尾的 bgm / 状态栏装饰
-    text = re.sub(r'(当前bgm:|⋯♡⋯|𐙚₊˚|☆₊⁺|𓋫 𓏴𓏴).*?(\n|$)', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\n\s*\n', '\n', text)
+    text = re.sub(
+        r"(当前bgm:|⋯♡⋯|𐙚₊˚|☆₊⁺|𓋫 𓏴𓏴).*?(\n|$)", "", text, flags=re.IGNORECASE
+    )
+    text = re.sub(r"\n\s*\n", "\n", text)
     return text.strip()
 
 
@@ -544,22 +624,35 @@ async def diagnose_clean(req: DiagnoseRequest):
         if style_info["confidence_score"] == 0:
             recommendations.append("未检测到明显格式标记，使用通用清洗策略即可。")
         if style_info["detected_style"] == "markdown_noise":
-            recommendations.append("⚠️ 发现代码块（```html/mermaid）—— 强烈建议在导入前清除，否则会严重污染向量空间。")
-        if "html_noise" in style_info["all_scores"] and style_info["all_scores"]["html_noise"] > 0:
-            recommendations.append("⚠️ 发现 HTML 自定义标签（如 <aurora_time>）—— 已自动去除，不影响语义。")
+            recommendations.append(
+                "⚠️ 发现代码块（```html/mermaid）—— 强烈建议在导入前清除，否则会严重污染向量空间。"
+            )
+        if (
+            "html_noise" in style_info["all_scores"]
+            and style_info["all_scores"]["html_noise"] > 0
+        ):
+            recommendations.append(
+                "⚠️ 发现 HTML 自定义标签（如 <aurora_time>）—— 已自动去除，不影响语义。"
+            )
         if style_info["detected_style"] == "forum_style":
-            recommendations.append("ℹ️ 检测到论坛/小剧场格式 —— 【】整行标记已过滤，正文部分保留。")
+            recommendations.append(
+                "ℹ️ 检测到论坛/小剧场格式 —— 【】整行标记已过滤，正文部分保留。"
+            )
         if clean_rate > 30:
-            recommendations.append(f"🎯 清洗率 {clean_rate}% 偏高，建议检查原数据是否包含大量 UI 装饰符号。")
+            recommendations.append(
+                f"🎯 清洗率 {clean_rate}% 偏高，建议检查原数据是否包含大量 UI 装饰符号。"
+            )
 
-        return JSONResponse({
-            "style": style_info,
-            "cleaned_preview": cleaned[:800],   # 最多展示800字预览
-            "original_length": len(raw),
-            "cleaned_length": len(cleaned),
-            "clean_rate_pct": clean_rate,
-            "recommendations": recommendations,
-        })
+        return JSONResponse(
+            {
+                "style": style_info,
+                "cleaned_preview": cleaned[:800],  # 最多展示800字预览
+                "original_length": len(raw),
+                "cleaned_length": len(cleaned),
+                "clean_rate_pct": clean_rate,
+                "recommendations": recommendations,
+            }
+        )
 
     except Exception as e:
         logger.error(f"[DiagnoseClean] 失败: {e}", exc_info=True)
@@ -571,12 +664,22 @@ async def diagnose_clean(req: DiagnoseRequest):
 # =====================
 
 QUERY_SEED_PHRASES = {
-    "回忆型": ["你还记得", "你还记不记得", "我说过", "我曾经说过", "我们之间", "上一次", "那一次", "当时"],
+    "回忆型": [
+        "你还记得",
+        "你还记不记得",
+        "我说过",
+        "我曾经说过",
+        "我们之间",
+        "上一次",
+        "那一次",
+        "当时",
+    ],
     "情感型": ["你对我的", "你喜不喜欢", "你有没有想过", "你最在乎的", "你的感受"],
     "事件型": ["发生了什么", "那件事", "我们做过", "一起经历的", "你告诉过我"],
     "地点型": ["在书房", "在旧申府", "在申都", "那个地方"],
     "时间型": ["第一次见面", "刚见面时", "很久以前", "那个下午", "刚认识时"],
 }
+
 
 @router.get("/universe/query_seed_phrases")
 async def get_query_seed_phrases():

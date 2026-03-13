@@ -15,7 +15,7 @@ from ..dependencies import (
     get_current_user,
     require_admin,
     require_super_admin,
-    CurrentUser
+    CurrentUser,
 )
 from ...core.config import settings
 from ...core.logging import logger
@@ -24,6 +24,7 @@ from ...core.logging import logger
 # Response Models
 class Token(BaseModel):
     """Token response model."""
+
     access_token: str
     token_type: str
     expires_in: int
@@ -32,6 +33,7 @@ class Token(BaseModel):
 
 class UserInfo(BaseModel):
     """User information response model."""
+
     user_id: str
     username: str
     email: str | None = None
@@ -42,6 +44,7 @@ class UserInfo(BaseModel):
 
 class AuthStatus(BaseModel):
     """Authentication status response model."""
+
     authenticated: bool
     user: UserInfo | None = None
     permissions: list[str] = []
@@ -53,7 +56,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
-    form_data: OAuth2PasswordRequestForm = Depends()
+    form_data: OAuth2PasswordRequestForm = Depends(),
 ) -> Token:
     """
     OAuth2 compatible token login endpoint.
@@ -90,8 +93,7 @@ async def login_for_access_token(
     }
 
     access_token = create_access_token(
-        data=token_data,
-        expires_delta=access_token_expires
+        data=token_data, expires_delta=access_token_expires
     )
 
     logger.info(f"Successful login for user: {user.username}")
@@ -106,13 +108,15 @@ async def login_for_access_token(
             "email": user.email,
             "full_name": user.full_name,
             "roles": user.roles,
-            "is_active": user.is_active
-        }
+            "is_active": user.is_active,
+        },
     )
 
 
 @router.get("/me", response_model=UserInfo)
-async def read_users_me(current_user: CurrentUser = Depends(get_current_user)) -> UserInfo:
+async def read_users_me(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> UserInfo:
     """
     Get current authenticated user information.
 
@@ -130,12 +134,14 @@ async def read_users_me(current_user: CurrentUser = Depends(get_current_user)) -
         email=current_user.email,
         full_name=current_user.full_name,
         roles=current_user.roles,
-        is_active=current_user.is_active
+        is_active=current_user.is_active,
     )
 
 
 @router.get("/status", response_model=AuthStatus)
-async def get_auth_status(current_user: CurrentUser = Depends(get_current_user)) -> AuthStatus:
+async def get_auth_status(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AuthStatus:
     """
     Get detailed authentication status including permissions.
 
@@ -150,15 +156,25 @@ async def get_auth_status(current_user: CurrentUser = Depends(get_current_user))
     if "user" in current_user.roles:
         permissions.extend(["read:documents", "create:queries", "read:agents"])
     if "admin" in current_user.roles:
-        permissions.extend([
-            "write:documents", "delete:documents", "manage:agents",
-            "read:logs", "manage:users"
-        ])
+        permissions.extend(
+            [
+                "write:documents",
+                "delete:documents",
+                "manage:agents",
+                "read:logs",
+                "manage:users",
+            ]
+        )
     if "super_admin" in current_user.roles:
-        permissions.extend([
-            "manage:system", "read:metrics", "manage:config",
-            "delete:users", "manage:permissions"
-        ])
+        permissions.extend(
+            [
+                "manage:system",
+                "read:metrics",
+                "manage:config",
+                "delete:users",
+                "manage:permissions",
+            ]
+        )
 
     logger.debug(f"Auth status requested for: {current_user.username}")
 
@@ -170,9 +186,9 @@ async def get_auth_status(current_user: CurrentUser = Depends(get_current_user))
             email=current_user.email,
             full_name=current_user.full_name,
             roles=current_user.roles,
-            is_active=current_user.is_active
+            is_active=current_user.is_active,
         ),
-        permissions=list(set(permissions))  # Remove duplicates
+        permissions=list(set(permissions)),  # Remove duplicates
     )
 
 
@@ -197,8 +213,7 @@ async def refresh_token(current_user: CurrentUser = Depends(get_current_user)) -
     }
 
     access_token = create_access_token(
-        data=token_data,
-        expires_delta=access_token_expires
+        data=token_data, expires_delta=access_token_expires
     )
 
     logger.info(f"Token refreshed for user: {current_user.username}")
@@ -213,13 +228,15 @@ async def refresh_token(current_user: CurrentUser = Depends(get_current_user)) -
             "email": current_user.email,
             "full_name": current_user.full_name,
             "roles": current_user.roles,
-            "is_active": current_user.is_active
-        }
+            "is_active": current_user.is_active,
+        },
     )
 
 
 @router.get("/admin-test")
-async def test_admin_access(admin_user: CurrentUser = Depends(require_admin)) -> Dict[str, str]:
+async def test_admin_access(
+    admin_user: CurrentUser = Depends(require_admin),
+) -> Dict[str, str]:
     """
     Test endpoint for admin role verification.
 
@@ -233,13 +250,13 @@ async def test_admin_access(admin_user: CurrentUser = Depends(require_admin)) ->
     return {
         "message": "Admin access granted successfully",
         "user": admin_user.username,
-        "roles": admin_user.roles
+        "roles": admin_user.roles,
     }
 
 
 @router.get("/super-admin-test")
 async def test_super_admin_access(
-    super_admin_user: CurrentUser = Depends(require_super_admin)
+    super_admin_user: CurrentUser = Depends(require_super_admin),
 ) -> Dict[str, str]:
     """
     Test endpoint for super admin role verification.
@@ -250,16 +267,20 @@ async def test_super_admin_access(
     Returns:
         Success message for super admin access
     """
-    logger.info(f"Super admin access test successful for user: {super_admin_user.username}")
+    logger.info(
+        f"Super admin access test successful for user: {super_admin_user.username}"
+    )
     return {
         "message": "Super admin access granted successfully",
         "user": super_admin_user.username,
-        "roles": super_admin_user.roles
+        "roles": super_admin_user.roles,
     }
 
 
 @router.post("/logout")
-async def logout(current_user: CurrentUser = Depends(get_current_user)) -> Dict[str, str]:
+async def logout(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> Dict[str, str]:
     """
     Logout current user (invalidate token on client side).
 
@@ -277,5 +298,5 @@ async def logout(current_user: CurrentUser = Depends(get_current_user)) -> Dict[
     return {
         "message": "Logout successful",
         "username": current_user.username,
-        "note": "Please remove the token from client storage"
+        "note": "Please remove the token from client storage",
     }

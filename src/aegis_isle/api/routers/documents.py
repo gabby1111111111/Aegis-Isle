@@ -3,7 +3,7 @@ Document management endpoints.
 """
 
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, UploadFile, HTTPException, status
@@ -19,6 +19,7 @@ documents_router = APIRouter()
 
 class DocumentUploadResponse(BaseModel):
     """Response model for document upload."""
+
     success: bool
     message: str
     document_id: Optional[str] = None
@@ -27,12 +28,14 @@ class DocumentUploadResponse(BaseModel):
 
 class TextDocumentRequest(BaseModel):
     """Request model for adding text content."""
+
     content: str
     metadata: Optional[Dict[str, Any]] = None
 
 
 class UrlDocumentRequest(BaseModel):
     """Request model for adding URL content."""
+
     url: str
     metadata: Optional[Dict[str, Any]] = None
 
@@ -41,7 +44,7 @@ class UrlDocumentRequest(BaseModel):
 async def upload_document(
     file: UploadFile = File(...),
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
-    request_id: str = Depends(get_request_id)
+    request_id: str = Depends(get_request_id),
 ) -> DocumentUploadResponse:
     """Upload and process a document file."""
 
@@ -49,15 +52,14 @@ async def upload_document(
         # Validate file type
         if not file.filename:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No filename provided"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="No filename provided"
             )
 
         file_ext = Path(file.filename).suffix.lower()
-        if file_ext not in ['.pdf', '.docx', '.doc', '.txt', '.md', '.html', '.htm']:
+        if file_ext not in [".pdf", ".docx", ".doc", ".txt", ".md", ".html", ".htm"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported file type: {file_ext}"
+                detail=f"Unsupported file type: {file_ext}",
             )
 
         # Check file size
@@ -65,7 +67,7 @@ async def upload_document(
         if len(content) > 50 * 1024 * 1024:  # 50MB limit
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="File too large (max 50MB)"
+                detail="File too large (max 50MB)",
             )
 
         # Save temporary file
@@ -83,7 +85,7 @@ async def upload_document(
             "filename": file.filename,
             "content_type": file.content_type,
             "file_size": len(content),
-            "request_id": request_id
+            "request_id": request_id,
         }
 
         success = await pipeline.add_document(str(temp_path), metadata)
@@ -98,12 +100,12 @@ async def upload_document(
             return DocumentUploadResponse(
                 success=True,
                 message=f"Successfully processed document: {file.filename}",
-                metadata=metadata
+                metadata=metadata,
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to process document"
+                detail="Failed to process document",
             )
 
     except HTTPException:
@@ -112,7 +114,7 @@ async def upload_document(
         logger.error(f"Error uploading document: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
@@ -120,7 +122,7 @@ async def upload_document(
 async def add_text_content(
     request: TextDocumentRequest,
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
-    request_id: str = Depends(get_request_id)
+    request_id: str = Depends(get_request_id),
 ) -> DocumentUploadResponse:
     """Add raw text content to the knowledge base."""
 
@@ -128,15 +130,17 @@ async def add_text_content(
         if not request.content.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Content cannot be empty"
+                detail="Content cannot be empty",
             )
 
         metadata = request.metadata or {}
-        metadata.update({
-            # 'source' 已在 DocumentMetadata 构造函数中设置，这里不再重复
-            "content_length": len(request.content),
-            "request_id": request_id
-        })
+        metadata.update(
+            {
+                # 'source' 已在 DocumentMetadata 构造函数中设置，这里不再重复
+                "content_length": len(request.content),
+                "request_id": request_id,
+            }
+        )
 
         success = await pipeline.add_text(request.content, metadata)
 
@@ -144,12 +148,12 @@ async def add_text_content(
             return DocumentUploadResponse(
                 success=True,
                 message="Successfully added text content",
-                metadata=metadata
+                metadata=metadata,
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to process text content"
+                detail="Failed to process text content",
             )
 
     except HTTPException:
@@ -158,7 +162,7 @@ async def add_text_content(
         logger.error(f"Error adding text content: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
@@ -166,30 +170,25 @@ async def add_text_content(
 async def add_url_content(
     request: UrlDocumentRequest,
     pipeline: RAGPipeline = Depends(get_rag_pipeline),
-    request_id: str = Depends(get_request_id)
+    request_id: str = Depends(get_request_id),
 ) -> DocumentUploadResponse:
     """Add content from a URL to the knowledge base."""
 
     try:
         if not request.url.strip():
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="URL cannot be empty"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="URL cannot be empty"
             )
 
         # Basic URL validation
-        if not request.url.startswith(('http://', 'https://')):
+        if not request.url.startswith(("http://", "https://")):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="URL must start with http:// or https://"
+                detail="URL must start with http:// or https://",
             )
 
         metadata = request.metadata or {}
-        metadata.update({
-            "source": "url",
-            "url": request.url,
-            "request_id": request_id
-        })
+        metadata.update({"source": "url", "url": request.url, "request_id": request_id})
 
         success = await pipeline.add_url(request.url, metadata)
 
@@ -197,12 +196,12 @@ async def add_url_content(
             return DocumentUploadResponse(
                 success=True,
                 message=f"Successfully processed URL: {request.url}",
-                metadata=metadata
+                metadata=metadata,
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to process URL content"
+                detail="Failed to process URL content",
             )
 
     except HTTPException:
@@ -211,14 +210,13 @@ async def add_url_content(
         logger.error(f"Error adding URL content: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
 @documents_router.delete("/{document_id}")
 async def delete_document(
-    document_id: str,
-    pipeline: RAGPipeline = Depends(get_rag_pipeline)
+    document_id: str, pipeline: RAGPipeline = Depends(get_rag_pipeline)
 ) -> Dict[str, Any]:
     """Delete a document from the knowledge base."""
 
@@ -228,12 +226,12 @@ async def delete_document(
         if success:
             return {
                 "success": True,
-                "message": f"Successfully deleted document: {document_id}"
+                "message": f"Successfully deleted document: {document_id}",
             }
         else:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Document not found: {document_id}"
+                detail=f"Document not found: {document_id}",
             )
 
     except HTTPException:
@@ -242,26 +240,23 @@ async def delete_document(
         logger.error(f"Error deleting document: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
 @documents_router.get("/stats")
 async def get_document_stats(
-    pipeline: RAGPipeline = Depends(get_rag_pipeline)
+    pipeline: RAGPipeline = Depends(get_rag_pipeline),
 ) -> Dict[str, Any]:
     """Get statistics about the document collection."""
 
     try:
         stats = await pipeline.get_stats()
-        return {
-            "success": True,
-            "stats": stats
-        }
+        return {"success": True, "stats": stats}
 
     except Exception as e:
         logger.error(f"Error getting document stats: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )

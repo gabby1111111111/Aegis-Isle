@@ -5,13 +5,12 @@ Token 使用统计与延迟监控模块。
 响应延迟和费用估算。支持 P50/P95/P99 延迟分位数计算。
 """
 
-import time
 import csv
 import io
 from collections import deque
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
-from typing import Optional, Dict, List, Deque
+from typing import Dict, List, Deque
 
 from ..core.logging import logger
 
@@ -22,7 +21,7 @@ from ..core.logging import logger
 
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "Qwen/Qwen2.5-7B-Instruct": {
-        "prompt": 0.35,       # SiliconFlow 价格
+        "prompt": 0.35,  # SiliconFlow 价格
         "completion": 0.35,
     },
     "Qwen/Qwen2.5-72B-Instruct": {
@@ -37,20 +36,23 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "_default": {
         "prompt": 1.0,
         "completion": 1.0,
-    }
+    },
 }
 
 
 @dataclass
 class TokenRecord:
     """单次 LLM 调用的 Token 记录"""
+
     request_id: str
     model: str
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
     latency_ms: float
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
     user_id: str = "default"
     endpoint: str = "/v1/chat/completions"
     cost_usd: float = 0.0
@@ -59,15 +61,15 @@ class TokenRecord:
         """自动计算费用"""
         pricing = MODEL_PRICING.get(self.model, MODEL_PRICING["_default"])
         self.cost_usd = (
-            self.prompt_tokens * pricing["prompt"] / 1_000_000 +
-            self.completion_tokens * pricing["completion"] / 1_000_000
+            self.prompt_tokens * pricing["prompt"] / 1_000_000
+            + self.completion_tokens * pricing["completion"] / 1_000_000
         )
 
 
 class TokenMetrics:
     """
     Token 使用统计收集器。
-    
+
     线程安全的 Token 消耗追踪器，支持:
     - 累计 prompt/completion token 统计
     - 按模型分组的 token 使用量
@@ -125,13 +127,12 @@ class TokenMetrics:
     def get_dashboard(self) -> dict:
         """
         返回汇总统计面板数据。
-        
+
         Returns:
             包含 Token 统计、延迟分位数、费用和模型分布的字典
         """
         avg_latency = (
-            sum(self._latencies) / len(self._latencies)
-            if self._latencies else 0.0
+            sum(self._latencies) / len(self._latencies) if self._latencies else 0.0
         )
 
         return {
@@ -167,7 +168,7 @@ class TokenMetrics:
     def export_csv(self) -> str:
         """
         将所有记录导出为 CSV 字符串。
-        
+
         Returns:
             CSV 格式的字符串
         """
@@ -175,19 +176,36 @@ class TokenMetrics:
         writer = csv.writer(output)
 
         # 表头
-        writer.writerow([
-            "timestamp", "request_id", "user_id", "model",
-            "prompt_tokens", "completion_tokens", "total_tokens",
-            "latency_ms", "cost_usd", "endpoint"
-        ])
+        writer.writerow(
+            [
+                "timestamp",
+                "request_id",
+                "user_id",
+                "model",
+                "prompt_tokens",
+                "completion_tokens",
+                "total_tokens",
+                "latency_ms",
+                "cost_usd",
+                "endpoint",
+            ]
+        )
 
         for record in self.history:
-            writer.writerow([
-                record.timestamp, record.request_id, record.user_id,
-                record.model, record.prompt_tokens, record.completion_tokens,
-                record.total_tokens, round(record.latency_ms, 1),
-                round(record.cost_usd, 6), record.endpoint,
-            ])
+            writer.writerow(
+                [
+                    record.timestamp,
+                    record.request_id,
+                    record.user_id,
+                    record.model,
+                    record.prompt_tokens,
+                    record.completion_tokens,
+                    record.total_tokens,
+                    round(record.latency_ms, 1),
+                    round(record.cost_usd, 6),
+                    record.endpoint,
+                ]
+            )
 
         return output.getvalue()
 
@@ -207,29 +225,31 @@ class TokenMetrics:
 # tiktoken Token 估算工具
 # ============================================
 
+
 def estimate_tokens(text: str, model: str = "gpt-4") -> int:
     """
     使用 tiktoken 估算文本的 token 数。
-    
+
     对于不被 tiktoken 原生支持的模型（如 Qwen），
     使用 cl100k_base 编码器作为近似估算。
-    
+
     Args:
         text: 要估算的文本
         model: 模型名称 (用于选择编码器)
-        
+
     Returns:
         估算的 token 数
     """
     try:
         import tiktoken
+
         # Qwen/DeepSeek 等国产模型用 cl100k_base 近似
         enc = tiktoken.get_encoding("cl100k_base")
         return len(enc.encode(text))
     except ImportError:
         # 如果 tiktoken 未安装，用字符数粗略估算
         # 中文约 1.5 token/字，英文约 0.25 token/word
-        chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+        chinese_chars = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
         other_chars = len(text) - chinese_chars
         return int(chinese_chars * 1.5 + other_chars * 0.3)
     except Exception as e:
@@ -240,11 +260,11 @@ def estimate_tokens(text: str, model: str = "gpt-4") -> int:
 def estimate_messages_tokens(messages: list, model: str = "gpt-4") -> int:
     """
     估算消息列表的总 token 数 (包含角色标记开销)。
-    
+
     Args:
         messages: OpenAI 格式的消息列表
         model: 模型名称
-        
+
     Returns:
         估算的总 token 数
     """

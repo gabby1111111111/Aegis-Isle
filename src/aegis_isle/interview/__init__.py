@@ -12,6 +12,7 @@ A comprehensive interview preparation system with:
 from .knowledge_engine import KnowledgeEngine, Question
 from .persona_manager import PersonaManager, Persona
 from .generator import Generator
+
 try:
     from .graph import (
         InterviewState,

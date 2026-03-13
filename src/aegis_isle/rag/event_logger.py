@@ -1,11 +1,12 @@
-import os
 import json
 import logging
 import asyncio
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 logger = logging.getLogger(__name__)
+
 
 class LifeEventBus:
     """
@@ -13,19 +14,19 @@ class LifeEventBus:
     实时将各端（ST-Companion-Link, Love&Code, Aegis Chat）的行为写入 JSONL 尾部。
     后续由 DailyDigest 定时提取并编译为日记。
     """
-    
+
     def __init__(self, base_dir: str = "data/diary/events"):
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        
+
         self.files = {
             "browsing": self.base_dir / "browsing.jsonl",
             "interview": self.base_dir / "interview.jsonl",
             "chat_summary": self.base_dir / "chat_summary.jsonl",
             "character_activity": self.base_dir / "character_activity.jsonl",
-            "pending_char_activity": self.base_dir / "pending_char_activity.jsonl"
+            "pending_char_activity": self.base_dir / "pending_char_activity.jsonl",
         }
-        
+
         # 确保文件存在
         for path in self.files.values():
             if not path.exists():
@@ -37,9 +38,9 @@ class LifeEventBus:
         if not filepath:
             logger.error(f"未知的日志类型: {log_type}")
             return
-            
+
         data["timestamp"] = datetime.now().isoformat()
-        
+
         try:
             # 简单追加写入，因为是通过 FastAPI 单实例队列或异步处理，冲突概率低，且 jsonl 本身就是 append
             with open(filepath, "a", encoding="utf-8") as f:
@@ -49,7 +50,15 @@ class LifeEventBus:
             logger.error(f"写入事件日志失败 [{log_type}]: {e}", exc_info=True)
 
     # 异步包装，方便在 FastAPI 中使用而不阻塞主线程
-    async def log_browsing(self, action: str, title: str, tags: list, url: str, platform: str, comment: str = None):
+    async def log_browsing(
+        self,
+        action: str,
+        title: str,
+        tags: list,
+        url: str,
+        platform: str,
+        comment: str = None,
+    ):
         """记录用户的浏览行为 (CL)"""
         data = {
             "action": action,
@@ -57,19 +66,21 @@ class LifeEventBus:
             "tags": tags,
             "url": url,
             "platform": platform,
-            "comment": comment
+            "comment": comment,
         }
         # 使用 asyncio.to_thread 避免密集 IO 阻塞事件循环 (虽然此处 IO 极小)
         await asyncio.to_thread(self._append_to_log, "browsing", data)
 
-    async def log_interview(self, question_text: str, correct: bool, category: str, tags: list):
+    async def log_interview(
+        self, question_text: str, correct: bool, category: str, tags: list
+    ):
         """记录用户的面试练习行为 (Love & Code)"""
         data = {
             "action": "answer_question",
             "question": question_text,
             "verdict": "correct" if correct else "incorrect",
             "category": category,
-            "tags": tags
+            "tags": tags,
         }
         await asyncio.to_thread(self._append_to_log, "interview", data)
 
@@ -79,19 +90,54 @@ class LifeEventBus:
             "action": "chat_episode",
             "universe_id": universe_id,
             "character": character,
-            "summary": summary
+            "summary": summary,
         }
         await asyncio.to_thread(self._append_to_log, "chat_summary", data)
 
-    async def log_character_activity(self, universe_id: str, character: str, action_type: str, details: dict):
+    async def log_character_activity(
+        self, universe_id: str, character: str, action_type: str, details: dict
+    ):
         """记录角色自主做的事情（CharLifeAgent），先进入待审核队列"""
         data = {
             "action": action_type,
             "universe_id": universe_id,
             "character": character,
-            "details": details
+            "details": details,
         }
         await asyncio.to_thread(self._append_to_log, "pending_char_activity", data)
+
+    async def get_last_interaction_time(
+        self, universe_id: str, character: str
+    ) -> Optional[datetime]:
+        """获取最近一次与该角色互动的聊天摘要时间（作为上次见面的粗略时间点）"""
+        filepath = self.files.get("chat_summary")
+        if not filepath or not filepath.exists():
+            return None
+
+        try:
+            last_dt = None
+            with open(filepath, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                for line in reversed(lines):
+                    if not line.strip():
+                        continue
+                    try:
+                        data = json.loads(line)
+                        if (
+                            data.get("universe_id") == universe_id
+                            and data.get("character") == character
+                        ):
+                            ts = data.get("timestamp")
+                            if ts:
+                                last_dt = datetime.fromisoformat(ts)
+                                break
+                    except json.JSONDecodeError:
+                        continue
+            return last_dt
+        except Exception as e:
+            logger.error(f"读取最后交互时间失败: {e}", exc_info=True)
+            return None
+
 
 # 全局单例
 event_bus = LifeEventBus()

@@ -70,7 +70,7 @@ class StateChangeTracker:
 
         # 只保留最近 N 条
         if len(self._changes) > self._max_changes:
-            self._changes = self._changes[-self._max_changes:]
+            self._changes = self._changes[-self._max_changes :]
 
     def get_recent_changes(self, limit: int = 3) -> List[Dict[str, Any]]:
         """获取最近的变更"""

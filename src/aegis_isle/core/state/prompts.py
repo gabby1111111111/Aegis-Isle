@@ -123,17 +123,15 @@ STANDARD_PROMPT = """你是专业的状态管理AI。分析对话内容,判断�
 # Prompt 生成函数
 # ============================================
 
-def generate_state_update_prompt(
-    current_state: str,
-    user_message: str
-) -> str:
+
+def generate_state_update_prompt(current_state: str, user_message: str) -> str:
     """
     生成完整的状态更新 Prompt。
-    
+
     Args:
         current_state: 当前状态的 Markdown 字符串
         user_message: 用户输入
-        
+
     Returns:
         完整 Prompt
     """
@@ -145,7 +143,7 @@ def generate_state_update_prompt(
 
 请分析状态变化并生成指令。
 """
-    
+
     return f"{STANDARD_PROMPT}\n\n{user_prompt}"
 
 

@@ -32,8 +32,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         # Log request
         start_time = time.time()
         logger.info(
-            f"Request {request_id}: {request.method} {request.url} "
-            f"from {client_ip}"
+            f"Request {request_id}: {request.method} {request.url} from {client_ip}"
         )
 
         # Process request
@@ -44,8 +43,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
             # Log response
             logger.info(
-                f"Request {request_id}: {response.status_code} "
-                f"({duration:.3f}s)"
+                f"Request {request_id}: {response.status_code} ({duration:.3f}s)"
             )
 
             # Get authenticated user info if available
@@ -53,10 +51,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             username = None
             try:
                 # Try to extract user info from request state if auth middleware has set it
-                if hasattr(request.state, 'current_user'):
+                if hasattr(request.state, "current_user"):
                     user_info = request.state.current_user
-                    user_id = getattr(user_info, 'user_id', None)
-                    username = getattr(user_info, 'username', None)
+                    user_id = getattr(user_info, "user_id", None)
+                    username = getattr(user_info, "username", None)
             except:
                 pass
 
@@ -71,7 +69,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     user_agent=user_agent,
                     status_code=response.status_code,
                     response_time_ms=duration_ms,
-                    request_id=request_id
+                    request_id=request_id,
                 )
 
             # Add request ID to response headers
@@ -96,7 +94,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     user_agent=user_agent,
                     status_code=500,  # Internal server error
                     response_time_ms=duration_ms,
-                    request_id=request_id
+                    request_id=request_id,
                 )
 
             raise
@@ -105,7 +103,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 class MetricsMiddleware(BaseHTTPMiddleware):
     """
     增强版请求度量中间件。
-    
+
     功能:
     - 按端点分组的请求计数和延迟统计
     - P50/P95/P99 延迟分位数计算
@@ -162,7 +160,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 
             return response
 
-        except Exception as e:
+        except Exception:
             self.error_count += 1
             duration = time.time() - start_time
             duration_ms = duration * 1000
@@ -182,7 +180,9 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             self._endpoint_latencies[endpoint] = []
         self._endpoint_latencies[endpoint].append(latency_ms)
         if len(self._endpoint_latencies[endpoint]) > 500:
-            self._endpoint_latencies[endpoint] = self._endpoint_latencies[endpoint][-500:]
+            self._endpoint_latencies[endpoint] = self._endpoint_latencies[endpoint][
+                -500:
+            ]
 
     @staticmethod
     def _percentile(data: list, p: int) -> float:
@@ -197,7 +197,8 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         """Get collected metrics with percentile latency breakdown."""
         avg_duration = (
             self.request_duration_total / self.request_count
-            if self.request_count > 0 else 0
+            if self.request_count > 0
+            else 0
         )
 
         # 全局延迟分位数

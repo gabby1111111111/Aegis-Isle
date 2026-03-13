@@ -11,13 +11,14 @@ from ..dependencies import get_agent_router, get_agent_orchestrator, get_request
 from ...core.logging import logger
 from ...agents.router import AgentRouter
 from ...agents.orchestrator import AgentOrchestrator
-from ...agents.base import AgentConfig, AgentRole
+from ...agents.base import AgentRole
 
 agents_router = APIRouter()
 
 
 class AgentConfigRequest(BaseModel):
     """Request model for agent configuration."""
+
     name: str
     role: str  # Will be converted to AgentRole
     description: str
@@ -34,6 +35,7 @@ class AgentConfigRequest(BaseModel):
 
 class WorkflowExecutionRequest(BaseModel):
     """Request model for workflow execution."""
+
     workflow_name: str
     input_data: Any
     workflow_id: Optional[str] = None
@@ -41,6 +43,7 @@ class WorkflowExecutionRequest(BaseModel):
 
 class MessageRequest(BaseModel):
     """Request model for sending messages to agents."""
+
     message: str
     target_agents: Optional[List[str]] = None  # None for auto-routing
     broadcast: bool = False
@@ -48,30 +51,26 @@ class MessageRequest(BaseModel):
 
 @agents_router.get("/")
 async def list_agents(
-    router: AgentRouter = Depends(get_agent_router)
+    router: AgentRouter = Depends(get_agent_router),
 ) -> Dict[str, Any]:
     """List all registered agents."""
 
     try:
         agent_status = router.get_agent_status()
 
-        return {
-            "total_agents": len(agent_status),
-            "agents": agent_status
-        }
+        return {"total_agents": len(agent_status), "agents": agent_status}
 
     except Exception as e:
         logger.error(f"Error listing agents: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
 @agents_router.get("/{agent_id}")
 async def get_agent_info(
-    agent_id: str,
-    router: AgentRouter = Depends(get_agent_router)
+    agent_id: str, router: AgentRouter = Depends(get_agent_router)
 ) -> Dict[str, Any]:
     """Get detailed information about a specific agent."""
 
@@ -79,7 +78,7 @@ async def get_agent_info(
         if agent_id not in router.agents:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Agent not found: {agent_id}"
+                detail=f"Agent not found: {agent_id}",
             )
 
         agent = router.agents[agent_id]
@@ -91,7 +90,7 @@ async def get_agent_info(
         logger.error(f"Error getting agent info: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
@@ -99,7 +98,7 @@ async def get_agent_info(
 async def send_message_to_agents(
     request: MessageRequest,
     router: AgentRouter = Depends(get_agent_router),
-    request_id: str = Depends(get_request_id)
+    request_id: str = Depends(get_request_id),
 ) -> Dict[str, Any]:
     """Send a message to agents."""
 
@@ -107,7 +106,7 @@ async def send_message_to_agents(
         if not request.message.strip():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Message cannot be empty"
+                detail="Message cannot be empty",
             )
 
         logger.info(f"Sending message to agents: {request.message[:100]}...")
@@ -117,7 +116,9 @@ async def send_message_to_agents(
             results = await router.broadcast_message(request.message)
         elif request.target_agents:
             # Send to specific agents
-            results = await router.send_to_agents(request.message, request.target_agents)
+            results = await router.send_to_agents(
+                request.message, request.target_agents
+            )
         else:
             # Auto-route based on message content
             target_agents = await router.route_message(request.message)
@@ -127,7 +128,7 @@ async def send_message_to_agents(
             "success": True,
             "message": "Message sent successfully",
             "request_id": request_id,
-            "results": results
+            "results": results,
         }
 
     except HTTPException:
@@ -136,13 +137,68 @@ async def send_message_to_agents(
         logger.error(f"Error sending message to agents: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
+
+
+class CallNowRequest(BaseModel):
+    character_name: str
+    universe_id: str
+    force_reason: Optional[str] = "用户主动发起的一键查岗连线"
+
+
+@agents_router.post("/call_now")
+async def force_trigger_boss_call(request: CallNowRequest) -> Dict[str, Any]:
+    """用户主动发起（反向摇人）接通角色的语音电话"""
+    import httpx
+    from ...core.config import settings
+
+    logger.info(f"🚀 用户强制呼叫 {request.character_name} ({request.universe_id})")
+
+    webhook_url = settings.st_sovits_webhook_url
+    ntfy_url = f"https://ntfy.sh/{settings.ntfy_topic_ring}"
+
+    result = {"success": False, "st_webhook": "failed", "ntfy": "failed", "detail": ""}
+
+    async with httpx.AsyncClient(timeout=3.0) as client:
+        # 1. 强行叫醒 ST 伴侣端
+        try:
+            payload = {
+                "character": request.character_name,
+                "universe_id": request.universe_id,
+                "trigger_reason": request.force_reason,
+                "preview_text": f"（电话接通中，{request.character_name} 被用户紧急呼叫）...",
+                "is_user_initiated": True,
+            }
+            res = await client.post(webhook_url, json=payload)
+            if res.status_code == 200:
+                result["st_webhook"] = "success"
+                result["success"] = True
+        except Exception as e:
+            result["st_webhook"] = f"error: {str(e)}"
+
+        # 2. ntfy 给自己发个振铃确认
+        try:
+            headers = {
+                "Title": "Aegis Manual Call Initiated",
+                "Tags": "telephone,check_mark",
+                "Priority": "default",
+            }
+            ntfy_msg = f"已强制呼叫 {request.character_name}，由于是反向拨号，请去电脑端查看 ST 屏幕！"
+            res = await client.post(
+                ntfy_url, content=ntfy_msg.encode("utf-8"), headers=headers
+            )
+            if res.status_code == 200:
+                result["ntfy"] = "success"
+        except Exception as e:
+            result["ntfy"] = f"error: {str(e)}"
+
+    return result
 
 
 @agents_router.get("/workflows/templates")
 async def list_workflow_templates(
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
 ) -> Dict[str, Any]:
     """List available workflow templates."""
 
@@ -156,17 +212,17 @@ async def list_workflow_templates(
                 name: {
                     "name": workflow.name,
                     "description": workflow.description,
-                    "steps": list(workflow.steps.keys())
+                    "steps": list(workflow.steps.keys()),
                 }
                 for name, workflow in orchestrator.workflow_templates.items()
-            }
+            },
         }
 
     except Exception as e:
         logger.error(f"Error listing workflow templates: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
@@ -174,7 +230,7 @@ async def list_workflow_templates(
 async def execute_workflow(
     request: WorkflowExecutionRequest,
     orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
-    request_id: str = Depends(get_request_id)
+    request_id: str = Depends(get_request_id),
 ) -> Dict[str, Any]:
     """Execute a workflow."""
 
@@ -182,7 +238,7 @@ async def execute_workflow(
         if request.workflow_name not in orchestrator.workflow_templates:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Workflow template not found: {request.workflow_name}"
+                detail=f"Workflow template not found: {request.workflow_name}",
             )
 
         logger.info(f"Executing workflow: {request.workflow_name}")
@@ -190,7 +246,7 @@ async def execute_workflow(
         result = await orchestrator.execute_workflow(
             workflow_name=request.workflow_name,
             initial_input=request.input_data,
-            workflow_id=request.workflow_id
+            workflow_id=request.workflow_id,
         )
 
         result["request_id"] = request_id
@@ -202,14 +258,13 @@ async def execute_workflow(
         logger.error(f"Error executing workflow: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
 @agents_router.get("/workflows/{workflow_id}/status")
 async def get_workflow_status(
-    workflow_id: str,
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    workflow_id: str, orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
 ) -> Dict[str, Any]:
     """Get the status of a running workflow."""
 
@@ -219,7 +274,7 @@ async def get_workflow_status(
         if status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Workflow not found: {workflow_id}"
+                detail=f"Workflow not found: {workflow_id}",
             )
 
         return status
@@ -230,13 +285,13 @@ async def get_workflow_status(
         logger.error(f"Error getting workflow status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
 @agents_router.get("/active-workflows")
 async def list_active_workflows(
-    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator)
+    orchestrator: AgentOrchestrator = Depends(get_agent_orchestrator),
 ) -> Dict[str, Any]:
     """List all currently active workflows."""
 
@@ -248,16 +303,13 @@ async def list_active_workflows(
             if status:
                 active_workflows[workflow_id] = status
 
-        return {
-            "total_active": len(active_workflows),
-            "workflows": active_workflows
-        }
+        return {"total_active": len(active_workflows), "workflows": active_workflows}
 
     except Exception as e:
         logger.error(f"Error listing active workflows: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail=f"Internal server error: {str(e)}",
         )
 
 
@@ -276,6 +328,6 @@ async def list_agent_roles() -> Dict[str, Any]:
             "chart_generator": "Generates charts and visualizations",
             "tool_caller": "Executes tools and external functions",
             "coordinator": "Coordinates tasks between multiple agents",
-            "router": "Routes messages and tasks to appropriate agents"
-        }
+            "router": "Routes messages and tasks to appropriate agents",
+        },
     }

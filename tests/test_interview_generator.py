@@ -1,15 +1,16 @@
 import pytest
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from aegis_isle.interview.generator import Generator
 from aegis_isle.interview.persona_manager import Persona
 from aegis_isle.interview.knowledge_engine import Question
+
 
 @pytest.fixture
 def mock_llm():
     with patch("aegis_isle.interview.generator.LLMGenerator") as MockLLM:
         mock_instance = MockLLM.return_value
         yield mock_instance
+
 
 @pytest.fixture
 def sample_persona():
@@ -20,18 +21,16 @@ def sample_persona():
         personality="Robotic.",
         first_message="Hello.",
         example_messages="User: Hi\nBot: Hello.",
-        scenario="Testing lab."
+        scenario="Testing lab.",
     )
+
 
 @pytest.fixture
 def sample_question():
     return Question(
-        id="q1",
-        content="What is 2+2?",
-        answer_key="4",
-        difficulty=1,
-        category="math"
+        id="q1", content="What is 2+2?", answer_key="4", difficulty=1, category="math"
     )
+
 
 @pytest.mark.asyncio
 async def test_generate_question_interaction(mock_llm, sample_persona, sample_question):
@@ -59,11 +58,14 @@ async def test_generate_question_interaction(mock_llm, sample_persona, sample_qu
     # Inject mock
     generator.llm = mock_llm
 
-    result = await generator.generate_question_interaction(sample_persona, sample_question)
+    result = await generator.generate_question_interaction(
+        sample_persona, sample_question
+    )
 
     assert result["role_flavor"]["scenario"] == "Lab setting."
     assert result["original_question"] == "What is 2+2?"
     assert "addition" in result["hints"]["tech_keywords"]
+
 
 @pytest.mark.asyncio
 async def test_generate_feedback(mock_llm, sample_persona, sample_question):
@@ -84,7 +86,9 @@ async def test_generate_feedback(mock_llm, sample_persona, sample_question):
     generator = Generator()
     generator.llm = mock_llm
 
-    result = await generator.generate_feedback(sample_persona, sample_question, "It is 4", {})
+    result = await generator.generate_feedback(
+        sample_persona, sample_question, "It is 4", {}
+    )
 
     assert result["character_verdict"]["status"] == "correct"
     assert result["standard_answer"] == "4"

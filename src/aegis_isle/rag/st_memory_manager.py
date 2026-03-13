@@ -44,7 +44,7 @@ class STMemoryManager:
 
         # To avoid fighting sync/async FAISS ingest right now, we can use the async-friendly pattern
         # or load a standard sentence-transformers wrapper for ingestion compatibility if needed.
-        from langchain_community.embeddings import HuggingFaceEmbeddings
+        from langchain_huggingface import HuggingFaceEmbeddings
 
         self.embedder = HuggingFaceEmbeddings(model_name=self.text_embedder.model_name)
 

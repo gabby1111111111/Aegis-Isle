@@ -16,8 +16,6 @@ RAG 检索质量评估 (DeepEval)
 
 import pytest
 import os
-import sys
-from pathlib import Path
 
 # DeepSeek-V3 响应可能较慢，延长 DeepEval 超时到 5 分钟
 os.environ.setdefault("DEEPEVAL_PER_TASK_TIMEOUT_SECONDS_OVERRIDE", "300")
@@ -28,12 +26,14 @@ os.environ.setdefault("DEEPEVAL_TASK_GATHER_BUFFER_SECONDS_OVERRIDE", "60")
 # 1. 离线检索质量测试 (不需要 LLM API)
 # ============================================
 
+
 class TestRAGOffline:
     """离线 RAG 质量测试 — 不需要 LLM API Key"""
 
     def test_memory_manager_can_initialize(self):
         """STMemoryManager 应能正常初始化"""
         from src.aegis_isle.rag.st_memory_manager import STMemoryManager
+
         mm = STMemoryManager()
         assert mm is not None
         assert hasattr(mm, "search_memory")
@@ -48,7 +48,7 @@ class TestRAGOffline:
                 query="你还记得那次在法餐厅的事吗？",
                 character_name="ZouZheng",
                 world_line="AIDom",
-                k=3
+                k=3,
             )
             return results
 
@@ -65,7 +65,7 @@ class TestRAGOffline:
                 query="今天发生了什么？",
                 character_name="ZouZheng",
                 world_line="AIDom",
-                k=3
+                k=3,
             )
             return results
 
@@ -73,9 +73,11 @@ class TestRAGOffline:
         if len(results) > 0:  # 只有当有数据时才检查
             first = results[0]
             # ChatChunk 或 Document 应有 text/page_content 字段
-            assert hasattr(first, 'page_content') or hasattr(first, 'text') or \
-                isinstance(first, (str, dict)), \
-                f"检索结果结构不符合预期: {type(first)}"
+            assert (
+                hasattr(first, "page_content")
+                or hasattr(first, "text")
+                or isinstance(first, (str, dict))
+            ), f"检索结果结构不符合预期: {type(first)}"
 
     def test_empty_query_returns_gracefully(self):
         """空查询不应崩溃"""
@@ -84,10 +86,7 @@ class TestRAGOffline:
 
         async def _search():
             results = await memory_manager.search_memory(
-                query="",
-                character_name="ZouZheng",
-                world_line="AIDom",
-                k=3
+                query="", character_name="ZouZheng", world_line="AIDom", k=3
             )
             return results
 
@@ -97,6 +96,7 @@ class TestRAGOffline:
     def test_format_context_for_prompt(self):
         """格式化上下文应返回字符串"""
         from src.aegis_isle.rag.st_memory_manager import memory_manager
+
         # 即使空列表也应返回空字符串而非崩溃
         context = memory_manager.format_context_for_prompt([])
         assert isinstance(context, str)
@@ -108,16 +108,13 @@ class TestRAGOffline:
 
         async def _search_two_worlds():
             r1 = await memory_manager.search_memory(
-                query="约会",
-                character_name="ZouZheng",
-                world_line="AIDom",
-                k=3
+                query="约会", character_name="ZouZheng", world_line="AIDom", k=3
             )
             r2 = await memory_manager.search_memory(
                 query="约会",
                 character_name="ZouZheng",
                 world_line="NonExistentWorld_XYZ",
-                k=3
+                k=3,
             )
             return r1, r2
 
@@ -139,14 +136,14 @@ class TestRAGOffline:
 #   JUDGE_MODEL=Qwen/Qwen3-235B-A22B
 AVAILABLE_JUDGE_MODELS = {
     # 🥇 顶级（最准确，但贵一点）
-    "deepseek-ai/DeepSeek-V3":        "DeepSeek V3 — 推理超强，当评判最准确",
-    "Qwen/Qwen3-235B-A22B":           "Qwen3 235B MoE — 旗舰级，多语言最强",
-    "Qwen/QwQ-32B":                    "QwQ 32B — 推理型，适合复杂评估",
+    "deepseek-ai/DeepSeek-V3": "DeepSeek V3 — 推理超强，当评判最准确",
+    "Qwen/Qwen3-235B-A22B": "Qwen3 235B MoE — 旗舰级，多语言最强",
+    "Qwen/QwQ-32B": "QwQ 32B — 推理型，适合复杂评估",
     # 🥈 性价比（够用，便宜）
-    "deepseek-ai/DeepSeek-V3-0324":   "DeepSeek V3 0324 — 平衡性价比",
-    "Qwen/Qwen3-8B":                   "Qwen3 8B — 轻量但有思考模式",
+    "deepseek-ai/DeepSeek-V3-0324": "DeepSeek V3 0324 — 平衡性价比",
+    "Qwen/Qwen3-8B": "Qwen3 8B — 轻量但有思考模式",
     # 🥉 免费（质量一般）
-    "Qwen/Qwen2.5-7B-Instruct":       "Qwen2.5 7B — 免费但评分偏保守",
+    "Qwen/Qwen2.5-7B-Instruct": "Qwen2.5 7B — 免费但评分偏保守",
 }
 
 # 默认用 DeepSeek-V3（准确度高）
@@ -156,6 +153,7 @@ DEFAULT_JUDGE_MODEL = "deepseek-ai/DeepSeek-V3"
 def _get_silicon_flow_config():
     """从 .env 或环境变量读取 SiliconFlow 配置"""
     from dotenv import load_dotenv
+
     load_dotenv()
     api_key = os.environ.get("OPENAI_API_KEY")
     base_url = os.environ.get("OPENAI_BASE_URL")
@@ -230,7 +228,7 @@ class TestRAGDeepEval:
             actual_output="那次在法餐厅，你第一次尝试了鹅肝，虽然有点紧张，但后来你说味道其实还不错。",
             retrieval_context=[
                 "在法餐厅的约会中，邹峥第一次尝试了鹅肝。他起初非常紧张，但最终评价说'味道竟然还不错'。"
-            ]
+            ],
         )
 
         faithfulness = FaithfulnessMetric(threshold=0.7, model=judge)
@@ -250,7 +248,7 @@ class TestRAGDeepEval:
             expected_output="邹峥喜欢古典音乐，尤其是肖邦的夜曲和德彪西的亚麻色头发的少女。",
             retrieval_context=[
                 "邹峥的音乐偏好: 古典音乐，最喜欢的作曲家是肖邦和德彪西。他经常在做研究的时候听肖邦的夜曲。"
-            ]
+            ],
         )
 
         recall = ContextualRecallMetric(threshold=0.7, model=judge)
@@ -269,7 +267,7 @@ class TestRAGDeepEval:
             actual_output="我们第一次见面是在2025年10月，当时是在星巴克。那是一个秋天的下午。",
             retrieval_context=[
                 "2025年10月，两人在星巴克首次见面。邹峥当天穿了白色衬衫和卡其色裤子。"
-            ]
+            ],
         )
 
         # DeepSeek-V3 作为严格裁判，会扣「无关细节」的分（如提到地点）

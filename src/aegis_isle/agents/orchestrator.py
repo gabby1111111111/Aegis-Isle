@@ -2,16 +2,14 @@
 Agent Orchestrator - Coordinates complex workflows between multiple agents using LangGraph.
 """
 
-import asyncio
 import time
 from typing import Any, Dict, List, Optional, Union, TypedDict
 
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langgraph.graph import StateGraph, END
 from langgraph.graph.state import CompiledStateGraph
-from langchain_core.runnables import RunnableLambda
 
-from .base import AgentMessage, AgentResponse, BaseAgent, AgentRole, AgentConfig
+from .base import AgentMessage, AgentRole, AgentConfig
 from .router import AgentRouter
 from .implementations import EnhancedChartAgent, EnhancedResearcherAgent
 from ..tools import get_tool_registry, PythonREPLTool, SearchTool, ToolConfig
@@ -23,6 +21,7 @@ class AgentState(TypedDict):
 
     Contains all shared information between agents during workflow execution.
     """
+
     messages: List[BaseMessage]
     context: Dict[str, Any]
     next_step: Optional[str]
@@ -40,7 +39,9 @@ class WorkflowStep:
         self.name = name
         self.agent_roles = agent_roles
         self.input_message = input_message
-        logger.warning(f"WorkflowStep '{name}' created - consider migrating to LangGraph")
+        logger.warning(
+            f"WorkflowStep '{name}' created - consider migrating to LangGraph"
+        )
 
 
 class Workflow:
@@ -72,7 +73,7 @@ class ToolIntegratedOrchestrator:
         router: Optional[AgentRouter] = None,
         auto_initialize_tools: bool = True,
         enable_web_search: bool = True,
-        search_providers_config: Optional[Dict[str, Dict[str, str]]] = None
+        search_providers_config: Optional[Dict[str, Dict[str, str]]] = None,
     ):
         """Initialize the tool-integrated orchestrator.
 
@@ -104,7 +105,7 @@ class ToolIntegratedOrchestrator:
                 name="orchestrator_python_repl",
                 description="Python REPL for code execution and data analysis",
                 timeout=60,
-                max_retries=2
+                max_retries=2,
             )
             python_tool = PythonREPLTool(config=python_config)
             self.tool_registry.register_tool(python_tool)
@@ -115,13 +116,13 @@ class ToolIntegratedOrchestrator:
                     name="orchestrator_web_search",
                     description="Web search for real-time information retrieval",
                     timeout=30,
-                    max_retries=3
+                    max_retries=3,
                 )
                 search_tool = SearchTool(
                     config=search_config,
                     primary_provider="duckduckgo",
                     providers_config=self.search_providers_config,
-                    enable_fallback=True
+                    enable_fallback=True,
                 )
                 self.tool_registry.register_tool(search_tool)
 
@@ -139,11 +140,10 @@ class ToolIntegratedOrchestrator:
                 role=AgentRole.CHART_GENERATOR,
                 description="Enhanced chart generation with Python tool integration",
                 temperature=0.3,
-                tools=["python_repl"]
+                tools=["python_repl"],
             )
             chart_agent = EnhancedChartAgent(
-                config=chart_config,
-                enable_python_tools=True
+                config=chart_config, enable_python_tools=True
             )
             self.router.register_agent(chart_agent)
 
@@ -153,12 +153,14 @@ class ToolIntegratedOrchestrator:
                 role=AgentRole.RESEARCHER,
                 description="Enhanced research with web search and RAG integration",
                 temperature=0.7,
-                tools=["web_search", "rag_retrieval"] if self.enable_web_search else ["rag_retrieval"]
+                tools=["web_search", "rag_retrieval"]
+                if self.enable_web_search
+                else ["rag_retrieval"],
             )
             researcher_agent = EnhancedResearcherAgent(
                 config=researcher_config,
                 enable_web_search=self.enable_web_search,
-                search_providers_config=self.search_providers_config
+                search_providers_config=self.search_providers_config,
             )
             self.router.register_agent(researcher_agent)
 
@@ -192,8 +194,8 @@ class ToolIntegratedOrchestrator:
                 "retriever": "retriever",
                 "summarizer": "summarizer",
                 "chart_generator": "chart_generator",
-                "finalizer": "finalizer"
-            }
+                "finalizer": "finalizer",
+            },
         )
 
         # All agent nodes flow to finalizer
@@ -217,7 +219,9 @@ class ToolIntegratedOrchestrator:
 
         # Initialize tools
         tool_results = await self.tool_registry.initialize_all()
-        results.update({f"tool_{name}": success for name, success in tool_results.items()})
+        results.update(
+            {f"tool_{name}": success for name, success in tool_results.items()}
+        )
 
         # Initialize agents
         agent_results = {}
@@ -229,7 +233,9 @@ class ToolIntegratedOrchestrator:
                 logger.error(f"Failed to initialize agent {agent_id}: {e}")
                 agent_results[agent_id] = False
 
-        results.update({f"agent_{name}": success for name, success in agent_results.items()})
+        results.update(
+            {f"agent_{name}": success for name, success in agent_results.items()}
+        )
 
         return results
 
@@ -251,11 +257,15 @@ class ToolIntegratedOrchestrator:
                 logger.error(f"Failed to cleanup agent {agent_id}: {e}")
                 agent_results[agent_id] = False
 
-        results.update({f"agent_{name}": success for name, success in agent_results.items()})
+        results.update(
+            {f"agent_{name}": success for name, success in agent_results.items()}
+        )
 
         # Cleanup tools
         tool_results = await self.tool_registry.cleanup_all()
-        results.update({f"tool_{name}": success for name, success in tool_results.items()})
+        results.update(
+            {f"tool_{name}": success for name, success in tool_results.items()}
+        )
 
         return results
 
@@ -309,8 +319,8 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                 "retriever": "retriever",
                 "summarizer": "summarizer",
                 "chart_generator": "chart_generator",
-                "finalizer": "finalizer"
-            }
+                "finalizer": "finalizer",
+            },
         )
 
         # All agent nodes flow to finalizer
@@ -348,7 +358,7 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                     "researcher": "researcher",
                     "retriever": "retriever",
                     "summarizer": "summarizer",
-                    "chart_generator": "chart_generator"
+                    "chart_generator": "chart_generator",
                 }
 
                 # Find first matching agent type
@@ -364,9 +374,9 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                 # Default to finalizer if no agents available
                 state["next_step"] = "finalizer"
 
-            state["messages"].append(SystemMessage(
-                content=f"Router decision: Route to {state['next_step']}"
-            ))
+            state["messages"].append(
+                SystemMessage(content=f"Router decision: Route to {state['next_step']}")
+            )
 
             return state
 
@@ -429,13 +439,12 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
         Returns:
             Updated state with chart generation results
         """
-        return await self._execute_agent_node(state, AgentRole.CHART_GENERATOR, "chart_generator")
+        return await self._execute_agent_node(
+            state, AgentRole.CHART_GENERATOR, "chart_generator"
+        )
 
     async def _execute_agent_node(
-        self,
-        state: AgentState,
-        agent_role: AgentRole,
-        node_name: str
+        self, state: AgentState, agent_role: AgentRole, node_name: str
     ) -> AgentState:
         """Execute a specific agent node with error handling.
 
@@ -453,7 +462,8 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
 
             # Find agents with the specified role
             target_agents = [
-                agent_id for agent_id, agent in self.router.agents.items()
+                agent_id
+                for agent_id, agent in self.router.agents.items()
                 if agent.role == agent_role and agent.config.enabled
             ]
 
@@ -461,24 +471,25 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                 logger.warning(f"No available {agent_role.value} agents found")
                 state["agent_results"][node_name] = {
                     "error": f"No {agent_role.value} agents available",
-                    "execution_time": 0.0
+                    "execution_time": 0.0,
                 }
                 return state
 
             # Execute agent
             message = AgentMessage(
-                sender_id="orchestrator",
-                content=state["current_query"]
+                sender_id="orchestrator", content=state["current_query"]
             )
 
-            results = await self.router.send_to_agents(message, target_agents[:1])  # Use first agent
+            results = await self.router.send_to_agents(
+                message, target_agents[:1]
+            )  # Use first agent
             execution_time = time.time() - start_time
 
             # Store results in state
             state["agent_results"][node_name] = {
                 "results": results,
                 "execution_time": execution_time,
-                "agent_count": len(target_agents)
+                "agent_count": len(target_agents),
             }
 
             # Add message to conversation
@@ -486,9 +497,9 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                 agent_result = list(results.values())[0]
                 if agent_result.get("success"):
                     content = agent_result.get("content", "")
-                    state["messages"].append(AIMessage(
-                        content=f"{agent_role.value} result: {content}"
-                    ))
+                    state["messages"].append(
+                        AIMessage(content=f"{agent_role.value} result: {content}")
+                    )
 
             logger.info(f"Completed {node_name} node in {execution_time:.2f}s")
             return state
@@ -497,7 +508,9 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
             logger.error(f"{node_name} node execution failed: {e}")
             state["agent_results"][node_name] = {
                 "error": str(e),
-                "execution_time": time.time() - start_time if 'start_time' in locals() else 0.0
+                "execution_time": time.time() - start_time
+                if "start_time" in locals()
+                else 0.0,
             }
             return state
 
@@ -520,14 +533,22 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                 if "results" in result:
                     agent_results = result["results"]
                     for agent_id, agent_response in agent_results.items():
-                        if agent_response.get("success") and agent_response.get("content"):
-                            all_results.append(f"{agent_name}: {agent_response['content']}")
+                        if agent_response.get("success") and agent_response.get(
+                            "content"
+                        ):
+                            all_results.append(
+                                f"{agent_name}: {agent_response['content']}"
+                            )
 
             # Generate final consolidated answer
             if all_results:
-                final_answer = "Based on multi-agent analysis:\n\n" + "\n\n".join(all_results)
+                final_answer = "Based on multi-agent analysis:\n\n" + "\n\n".join(
+                    all_results
+                )
             else:
-                final_answer = "Unable to generate response - no successful agent results"
+                final_answer = (
+                    "Unable to generate response - no successful agent results"
+                )
 
             state["final_answer"] = final_answer
             state["execution_metadata"]["finalization_time"] = time.time() - start_time
@@ -546,9 +567,7 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
             return state
 
     async def execute_workflow(
-        self,
-        query: str,
-        initial_context: Optional[Dict[str, Any]] = None
+        self, query: str, initial_context: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Execute the LangGraph workflow for a given query.
 
@@ -562,7 +581,9 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
         if not self.graph:
             raise RuntimeError("Graph not properly initialized")
 
-        logger.info(f"Starting LangGraph workflow execution for query: {query[:100]}...")
+        logger.info(
+            f"Starting LangGraph workflow execution for query: {query[:100]}..."
+        )
         start_time = time.time()
 
         try:
@@ -576,8 +597,8 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                 "final_answer": None,
                 "execution_metadata": {
                     "start_time": start_time,
-                    "workflow_type": "langgraph_multiagent"
-                }
+                    "workflow_type": "langgraph_multiagent",
+                },
             }
 
             # Execute the graph
@@ -594,7 +615,7 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                 "agent_results": final_state.get("agent_results", {}),
                 "messages": [msg.content for msg in final_state.get("messages", [])],
                 "execution_time": execution_time,
-                "metadata": final_state.get("execution_metadata", {})
+                "metadata": final_state.get("execution_metadata", {}),
             }
 
         except Exception as e:
@@ -605,7 +626,7 @@ class LangGraphAgentOrchestrator(ToolIntegratedOrchestrator):
                 "success": False,
                 "error": str(e),
                 "execution_time": execution_time,
-                "metadata": {"error": str(e)}
+                "metadata": {"error": str(e)},
             }
 
 
@@ -631,14 +652,14 @@ class AgentOrchestrator(LangGraphAgentOrchestrator):
         self.workflow_templates["rag_query"] = {
             "name": "rag_query",
             "description": "Standard RAG query processing workflow",
-            "type": "langgraph_multiagent"
+            "type": "langgraph_multiagent",
         }
 
     async def execute_workflow(
         self,
         workflow_name: str = "rag_query",
         initial_input: Union[str, Dict[str, Any]] = "",
-        workflow_id: Optional[str] = None
+        workflow_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Execute workflow with legacy compatibility.
 
@@ -659,7 +680,7 @@ class AgentOrchestrator(LangGraphAgentOrchestrator):
         # Use the new LangGraph execution
         result = await super().execute_workflow(
             query=query,
-            initial_context=initial_input if isinstance(initial_input, dict) else {}
+            initial_context=initial_input if isinstance(initial_input, dict) else {},
         )
 
         # Add legacy workflow fields
@@ -669,7 +690,9 @@ class AgentOrchestrator(LangGraphAgentOrchestrator):
 
     def register_workflow_template(self, workflow: Any) -> None:
         """Register workflow template (legacy compatibility - now no-op)."""
-        logger.info(f"Legacy workflow registration for '{workflow}' - using LangGraph instead")
+        logger.info(
+            f"Legacy workflow registration for '{workflow}' - using LangGraph instead"
+        )
 
     def get_workflow_status(self, workflow_id: str) -> Optional[Dict[str, Any]]:
         """Get workflow status (legacy compatibility - simplified)."""
@@ -681,7 +704,7 @@ class AgentOrchestrator(LangGraphAgentOrchestrator):
             "completed_steps": 4,
             "failed_steps": 0,
             "is_complete": True,
-            "has_errors": False
+            "has_errors": False,
         }
 
     def create_rag_workflow(self) -> Dict[str, Any]:
@@ -689,5 +712,5 @@ class AgentOrchestrator(LangGraphAgentOrchestrator):
         return {
             "name": "rag_query",
             "description": "LangGraph-based RAG workflow",
-            "type": "langgraph_multiagent"
+            "type": "langgraph_multiagent",
         }

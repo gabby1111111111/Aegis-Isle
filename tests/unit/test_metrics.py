@@ -1,7 +1,7 @@
 """
 Unit tests for Token Metrics module.
 """
-import pytest
+
 from aegis_isle.core.metrics import (
     TokenMetrics,
     TokenRecord,
