@@ -668,7 +668,29 @@ async def submit_answer(user_answer: str):
         
         # Record answer in story manager
         st.session_state.story_manager.record_answer(is_correct)
-        
+
+        # 发送答题事件到 Aegis LifeEventBus → interview.jsonl
+        try:
+            import httpx
+            import threading
+            q = st.session_state.current_question
+            event_data = {
+                "source": "interview",
+                "action": "answer_question",
+                "title": q.question,
+                "correct": bool(is_correct),
+                "category": getattr(q, "category", "algorithm"),
+                "tags": getattr(q, "tags", []),
+            }
+            def _send_event():
+                try:
+                    httpx.post("http://127.0.0.1:8001/v1/diary/event", json=event_data, timeout=3.0)
+                except Exception as e:
+                    print(f"[Interview] EventBus POST 失败: {e}")
+            threading.Thread(target=_send_event, daemon=True).start()
+        except Exception as e:
+            print(f"[Interview] 发送事件线程启动失败: {e}")
+
         # Check if we should trigger a story node
         all_questions = st.session_state.knowledge_engine.questions.values()
         box_levels = [q.review_box for q in all_questions]
