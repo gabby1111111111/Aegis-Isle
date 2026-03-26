@@ -10,8 +10,9 @@ import re
 
 # We test these window sizes
 WINDOW_SIZES = [100, 200, 300, 500, 800]
-API_KEY = os.getenv("OPENAI_API_KEY", "") # Will be loaded or fetched
+API_KEY = os.getenv("OPENAI_API_KEY", "")  # Will be loaded or fetched
 API_URL = "https://api.siliconflow.cn/v1/chat/completions"
+
 
 def centered_extract(full_text, sub_chunk_text, window_size):
     if sub_chunk_text and sub_chunk_text in full_text:
@@ -35,6 +36,7 @@ def centered_extract(full_text, sub_chunk_text, window_size):
     else:
         return full_text
 
+
 def get_samples(base_dir):
     pattern = os.path.join(base_dir, "debug", "chunks", "*_parent_chunks.jsonl")
     files = glob.glob(pattern)
@@ -49,24 +51,26 @@ def get_samples(base_dir):
                             chunks.append(data)
                     except:
                         pass
-    
+
     if len(chunks) > 80:
         chunks = random.sample(chunks, 80)
     return chunks
+
 
 def extract_subchunk(full_text):
     if len(full_text) < 50:
         return full_text
     # Pick a random 50-character slice to act as the "hit" sub-chunk
     start = random.randint(0, len(full_text) - 50)
-    return full_text[start:start+50]
+    return full_text[start:start + 50]
+
 
 async def llm_judge(client, text_a, text_b):
     if not API_KEY:
         # Dummy judge if no token locally (avoids crash, but user expects API call)
         # We will retrieve token later if needed.
         pass
-    
+
     prompt = f"""你是一个高级评估裁判。我们正在进行对话上下文截取。
 我们需要判断哪种截取方式更适合作为角色扮演(RP)的长期记忆上下文（信息保留完整、冗余少、截断自然）。
 
@@ -102,9 +106,10 @@ async def llm_judge(client, text_a, text_b):
         print(f"API Error: {e}")
         return "TIE"
 
+
 async def main():
     base_dir = r"e:\Aegis_Isle\AegisIsle_cc_ver\Aegis-Isle"
-    
+
     # Load .env
     env_path = os.path.join(base_dir, ".env")
     global API_KEY
@@ -113,26 +118,26 @@ async def main():
             for line in f:
                 if line.startswith("OPENAI_API_KEY="):
                     API_KEY = line.strip().split("=", 1)[1].strip("'\"")
-    
+
     if not API_KEY:
         print("WARNING: OPENAI_API_KEY not found. Calling API might fail.")
-    
+
     chunks = get_samples(base_dir)
     print(f"Sampled {len(chunks)} chunks.")
-    
+
     # Initialize scores. Wins track.
     scores = {ws: 0 for ws in WINDOW_SIZES}
     total_matches_per_ws = {ws: 0 for ws in WINDOW_SIZES}
-    
+
     async with httpx.AsyncClient() as client:
         for idx, chunk in enumerate(chunks):
             print(f"Processing chunk {idx+1}/{len(chunks)}")
             full_text = chunk["full_ai_text"]
-            meta_str = " | ".join(f"{k}: {v}" for k,v in chunk.get("scene_meta", {}).items() if v)
+            meta_str = " | ".join(f"{k}: {v}" for k, v in chunk.get("scene_meta", {}).items() if v)
             user_msg = chunk.get("user_msg", "")
-            
+
             sub_chunk = extract_subchunk(full_text)
-            
+
             # Generate texts
             texts = {}
             for ws in WINDOW_SIZES:
@@ -141,15 +146,15 @@ async def main():
                 parts.append(f"[User曾说]: {user_msg}")
                 parts.append(f"[相关上下文]: {snippet}")
                 texts[ws] = "\n".join(parts)
-            
+
             # Pairwise compare
             for w1, w2 in combinations(WINDOW_SIZES, 2):
-                await asyncio.sleep(2) # rate limit requested by user
+                await asyncio.sleep(2)  # rate limit requested by user
                 winner = await llm_judge(client, texts[w1], texts[w2])
-                
+
                 total_matches_per_ws[w1] += 1
                 total_matches_per_ws[w2] += 1
-                
+
                 if winner == "A":
                     scores[w1] += 1
                 elif winner == "B":
@@ -157,7 +162,7 @@ async def main():
                 else:
                     scores[w1] += 0.5
                     scores[w2] += 0.5
-                    
+
     # Summarize
     report = []
     report.append("# WINDOW_SIZE 寻参结果报告")
@@ -165,7 +170,7 @@ async def main():
     report.append(f"**测试窗口梯度**: {WINDOW_SIZES}")
     report.append("---")
     report.append("## 胜率/得分统计")
-    
+
     best_ws = None
     best_score = -1
     for ws in WINDOW_SIZES:
@@ -175,15 +180,15 @@ async def main():
         if avg > best_score:
             best_score = avg
             best_ws = ws
-            
+
     report.append("---")
     report.append(f"## 🏆 推荐默认值: **{best_ws}**")
-    
+
     with open(os.path.join(base_dir, "cowokers_ai", "WINDOW_SIZE_RESULT.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(report))
-        
+
     print(f"Done. Recommended WINDOW_SIZE: {best_ws}")
-    
+
     # Append to NIGHTLY_DONE.md
     done_path = os.path.join(base_dir, "cowokers_ai", "NIGHTLY_DONE.md")
     with open(done_path, "a", encoding="utf-8") as f:

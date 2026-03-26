@@ -13,6 +13,7 @@ EVENTS_DIR.mkdir(parents=True, exist_ok=True)
 PENDING_FILE = EVENTS_DIR / "pending_char_activity.jsonl"
 APPROVED_FILE = EVENTS_DIR / "character_activity.jsonl"
 
+
 def load_events(file_path):
     if not file_path.exists():
         return []
@@ -27,14 +28,17 @@ def load_events(file_path):
                     pass
     return events
 
+
 def save_events(file_path, events):
     with open(file_path, "w", encoding="utf-8") as f:
         for ev in events:
             f.write(json.dumps(ev, ensure_ascii=False) + "\n")
 
+
 def append_event(file_path, event):
     with file_path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(event, ensure_ascii=False) + "\n")
+
 
 def approve_event(index):
     ev = st.session_state.pending_events[index]
@@ -42,9 +46,11 @@ def approve_event(index):
     st.session_state.pending_events.pop(index)
     save_events(PENDING_FILE, st.session_state.pending_events)
 
+
 def reject_event(index):
     st.session_state.pending_events.pop(index)
     save_events(PENDING_FILE, st.session_state.pending_events)
+
 
 # 初始化状态
 if "pending_events" not in st.session_state:
@@ -57,13 +63,13 @@ events = st.session_state.pending_events
 
 if not events:
     st.success("🎉 当前没有需要审核的自治日记！")
-    
+
     if st.button("刷新状态", type="primary"):
         st.session_state.pending_events = load_events(PENDING_FILE)
         st.rerun()
 else:
     st.info(f"待审核队列中共有 **{len(events)}** 条记录。")
-    
+
     for i, ev in enumerate(events):
         details = ev.get('details', {})
         character = ev.get('character', 'Unknown')
@@ -71,14 +77,14 @@ else:
         reaction = details.get('char_reaction', '（无记录）')
         emotion = details.get('emotion_tag', '平静')
         timestamp = ev.get('timestamp', '刚刚')
-        
+
         with st.container(border=True):
             st.subheader(f"💡 {character} 的内心独白")
             st.caption(f"**生成时间**: {timestamp}")
             st.markdown(f"**触发源**: `{topic}`")
             st.info(f"\"{reaction}\"")
             st.markdown(f"**情绪推断**: `{emotion}`")
-            
+
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("✅ 批准写入 Diary FAISS", key=f"approve_{i}", use_container_width=True):
@@ -88,6 +94,6 @@ else:
                 if st.button("❌ 驳回", key=f"reject_{i}", use_container_width=True):
                     reject_event(i)
                     st.rerun()
-                    
+
         # 为了防误操作，每次只展示第一条（类似于 Tinder 审查卡片）
         break

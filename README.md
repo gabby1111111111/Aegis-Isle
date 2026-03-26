@@ -131,6 +131,17 @@ cp .env.example .env
 
 *(开发者贴士：欲分析后台并发分发流量与原始 Prompt 快照追踪，可启动时声明环境变量 `set DEBUG_SAVE=true` )*
 
+### 选项 C: MCP (Model Context Protocol) 标准集成协议
+
+Aegis-Isle 2.0 目前已原生搭载符合 Anthropic MCP 标准规范的独立微服务，支持与 SillyTavern MCP 客户端的无缝直连工具调用，完全脱离旧有的魔法代理劫持：
+
+1. **入口配置**：在支持 MCP 的客户端配置中，分别填入：
+   - WebSocket 端点：`ws://localhost:8001/mcp/ws`
+   - HTTP Fallback 端点：`http://localhost:8001/mcp/http`
+2. **已暴露的核心 Tool 能力库**：
+   - `search_aegis_memory`: 提供纯正的强类型场景 RAG 搜索，跨宇宙时空回调过去的对话事件。
+   - `send_ntfy_notification`: MCP 客户端遇到紧急阻断预警时，可调用此 Tool 物理唤醒 Gabby 大人的手机端。
+
 ---
 
 ## 🗺️ 阶段里程碑 (Roadmap)

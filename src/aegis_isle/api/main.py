@@ -116,6 +116,10 @@ def create_app() -> FastAPI:
 
     app.include_router(universe_router, prefix="/v1", tags=["universe"])
 
+    # 🤖 MCP (Model Context Protocol) Server
+    from ..mcp.router import mcp_app
+    app.mount("/mcp", mcp_app)
+
     @app.get("/")
     async def root():
         """Root endpoint."""

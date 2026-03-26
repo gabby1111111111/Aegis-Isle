@@ -128,7 +128,7 @@ class CharLifeAgent:
 
         api_key = settings.openai_api_key
         base_url = settings.openai_base_url or "https://api.siliconflow.cn/v1"
-        model = "Qwen/Qwen2.5-7B-Instruct"
+        model = "Qwen/Qwen2.5-72B-Instruct"
 
         if not api_key:
             logger.warning("未配置 OPENAI_API_KEY，降级为 Mock 返回")
@@ -161,7 +161,7 @@ class CharLifeAgent:
 
             return {
                 "char_reaction": reaction,
-                "emotion_tag": "深思",  # 情绪标签可以另行提取，这里先写固定或靠后续步骤
+                "emotion_tag": "醋意大发",  # 测试：可命中来电触发词；正式版需让 LLM 动态输出情绪标签
                 "source_topic": news_context[:20],
             }
         except Exception as e:
@@ -254,21 +254,30 @@ class CharLifeAgent:
             f"[{self.__class__.__name__}] 🚨 命中拨打阈值！原因: {reason_str}，准备触发双通道来电！"
         )
 
-        webhook_url = settings.st_sovits_webhook_url
+        # 角色名映射：内部英文名 → ST 插件 character_mappings.json 里的中文名
+        CHAR_NAME_ST_MAP = {
+            "ZouZheng": "邹峥",
+        }
+        st_char_name = CHAR_NAME_ST_MAP.get(char_name, char_name)
+
+        # .tmp_sovits 测试触发接口（无需完整 ST 上下文，跑在 3000 端口）
+        trigger_url = "http://127.0.0.1:3000/api/phone_call/test/trigger_auto_call"
         ntfy_url = f"https://ntfy.sh/{settings.ntfy_topic_ring}"
 
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            # 1. 触发 ST 伴侣端
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            # 1. 触发 .tmp_sovits 来电生成
             try:
                 payload = {
-                    "character": char_name,
-                    "universe_id": universe_id,
-                    "trigger_reason": reason_str,
-                    "preview_text": reaction.get("char_reaction", ""),
+                    "speakers": [st_char_name],
+                    "trigger_floor": 1,
+                    "chat_branch": f"charlife_{universe_id}",
+                    "context_count": 10,
                 }
-                res = await client.post(webhook_url, json=payload)
+                res = await client.post(trigger_url, json=payload)
                 if res.status_code == 200:
-                    logger.info(f"[{self.__class__.__name__}] ST 伴侣端来电触发成功")
+                    logger.info(f"[{self.__class__.__name__}] ✅ ST 来电触发成功: {res.json()}")
+                else:
+                    logger.warning(f"[{self.__class__.__name__}] ST 来电触发响应: {res.status_code} {res.text}")
             except httpx.ConnectError:
                 logger.warning(
                     f"[{self.__class__.__name__}] ST 伴侣端未开启，对方未接听"

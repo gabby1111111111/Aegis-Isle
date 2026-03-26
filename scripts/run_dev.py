@@ -21,11 +21,13 @@ if sys.platform.startswith('win'):
         # 如果失败，禁用emoji
         pass
 
+
 def check_venv():
     """检查虚拟环境是否激活"""
     if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
         return True
     return False
+
 
 def check_dependencies():
     """检查关键依赖是否安装"""
@@ -38,6 +40,7 @@ def check_dependencies():
         print(f"❌ 缺少依赖: {e}")
         print("请运行: pip install -r requirements.txt")
         return False
+
 
 def ensure_directories():
     """确保必要的目录存在"""
@@ -54,6 +57,7 @@ def ensure_directories():
 
     print("✅ 目录结构检查完成")
 
+
 def check_env_file():
     """检查环境配置文件"""
     if not Path(".env").exists():
@@ -67,6 +71,7 @@ def check_env_file():
     else:
         print("✅ .env 文件存在")
 
+
 def safe_print(text):
     """安全打印，处理编码问题"""
     try:
@@ -75,6 +80,7 @@ def safe_print(text):
         # 移除emoji和特殊字符，使用ASCII版本
         ascii_text = text.encode('ascii', 'ignore').decode('ascii')
         print(ascii_text)
+
 
 def start_server(mode="full", host="0.0.0.0", port=8002, reload=True):
     """启动开发服务器"""
@@ -144,6 +150,7 @@ def start_server(mode="full", host="0.0.0.0", port=8002, reload=True):
         safe_print(f"❌ 服务器启动失败: {e}")
         sys.exit(1)
 
+
 def main():
     parser = argparse.ArgumentParser(description="AegisIsle 开发服务器")
     parser.add_argument(
@@ -164,6 +171,7 @@ def main():
         port=args.port,
         reload=not args.no_reload
     )
+
 
 if __name__ == "__main__":
     main()

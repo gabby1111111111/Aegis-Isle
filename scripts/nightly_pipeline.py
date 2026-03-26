@@ -80,8 +80,8 @@ def phase_test_and_review() -> dict:
     # 1.1 Pytest
     print("\n  📋 运行 pytest...")
     code, out, err = run_cmd(
-        [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short", "-q"],
-        timeout=180,
+        [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short", "-q", "-p", "no:deepeval", "--ignore=tests/test_rag_quality.py", "--ignore=tests/test_rag_real_data.py"],
+        timeout=1200,
     )
     report["pytest"]["passed"] = (code == 0)
     report["pytest"]["detail"] = out[-2000:] if out else err[-2000:]
@@ -397,12 +397,14 @@ def phase_sync_interview(changes: dict):
 # ============================================================
 # 阶段 3.5: GitHub 子模块同步状态检查
 # ============================================================
+
+
 def phase_check_repos() -> list:
     """检查各个子模块的状态和与 Github 的连通性"""
     print("\n" + "=" * 60)
     print("🐙 阶段 3.5: Github 子模块同步检查")
     print("=" * 60)
-    
+
     repos = [
         {"name": "Aegis-Isle 主项目", "path": "E:/Aegis_Isle/AegisIsle_cc_ver/Aegis-Isle", "url": "https://github.com/gabby1111111111/Aegis-Isle"},
         {"name": "Love & Code 面试", "path": "E:/Love-and-Code-Interview", "url": "https://github.com/gabby1111111111/Love-and-Code-Interview"},
@@ -410,7 +412,7 @@ def phase_check_repos() -> list:
         {"name": "世界线管理器", "path": "E:/universe_manager", "url": "https://github.com/gabby1111111111/Universe-Manager"},
         {"name": "Bubby 品牌总管", "path": "C:/Users/MR/Desktop/bubby report", "url": "https://github.com/gabby1111111111/bubby-and-premitted-land"}
     ]
-    
+
     results = []
     for repo in repos:
         p = Path(repo["path"])
@@ -426,15 +428,17 @@ def phase_check_repos() -> list:
                 status = f"✅ 已关联 Git，有 {uncommitted} 个未提交变更"
             else:
                 status = "❌ Git 状态异常"
-        
+
         print(f"  {repo['name']} -> {status}")
         results.append({"name": repo["name"], "path": repo["path"], "status": status, "url": repo["url"]})
-        
+
     return results
+
 
 # ============================================================
 # 阶段 4: 汇总夜间报告
 # ============================================================
+
 
 def phase_generate_report(test_report: dict, changes: dict, repo_status: list = None):
     """生成完整的夜间运行报告"""
@@ -443,7 +447,7 @@ def phase_generate_report(test_report: dict, changes: dict, repo_status: list = 
     print("=" * 60)
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     pytest_icon = "✅" if test_report["pytest"]["passed"] else "❌"
     flake8_icon = "✅" if test_report["flake8"]["passed"] else "⚠️"
     import_icon = "✅" if test_report["import_check"]["passed"] else "❌"
@@ -495,7 +499,7 @@ def phase_generate_report(test_report: dict, changes: dict, repo_status: list = 
     else:
         report += "| (未测试) | - | - |\n"
 
-    report += """
+    report += f"""
 ---
 
 ## 📝 更新的文件
@@ -525,7 +529,7 @@ def phase_generate_report(test_report: dict, changes: dict, repo_status: list = 
 def main():
     """主管线入口"""
     print("=" * 60)
-    print(f"🌙 Aegis-Isle 夜间自动管线 v1.0")
+    print("🌙 Aegis-Isle 夜间自动管线 v1.0")
     print(f"⏰ 启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60)
 

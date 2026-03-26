@@ -96,10 +96,47 @@ async def search_memory(req: MemorySearchRequest):
         ):
             do_episode = True
 
-        # Fallback：没命中任何特定意图的话，全开 FAISS 和 Episode 以防遗漏
+        # ── Adaptive RAG: 闲聊检测器 (2026 行业标准) ──
+        # 短句 + 无人称代词 + 无回忆信号 → 判定为纯闲聊，跳过全部 RAG
+        CASUAL_KEYWORDS = [
+            "早安", "晚安", "早上好", "晚上好", "你好", "嗯嗯", "哈哈",
+            "哦哦", "好的", "行吧", "了解", "收到", "谢谢", "拜拜",
+            "去洗澡", "去吃饭", "去睡觉", "无聊", "困了", "饿了",
+            "笑死", "哭了", "啊啊", "呜呜", "嘻嘻", "呵呵",
+        ]
+        MEMORY_PRONOUNS = ["你", "我们", "咱", "咱们", "我俩"]
+        skip_rag = False
+
         if not do_faiss and not do_graph and not do_episode:
-            do_faiss = True
-            do_episode = True
+            is_short = len(query_text.strip()) <= 10
+            has_casual = any(c in query_text for c in CASUAL_KEYWORDS)
+            has_memory_pronoun = any(p in query_text for p in MEMORY_PRONOUNS)
+
+            if (is_short or has_casual) and not has_memory_pronoun:
+                skip_rag = True
+                logger.info(
+                    f"[Memory] Adaptive RAG: 检测到闲聊/短句, 跳过检索 "
+                    f"(len={len(query_text)}, casual={has_casual})"
+                )
+            else:
+                # 有代词或句子较长 → 保守 Fallback，全开 FAISS + Episode
+                do_faiss = True
+                do_episode = True
+
+        # ── Adaptive RAG: 闲聊短路返回 ──
+        if skip_rag:
+            return MemorySearchResponse(
+                memories=[],
+                context_string="",
+                count=0,
+                debug_info={
+                    "routed_faiss": False,
+                    "routed_graph": False,
+                    "routed_episode": False,
+                    "skipped_by_adaptive_rag": True,
+                    "reason": "casual_chat_detected",
+                },
+            )
 
         # 定义协程包
         async def _run_faiss():

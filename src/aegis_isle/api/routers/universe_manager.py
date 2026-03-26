@@ -165,8 +165,32 @@ async def get_sub_chunks(
     """
     try:
         sc_file = CHUNKS_DIR / f"{universe_id}_sub_chunks.jsonl"
+        print(f"[DEBUG chunks] universe_id='{universe_id}'")
+        print(f"[DEBUG chunks] Expected sub_chunks file: {sc_file}")
+        print(f"[DEBUG chunks] Does sc_file exist? {sc_file.exists()}")
+        print(f"[DEBUG chunks] parent_chunk_id to find='{parent_chunk_id}'")
+        
+        # --- Fallback wildcard matching for sub_chunks generated in different batches ---
         if not sc_file.exists():
-            return JSONResponse({"chunks": []})
+            # e.g., "12岁_养父_真实开局___2026_01_24_02h28_20260306_211620"
+            parts = universe_id.rsplit('_', 2)
+            if len(parts) >= 3 and parts[-2].isdigit() and parts[-1].isdigit():
+                # This drops the last _20260306_211620 portion
+                base_prefix = "_".join(parts[:-2])
+            else:
+                # If not strictly 2 digit parts at the end, just chop off the last segment
+                base_prefix = universe_id.rsplit('_', 1)[0]
+                
+            pattern = str(CHUNKS_DIR / f"{base_prefix}*_sub_chunks.jsonl")
+            matches = glob.glob(pattern)
+            if matches:
+                # Use the first matched file
+                sc_file = Path(matches[0])
+                print(f"[DEBUG chunks] Fallback matched file: {sc_file}")
+            else:
+                print(f"[DEBUG chunks] No fallback matches found for pattern: {pattern}")
+                return JSONResponse({"chunks": []})
+        # ---------------------------------------------------------------------------------
 
         chunks = []
         with open(sc_file, "r", encoding="utf-8") as f:
@@ -182,6 +206,7 @@ async def get_sub_chunks(
                     if len(chunks) >= limit:
                         break
 
+        print(f"[DEBUG chunks] returning {len(chunks)} chunks")
         return JSONResponse({"chunks": chunks})
 
     except Exception as e:

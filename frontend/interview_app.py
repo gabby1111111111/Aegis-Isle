@@ -39,6 +39,7 @@ import logging
 
 logger = logging.getLogger("love_and_code.tracker")
 
+
 async def send_to_companion_link(action: str, title: str, tags: list, comment_text: str = None):
     """
     伪装浏览器扩展，向 ST-Companion-Link 发送信号
@@ -46,7 +47,7 @@ async def send_to_companion_link(action: str, title: str, tags: list, comment_te
     url = "http://localhost:5001/api/signal"
     payload = {
         "action": action,
-        "note_url": "love_and_code://interview", # 虚构伪协议
+        "note_url": "love_and_code://interview",  # 虚构伪协议
         "comment_text": comment_text,
         "note_data": {
             "title": f"[Love & Code面试练习] {title}",
@@ -151,6 +152,7 @@ TRANSLATIONS = {
     }
 }
 
+
 def t(key: str) -> str:
     """Get translated text."""
     lang = st.session_state.get("language", "zh")
@@ -163,9 +165,9 @@ def t(key: str) -> str:
 
 def load_custom_css():
     """Load CSS based on current stage."""
-    
+
     stage = st.session_state.get("stage", "config")
-    
+
     if stage == "config":
         # === Title Screen Style (Reference Image) ===
         css = """
@@ -236,7 +238,7 @@ def load_custom_css():
         """
     else:
         # === Visual Novel Style (Interview Mode) ===
-        
+
         # Load background image
         bg_image_data = ""
         try:
@@ -248,7 +250,7 @@ def load_custom_css():
                     bg_image_data = f"background-image: url('data:image/jpeg;base64,{encoded}');"
         except Exception as e:
             print(f"Background image not loaded: {e}")
-            
+
         css = f"""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Noto+Sans+SC:wght@400;900&display=swap');
@@ -476,9 +478,8 @@ def load_custom_css():
         }}
         </style>
         """
-    
-    st.markdown(css, unsafe_allow_html=True)
 
+    st.markdown(css, unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -521,7 +522,7 @@ def initialize_session_state():
             from aegis_isle.interview.generator import Generator
             st.session_state.generator = Generator()
             print("🔄 Generator module reloaded and instance recreated.")
-    
+
     if "story_manager" not in st.session_state:
         st.session_state.story_manager = StoryManager()
 
@@ -545,15 +546,15 @@ def initialize_session_state():
 
     if "jd_context" not in st.session_state:
         st.session_state.jd_context = ""
-    
+
     # Track answered questions in current session to prevent immediate repetition
     if "answered_question_ids" not in st.session_state:
         st.session_state.answered_question_ids = []
-    
+
     # Track if we should show a story node
     if "pending_story_node" not in st.session_state:
         st.session_state.pending_story_node = None
-    
+
     # Emperor's Satisfaction Score (0-100)
     if "satisfaction_score" not in st.session_state:
         st.session_state.satisfaction_score = 50  # Start at 50%
@@ -568,19 +569,19 @@ async def generate_new_question():
     # Check if we should trigger a story node first
     if st.session_state.pending_story_node:
         return  # Story node will be rendered instead
-    
+
     # Get recently answered IDs to avoid immediate repetition
     recent_ids = st.session_state.answered_question_ids[-3:] if len(st.session_state.answered_question_ids) > 0 else []
-    
+
     # Get next question with exclusions
     question = st.session_state.knowledge_engine.get_next_question(exclude_ids=recent_ids)
-    
+
     if not question:
         st.warning(t("no_questions"))
         return
 
     st.session_state.current_question = question
-    
+
     import random
     if st.session_state.tutor_personas:
         st.session_state.current_tutor = random.choice(st.session_state.tutor_personas)
@@ -605,7 +606,7 @@ async def generate_new_question():
             )
         st.session_state.polyphonic_question = poly_q
         st.session_state.feedback_data = None  # Reset feedback
-        
+
         # --- 发送 read 信号到 ST-Companion-Link 15分钟缓冲区 ---
         question_title = question.question_text[:30] + "..." if question else "未知题目"
         extracted_tags = [question.category] if question and hasattr(question, 'category') else []
@@ -644,17 +645,17 @@ async def submit_answer(user_answer: str):
                 language=st.session_state.language
             )
         st.session_state.feedback_data = feedback
-        
+
         # Update progress
         verdict_status = feedback.get("verdict", {}).get("status")
         is_correct = verdict_status == "correct"
         is_partial = verdict_status == "partial"
-        
+
         st.session_state.knowledge_engine.update_progress(
             st.session_state.current_question.id,
             is_correct
         )
-        
+
         # Update Emperor's Satisfaction Score
         if is_correct:
             st.session_state.satisfaction_score = min(100, st.session_state.satisfaction_score + 15)
@@ -662,10 +663,10 @@ async def submit_answer(user_answer: str):
             st.session_state.satisfaction_score = min(100, st.session_state.satisfaction_score + 5)
         else:
             st.session_state.satisfaction_score = max(0, st.session_state.satisfaction_score - 10)
-        
+
         # Track this question as answered
         st.session_state.answered_question_ids.append(st.session_state.current_question.id)
-        
+
         # Record answer in story manager
         st.session_state.story_manager.record_answer(is_correct)
 
@@ -682,6 +683,7 @@ async def submit_answer(user_answer: str):
                 "category": getattr(q, "category", "algorithm"),
                 "tags": getattr(q, "tags", []),
             }
+
             def _send_event():
                 try:
                     httpx.post("http://127.0.0.1:8001/v1/diary/event", json=event_data, timeout=3.0)
@@ -695,12 +697,12 @@ async def submit_answer(user_answer: str):
         all_questions = st.session_state.knowledge_engine.questions.values()
         box_levels = [q.review_box for q in all_questions]
         story_trigger = st.session_state.story_manager.check_box_milestone(box_levels)
-        
+
         if story_trigger:
             st.session_state.pending_story_node = story_trigger
 
         # --- 发送 comment 信号到 ST-Companion-Link 以触发角色潜意识发言 ---
-        reaction_text = f"刚才做对了一道面试题，得分+15！好耶！" if is_correct else (f"这道面试题答得磕磕绊绊，只拿到一部分分数..." if is_partial else f"这题又答错了，好郁闷，被扣了10分...")
+        reaction_text = "刚才做对了一道面试题，得分+15！好耶！" if is_correct else ("这道面试题答得磕磕绊绊，只拿到一部分分数..." if is_partial else "这题又答错了，好郁闷，被扣了10分...")
         try:
             asyncio.create_task(send_to_companion_link(
                 action="comment",
@@ -725,20 +727,20 @@ def load_emperor_test():
     """Load Emperor test scenario without file upload."""
     import json
     from pathlib import Path
-    
+
     try:
         # Load emperor card
         card_path = Path("data/emperor_card.json")
         if not card_path.exists():
             st.error("测试数据不存在，请先运行: python create_emperor_test.py")
             return False
-        
+
         with open(card_path, 'r', encoding='utf-8') as f:
             card_data = json.load(f)
-        
+
         # Create Persona from card
         from aegis_isle.interview.persona_manager import Persona
-        
+
         emperor = Persona(
             name=card_data.get("name", "人类帝皇"),
             role="人类之主，黄金王座的统治者",
@@ -750,43 +752,47 @@ def load_emperor_test():
             character_book=card_data.get("character_book", {}),
             avatar_path=None
         )
-        
+
         st.session_state.emperor_persona = emperor
-        st.session_state.current_persona = emperor # Fallback
-        
+        st.session_state.current_persona = emperor  # Fallback
+
         # Load the 3 tutors from PersonaManager
         pm = st.session_state.persona_manager
         # Ensure default personas are there
         tutors = []
-        if "gojo" in pm.personas: tutors.append(pm.personas["gojo"])
-        if "sukuna" in pm.personas: tutors.append(pm.personas["sukuna"])
-        if "nanami" in pm.personas: tutors.append(pm.personas["nanami"])
+        if "gojo" in pm.personas:
+            tutors.append(pm.personas["gojo"])
+        if "sukuna" in pm.personas:
+            tutors.append(pm.personas["sukuna"])
+        if "nanami" in pm.personas:
+            tutors.append(pm.personas["nanami"])
         st.session_state.tutor_personas = tutors
-        
+
         # Load question database
         db_path = Path("data/emperor_test_db.json")
         if not db_path.exists():
             st.error("题库不存在，请先运行: python create_emperor_test.py")
             return False
-        
+
         with open(db_path, 'r', encoding='utf-8') as f:
             db_data = json.load(f)
-        
+
         # Load questions into knowledge engine
         from aegis_isle.interview.knowledge_engine import Question
-        
+
         st.session_state.knowledge_engine.questions = {}
         for qid, qdata in db_data.get("questions", {}).items():
             question = Question(**qdata)
             st.session_state.knowledge_engine.questions[qid] = question
-        
+
         st.session_state.knowledge_engine.save_database()
-        
+
         return True
-    
+
     except Exception as e:
         st.error(f"加载失败: {e}")
         return False
+
 
 async def load_default_scenario():
     """Load default scenario files (JD, KB, Persona)."""
@@ -808,14 +814,14 @@ async def load_default_scenario():
             # 1. Load JD
             with open(jd_path, "r", encoding="utf-8") as f:
                 st.session_state.jd_context = f.read()
-            
+
             # 2. Load Knowledge Base
             with open(kb_path, "r", encoding="utf-8") as f:
                 kb_content = f.read()
                 # Clear existing questions to ensure clean slate
                 st.session_state.knowledge_engine.questions = {}
                 questions = await st.session_state.knowledge_engine.ingest_data(kb_content, st.session_state.jd_context, language=st.session_state.language)
-            
+
             # 3. Load Persona
             with open(card_path, "r", encoding="utf-8") as f:
                 card_data = json.load(f)
@@ -823,13 +829,13 @@ async def load_default_scenario():
                 # Assuming bigE.json is a simple JSON or compatible format
                 # If it's a SillyTavern card, we might need more complex parsing logic
                 # For now, let's assume it matches the Persona structure or use the manager
-                
+
                 # Check if it's a V2 card (spec_version) or simple dict
-                if "spec" in card_data and "data" in card_data: # V2
-                     data = card_data["data"]
-                     persona = Persona(
+                if "spec" in card_data and "data" in card_data:  # V2
+                    data = card_data["data"]
+                    persona = Persona(
                         name=data.get("name", "Unknown"),
-                        role="Interviewer", # Default
+                        role="Interviewer",  # Default
                         description=data.get("description", ""),
                         personality=data.get("personality", ""),
                         first_message=data.get("first_mes", ""),
@@ -838,7 +844,7 @@ async def load_default_scenario():
                         character_book=data.get("character_book", {}),
                         avatar_path=None
                     )
-                else: # Simple or V1
+                else:  # Simple or V1
                     persona = Persona(
                         name=card_data.get("name", "Unknown"),
                         role="Interviewer",
@@ -850,9 +856,9 @@ async def load_default_scenario():
                         character_book=card_data.get("character_book", {}),
                         avatar_path=None
                     )
-            
+
             st.session_state.current_persona = persona
-            
+
             st.success(f"Loaded Default Scenario! Generated {len(questions)} questions.")
             st.session_state.stage = "intro"
             st.rerun()
@@ -871,13 +877,13 @@ def render_sidebar():
     """Render configuration sidebar."""
     with st.sidebar:
         st.title(t("config_title"))
-        
+
         # === Default Scenario Button ===
         if st.button("🚀 加载默认剧本 (Load Default)", type="primary"):
             asyncio.run(load_default_scenario())
-        
+
         st.divider()
-        
+
         # Language Selector
         selected_lang = st.selectbox(
             t("language_selector"),
@@ -888,12 +894,12 @@ def render_sidebar():
         if selected_lang != st.session_state.language:
             st.session_state.language = selected_lang
             st.rerun()
-        
+
         st.divider()
-        
+
         # === 快速测试 ===
         st.subheader("⚡ 快速测试" if st.session_state.language == "zh" else "⚡ Quick Test")
-        
+
         if st.button("👑 加载帝皇测试剧本" if st.session_state.language == "zh" else "👑 Load Emperor Test"):
             with st.spinner("正在召唤人类帝皇..." if st.session_state.language == "zh" else "Summoning the Emperor..."):
                 success = load_emperor_test()
@@ -902,9 +908,9 @@ def render_sidebar():
                     st.info("📋 已加载 5 道题目\n👑 角色：人类帝皇" if st.session_state.language == "zh" else "📋 5 questions loaded\n👑 Character: Emperor of Mankind")
                 else:
                     st.error("❌ 加载失败，请确保测试数据存在" if st.session_state.language == "zh" else "❌ Failed to load test data")
-        
+
         st.divider()
-        
+
         # Job Description
         st.subheader(t("jd_section"))
         st.session_state.jd_context = st.text_area(
@@ -929,7 +935,7 @@ def render_sidebar():
                 temp_path = Path(f"temp_{card_file.name}")
                 with open(temp_path, "wb") as f:
                     f.write(card_file.read())
-                
+
                 # Load
                 persona = st.session_state.persona_manager.load_card(temp_path)
                 st.session_state.current_persona = persona
@@ -937,7 +943,7 @@ def render_sidebar():
                 temp_path.unlink()
             except Exception as e:
                 st.error(t("card_error").format(e))
-        
+
         st.markdown("---")
         if st.session_state.current_persona:
             st.image(st.session_state.current_persona.avatar_path or "https://placehold.co/200x200?text=Avatar", width=150)
@@ -947,12 +953,12 @@ def render_sidebar():
 def stream_text(text, placeholder_container):
     """Stream text with a typewriter effect."""
     import time
-    
+
     # Split text into chunks to simulate natural typing
     # Simple character by character for now
     full_text = ""
     text_placeholder = placeholder_container.empty()
-    
+
     for char in text:
         full_text += char
         # Add cursor
@@ -961,8 +967,8 @@ def stream_text(text, placeholder_container):
             {full_text}<span class="cursor-blink"></span>
         </div>
         """, unsafe_allow_html=True)
-        time.sleep(0.02) # Typing speed
-        
+        time.sleep(0.02)  # Typing speed
+
     # Final state: text only (cursor removed)
     text_placeholder.markdown(f"""
     <div class="dialogue-text">
@@ -974,37 +980,37 @@ def stream_text(text, placeholder_container):
 def render_intro():
     """Render the Cinematic Intro."""
     persona = st.session_state.current_persona
-    
+
     # Nameplate
     st.markdown(f"""
     <div class="character-nameplate">
         <span>{persona.name}</span>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # Dialogue Box Container
     dialogue_container = st.container()
-    
+
     # Stream the intro message if it hasn't been shown yet
     if "intro_shown" not in st.session_state:
         # Clean text: Remove "Name:" prefix if present
         clean_text = persona.first_message.replace(f"{persona.name}：", "").replace(f"{persona.name}:", "")
         # Also handle "人类帝皇" specifically if name doesn't match exactly
         clean_text = clean_text.replace("人类帝皇：", "").replace("人类帝皇:", "")
-        
+
         stream_text(clean_text, dialogue_container)
         st.session_state.intro_shown = True
     else:
         # Show static if already shown
         clean_text = persona.first_message.replace(f"{persona.name}：", "").replace(f"{persona.name}:", "")
         clean_text = clean_text.replace("人类帝皇：", "").replace("人类帝皇:", "")
-        
+
         dialogue_container.markdown(f"""
         <div class="dialogue-text">
             {clean_text}
         </div>
         """, unsafe_allow_html=True)
-    
+
     # Next Button (Clickable Arrow)
     st.markdown('<div class="next-button-container">', unsafe_allow_html=True)
     if st.button("▼", key="intro_next"):
@@ -1017,18 +1023,18 @@ def render_intro():
 def render_story_node():
     """Render a story node (cinematic moment)."""
     story_trigger = st.session_state.pending_story_node
-    
+
     if not story_trigger:
         return False
-    
+
     # Get trigger description
-    trigger_info = st.session_state.story_manager.triggers.get(story_trigger)
-    
+    st.session_state.story_manager.triggers.get(story_trigger)
+
     # Generate story content if not already generated
     if "current_story_content" not in st.session_state:
-         # ... (Generation logic same as before) ...
-         # For brevity, assuming generation is fast or handled elsewhere
-         # Re-implementing generation here for correctness:
+        # ... (Generation logic same as before) ...
+        # For brevity, assuming generation is fast or handled elsewhere
+        # Re-implementing generation here for correctness:
         success_rate = st.session_state.story_manager.get_success_rate()
         if "box_1" in story_trigger:
             node_type = "node_a"
@@ -1039,7 +1045,7 @@ def render_story_node():
         else:
             node_type = "mastery"
             title = "👑 荣誉时刻"
-            
+
         with st.spinner("剧情生成中..."):
             story_data = asyncio.run(st.session_state.generator.generate_story_node(
                 st.session_state.current_persona,
@@ -1056,9 +1062,9 @@ def render_story_node():
         <span>{st.session_state.current_story_title}</span>
     </div>
     """, unsafe_allow_html=True)
-    
+
     dialogue_container = st.container()
-    
+
     # Stream text
     if "story_text_shown" not in st.session_state:
         stream_text(st.session_state.current_story_content, dialogue_container)
@@ -1069,7 +1075,7 @@ def render_story_node():
             {st.session_state.current_story_content}
         </div>
         """, unsafe_allow_html=True)
-    
+
     # Next Button for Story Node
     st.markdown('<div class="next-button-container">', unsafe_allow_html=True)
     if st.button("▼", key="continue_from_story"):
@@ -1078,11 +1084,11 @@ def render_story_node():
         del st.session_state.current_story_content
         del st.session_state.current_story_title
         del st.session_state.story_text_shown
-        
+
         asyncio.run(generate_new_question())
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
-    
+
     return True
 
 
@@ -1092,9 +1098,9 @@ def render_interview():
     if st.session_state.pending_story_node:
         if render_story_node():
             return  # Story node is being displayed
-    
+
     poly_q = st.session_state.polyphonic_question
-    
+
     if not poly_q:
         st.error("No question generated.")
         if st.button(t("retry")):
@@ -1104,7 +1110,6 @@ def render_interview():
 
     # === Menu & Settings Buttons (Top Left) - DISABLED ===
     # (Removed to fix syntax error - can be re-added with proper JavaScript injection later)
-
 
     # === Emperor's Satisfaction Progress Bar (Top Right) ===
     satisfaction = st.session_state.satisfaction_score
@@ -1127,7 +1132,7 @@ def render_interview():
         <span>{character_name}</span>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # === 系统消息 (Technical Protocol) ===
     st.markdown(f"""
     <div class="system-protocol">
@@ -1138,10 +1143,10 @@ def render_interview():
 
     # === 角色台词 (Dialogue) ===
     dialogue_container = st.container()
-    
+
     # Check if this specific question's dialogue has been shown
     q_key = f"q_{st.session_state.current_question.id}_shown"
-    
+
     if 'emperor_flavor' in poly_q and 'tutor_flavor' in poly_q:
         emp_text = poly_q['emperor_flavor'].replace("人类帝皇：", "").replace("人类帝皇:", "")
         tut_text = poly_q['tutor_flavor'].replace(f"{st.session_state.current_tutor.name}：", "").replace(f"{st.session_state.current_tutor.name}:", "")
@@ -1150,7 +1155,7 @@ def render_interview():
         dialogue_content = raw_dialogue.replace(f"{character_name}：", "").replace(f"{character_name}:", "")
         emp_text = dialogue_content.replace("人类帝皇：", "").replace("人类帝皇:", "")
         tut_text = ""
-    
+
     if q_key not in st.session_state:
         stream_text(emp_text, dialogue_container)
         if tut_text:
@@ -1191,7 +1196,7 @@ def render_interview():
         }
         </style>
         """, unsafe_allow_html=True)
-        
+
         col1, col2 = st.columns([4, 1])
         with col1:
             user_answer = st.text_input("Answer", key="answer_input", label_visibility="collapsed", placeholder="在此输入你的回答...")
@@ -1208,7 +1213,7 @@ def render_interview():
                 <strong>💡 技术提示：</strong> {poly_q.get('tech_hint')}
             </div>
             """, unsafe_allow_html=True)
-            
+
         # ELI5 Hint (Warhammer 40k Servitor Style)
         if poly_q.get('eli5_hint'):
             st.markdown(f"""
@@ -1221,7 +1226,7 @@ def render_interview():
         fb = st.session_state.feedback_data
         verdict_data = fb.get("verdict", {})
         status = verdict_data.get("status", "partial")
-        
+
         # Visual Effects based on answer correctness
         if status == "incorrect":
             # Screen Shake Effect (Emperor's Anger)
@@ -1270,22 +1275,22 @@ def render_interview():
                 <div class="firework" style="--x: 0px; --y: 250px; animation-delay: 0.5s; left: 50%; top: 50%;">🌟</div>
             </div>
             """, unsafe_allow_html=True)
-        
+
         # 1. Emperor & Tutor Verdicts
         verdict_comment = verdict_data.get('comment', '')
         # Clean the verdict comment
         character_name = st.session_state.emperor_persona.name
         verdict_clean = verdict_comment.replace(f"{character_name}：", "").replace(f"{character_name}:", "")
         verdict_clean = verdict_clean.replace("人类帝皇：", "").replace("人类帝皇:", "")
-        
+
         # Merge Tutor's explanation if available
         tut_exp = fb.get("servitor_explanation", "")
         tut_name = st.session_state.current_tutor.name
         tut_clean = tut_exp.replace(f"{tut_name}：", "").replace(f"{tut_name}:", "")
-        
+
         fb_key = f"q_{st.session_state.current_question.id}_fb_shown"
         verdict_container = st.container()
-        
+
         if fb_key not in st.session_state:
             stream_text(verdict_clean, verdict_container)
             if tut_clean:
@@ -1297,9 +1302,9 @@ def render_interview():
                 {verdict_clean}
             </div>
             """, unsafe_allow_html=True)
-        
+
         st.markdown("---")
-        
+
         # 2. Standard Answer (Professional)
         standard_answer = fb.get("standard_answer", "")
         if standard_answer:
@@ -1328,16 +1333,16 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    
+
     # Initialize session state
     initialize_session_state()
-    
+
     # Load custom CSS (simplified version)
     load_custom_css()
-    
+
     # Render Sidebar
     render_sidebar()
-    
+
     # Main Content Area
     if st.session_state.stage == "config":
         # Title Screen Content
@@ -1351,17 +1356,18 @@ def main():
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
+
         # Centered Button (No columns needed with flexbox)
         if st.button("接入思维阵列"):
             st.session_state.stage = "intro"
             st.rerun()
-            
+
     elif st.session_state.stage == "intro":
         render_intro()
-        
+
     elif st.session_state.stage == "interview":
         render_interview()
+
 
 if __name__ == "__main__":
     main()  # Fixed: removed asyncio.run() since main() is not async

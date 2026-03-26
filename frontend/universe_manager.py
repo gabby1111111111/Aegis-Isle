@@ -45,7 +45,7 @@ with st.sidebar:
         st.cache_data.clear()
 
     if character:
-        data = api("GET", f"/universe/list?character={character}")
+        data = api("GET", "/universe/list", params={"character": character})
         universes = data.get("universes", []) if data else []
 
         if not universes:
@@ -119,7 +119,7 @@ with tab_overview:
         st.caption("根据所有章节摘要让 LLM 生成一个文学标题")
         if st.button("✨ 自动生成名称", use_container_width=True):
             with st.spinner("AI 正在思考..."):
-                res = api("POST", f"/universe/auto_name?universe_id={selected_universe['universe_id']}")
+                res = api("POST", "/universe/auto_name", params={"universe_id": selected_universe['universe_id']})
             if res and res.get("status") == "ok":
                 st.success(f"✅ 生成名称：「{res['alias']}」（方式: {res.get('method', 'llm')}）")
             else:
@@ -130,7 +130,7 @@ with tab_overview:
 # Tab 2：章节浏览（Episode + Sub-chunks）
 # ─────────────────────────────────────────
 with tab_chapters:
-    ep_data = api("GET", f"/universe/episodes?universe_id={selected_universe['universe_id']}")
+    ep_data = api("GET", "/universe/episodes", params={"universe_id": selected_universe['universe_id']})
     episodes = ep_data.get("episodes", []) if ep_data else []
 
     if not episodes:
@@ -164,18 +164,18 @@ with tab_chapters:
                 ep_id = ep["episode_id"]
                 ep_scene_id = ep.get("scene_id") or ep_id  # fallback to episode_id
 
-                if st.button(f"📄 加载本章原文切片", key=f"load_{ep_id}"):
+                if st.button("📄 加载本章原文切片", key=f"load_{ep_id}"):
                     # 先拉全部 parent_chunks，找到序号匹配的父块
-                    pc_data = api("GET", f"/universe/parent_chunks?universe_id={selected_universe['universe_id']}")
+                    pc_data = api("GET", "/universe/parent_chunks", params={"universe_id": selected_universe['universe_id']})
                     parent_chunks = pc_data.get("parent_chunks", []) if pc_data else []
 
                     # episode_id 末尾 3 位数字就是章节序号，例如 ep_..._001 -> 001
-                    # parent.scene_id 末尾规律一致，例如 ..._scene_001 -> 001
+                    # parent_chunk_id 末尾也是序号，例如 ..._chunk_001 -> 001
                     ep_serial_num = ep_id.split('_')[-1].zfill(3)  # '001'
 
                     matched_parents = [
                         pc for pc in parent_chunks
-                        if pc.get('scene_id', '').split('_')[-1].zfill(3) == ep_serial_num
+                        if pc.get('parent_chunk_id', '').split('_')[-1].zfill(3) == ep_serial_num
                     ]
 
                     if matched_parents:
@@ -191,8 +191,8 @@ with tab_chapters:
 
                         # 加载该父块下的 sub_chunks
                         sc_data = api("GET",
-                            f"/universe/chunks?universe_id={selected_universe['universe_id']}&parent_chunk_id={pc['parent_chunk_id']}"
-                        )
+                                      "/universe/chunks", params={"universe_id": selected_universe['universe_id'], "parent_chunk_id": pc['parent_chunk_id']}
+                                      )
                         sub_chunks = sc_data.get("chunks", []) if sc_data else []
 
                         if not sub_chunks:
@@ -201,7 +201,7 @@ with tab_chapters:
                             text = sc.get("text", "")
                             dh = sc.get("dh_index", "")
                             st.markdown(f"**切片 #{i}** (DH层级: `{dh}`)")
-                            
+
                             # 使用原生的 HTML DIV 并在外层加上 markdown 处理可以实现漂亮的文本框，不受 st.text_area disabled 时灰暗字体的限制
                             text_html = text.replace('\n', '<br>')
                             st.markdown(
@@ -227,7 +227,7 @@ with tab_search:
 
     if seed_categories:
         st.markdown("**💭 快捷意图种子词**  <span style='color:#999; font-size:0.85em;'>点击将词语追加到你的 query 后面</span>",
-                   unsafe_allow_html=True)
+                    unsafe_allow_html=True)
 
         if "query_prefix" not in st.session_state:
             st.session_state.query_prefix = ""
@@ -238,18 +238,18 @@ with tab_search:
                 for pi, phrase in enumerate(phrases):
                     with cols_p[pi % 4]:
                         if st.button(phrase, key=f"seed_{cat_name}_{pi}",
-                                    help=f"点击将 '{phrase}' 加入 query"):
+                                     help=f"点击将 '{phrase}' 加入 query"):
                             st.session_state.query_prefix = phrase
 
     # 输入框：如果有 seed 被点击，自动填入
     prefix = st.session_state.get("query_prefix", "")
     query_default = prefix
     query = st.text_input("input query here",
-                         value=query_default,
-                         placeholder="例如：你还记得我们在书房里第一次上课吗...",
-                         label_visibility="collapsed")
+                          value=query_default,
+                          placeholder="例如：你还记得我们在书房里第一次上课吗...",
+                          label_visibility="collapsed")
     st.caption("↑ 即将发送给向量库的 Query。想要加內容可以直接在上方编辑，点击快捷词会自动填入。")
-    
+
     col_s1, col_s2, col_s3 = st.columns([2, 1, 1])
     with col_s1:
         # 支持限定要搜哪些宇宙
@@ -262,18 +262,23 @@ with tab_search:
 
     if st.button("🔍 开始搜索", use_container_width=True, type="primary") and query:
         with st.spinner("正在进行多路并发检索 + Re-ranking..."):
-            
+
             target_uids = []
             if selected_search_universes:
                 target_uids = [alias_map[a]["universe_id"] for a in selected_search_universes]
             uids_str = ",".join(target_uids)
             human_weight = human_weight_pct / 100.0
 
-            req_url = f"/universe/search?query={query}&character={character}&k={k}&human_weight={human_weight}"
+            req_params = {
+                "query": query,
+                "character": character,
+                "k": k,
+                "human_weight": human_weight
+            }
             if uids_str:
-                req_url += f"&target_universes={uids_str}"
+                req_params["target_universes"] = uids_str
 
-            res = api("GET", req_url)
+            res = api("GET", "/universe/search", params=req_params)
 
         if res:
             results = res.get("results", [])
@@ -291,7 +296,7 @@ with tab_search:
                         cols = st.columns([5, 1, 1, 1])
                         with cols[0]:
                             st.markdown(f"**#{i}** | 🤖向量相似度: `{item['similarity']}` | 👤人类偏好: `{item['human_avg_score']}` | 🏆综合分: `{item['final_score']}`")
-                            
+
                             text_html = item["text"].replace('\n', '<br>')
                             st.markdown(
                                 f"""<div style="padding: 15px; border-radius: 8px; background-color: #f7f9fc; border: 1px solid #e2e8f0; color: #1e293b; font-size: 1.05em; line-height: 1.6; max-height: 250px; overflow-y: auto;">

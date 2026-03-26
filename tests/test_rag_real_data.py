@@ -134,9 +134,17 @@ class QueryEvalResult:
 class TestIntentRouting:
     """测试意图路由是否正确分发到对应的检索路线"""
 
-    @staticmethod
-    def _simulate_routing(query: str) -> dict:
-        """复现 memory.py 里的路由逻辑"""
+    CASUAL_KEYWORDS = [
+        "早安", "晚安", "早上好", "晚上好", "你好", "嗯嗯", "哈哈",
+        "哦哦", "好的", "行吧", "了解", "收到", "谢谢", "拜拜",
+        "去洗澡", "去吃饭", "去睡觉", "无聊", "困了", "饿了",
+        "笑死", "哭了", "啊啊", "呜呜", "嘻嘻", "呵呵",
+    ]
+    MEMORY_PRONOUNS = ["你", "我们", "咱", "咱们", "我俩"]
+
+    @classmethod
+    def _simulate_routing(cls, query: str) -> dict:
+        """复现 memory.py 里的路由逻辑 (含 Adaptive RAG 闲聊跳过)"""
         query_text = query.lower()
         do_faiss = any(
             k in query_text
@@ -149,11 +157,22 @@ class TestIntentRouting:
             k in query_text for k in ["第一次", "什么时候", "发生过", "以前", "之前"]
         )
 
+        skip_rag = False
         if not do_faiss and not do_graph and not do_episode:
-            do_faiss = True
-            do_episode = True
+            is_short = len(query_text.strip()) <= 10
+            has_casual = any(c in query_text for c in cls.CASUAL_KEYWORDS)
+            has_memory_pronoun = any(p in query_text for p in cls.MEMORY_PRONOUNS)
 
-        return {"faiss": do_faiss, "graph": do_graph, "episode": do_episode}
+            if (is_short or has_casual) and not has_memory_pronoun:
+                skip_rag = True
+            else:
+                do_faiss = True
+                do_episode = True
+
+        return {
+            "faiss": do_faiss, "graph": do_graph, "episode": do_episode,
+            "skip_rag": skip_rag,
+        }
 
     @pytest.mark.parametrize(
         "test_case", REAL_QUERIES, ids=[q["category"] for q in REAL_QUERIES]
@@ -167,6 +186,26 @@ class TestIntentRouting:
             assert routes.get(route_name, False), (
                 f"查询 '{test_case['query']}' 应触发 {route_name}，但路由结果: {routes}"
             )
+
+    @pytest.mark.parametrize(
+        "casual_input",
+        ["哈哈", "早安", "好的", "去洗澡了", "困了", "嗯嗯", "行吧"],
+        ids=["哈哈", "早安", "好的", "去洗澡了", "困了", "嗯嗯", "行吧"],
+    )
+    def test_casual_chat_skips_rag(self, casual_input):
+        """Adaptive RAG: 闲聊/短句应跳过全部检索"""
+        routes = self._simulate_routing(casual_input)
+        assert routes["skip_rag"], (
+            f"闲聊 '{casual_input}' 应该跳过 RAG, 但路由结果: {routes}"
+        )
+        assert not routes["faiss"]
+        assert not routes["graph"]
+        assert not routes["episode"]
+
+    def test_pronoun_prevents_skip(self):
+        """带有记忆代词的短句不应跳过 RAG"""
+        routes = self._simulate_routing("你怎么看")
+        assert not routes["skip_rag"], "带'你'的短句不应跳过 RAG"
 
 
 # ============================================

@@ -125,6 +125,7 @@ TRANSLATIONS = {
     }
 }
 
+
 def t(key: str) -> str:
     """Get translated text."""
     lang = st.session_state.get("language", "zh")
@@ -140,7 +141,7 @@ def load_custom_css():
     Load Visual Novel / Galgame specific CSS.
     Style: [Royal Light Theme] - White background, Black text, Gold accents.
     """
-    
+
     # 尝试加载背景图
     bg_image_css = ""
     try:
@@ -153,7 +154,7 @@ def load_custom_css():
                 # 这样既能看到背景隐约的纹理，又能保证黑字清晰可见
                 bg_image_css = f"background-image: linear-gradient(rgba(255,255,255,0.85), rgba(255,255,255,0.85)), url('data:image/jpeg;base64,{encoded}');"
         else:
-            bg_image_css = "background-color: #f8f9fa;" # 如果没图，用米白色
+            bg_image_css = "background-color: #f8f9fa;"  # 如果没图，用米白色
     except:
         bg_image_css = "background-color: #f8f9fa;"
 
@@ -352,7 +353,7 @@ def load_custom_css():
     Load Visual Novel / Galgame specific CSS.
     Style: Light (Otome Style) - White background, Black text, Elegant Gold/Pink accents.
     """
-    
+
     # 尝试加载本地背景图
     bg_image_css = ""
     try:
@@ -532,7 +533,7 @@ def load_custom_css():
     """
     st.markdown(css, unsafe_allow_html=True)
     """Load visual novel style with white background and large black text."""
-    
+
     # Load background image
     bg_image_data = ""
     try:
@@ -544,7 +545,7 @@ def load_custom_css():
                 bg_image_data = f"background-image: url('data:image/jpeg;base64,{encoded}');"
     except Exception as e:
         print(f"Background image not loaded: {e}")
-    
+
     css = f"""
     <style>
     /* 视觉小说风格 - 白底黑字 + 背景图 */
@@ -726,7 +727,6 @@ def load_custom_css():
     st.markdown(css, unsafe_allow_html=True)
 
 
-
 # ============================================================================
 # Session State
 # ============================================================================
@@ -747,7 +747,7 @@ def initialize_session_state():
 
     if "generator" not in st.session_state:
         st.session_state.generator = Generator()
-    
+
     if "story_manager" not in st.session_state:
         st.session_state.story_manager = StoryManager()
 
@@ -766,11 +766,11 @@ def initialize_session_state():
 
     if "jd_context" not in st.session_state:
         st.session_state.jd_context = ""
-    
+
     # Track answered questions in current session to prevent immediate repetition
     if "answered_question_ids" not in st.session_state:
         st.session_state.answered_question_ids = []
-    
+
     # Track if we should show a story node
     if "pending_story_node" not in st.session_state:
         st.session_state.pending_story_node = None
@@ -785,19 +785,19 @@ async def generate_new_question():
     # Check if we should trigger a story node first
     if st.session_state.pending_story_node:
         return  # Story node will be rendered instead
-    
+
     # Get recently answered IDs to avoid immediate repetition
     recent_ids = st.session_state.answered_question_ids[-3:] if len(st.session_state.answered_question_ids) > 0 else []
-    
+
     # Get next question with exclusions
     question = st.session_state.knowledge_engine.get_next_question(exclude_ids=recent_ids)
-    
+
     if not question:
         st.warning(t("no_questions"))
         return
 
     st.session_state.current_question = question
-    
+
     with st.spinner(t("loading")):
         poly_q = await st.session_state.generator.generate_question_interaction(
             st.session_state.current_persona,
@@ -823,25 +823,25 @@ async def submit_answer(user_answer: str):
             language=st.session_state.language
         )
         st.session_state.feedback_data = feedback
-        
+
         # Update progress
         is_correct = feedback.get("verdict", {}).get("status") == "correct"
         st.session_state.knowledge_engine.update_progress(
             st.session_state.current_question.id,
             is_correct
         )
-        
+
         # Track this question as answered
         st.session_state.answered_question_ids.append(st.session_state.current_question.id)
-        
+
         # Record answer in story manager
         st.session_state.story_manager.record_answer(is_correct)
-        
+
         # Check if we should trigger a story node
         all_questions = st.session_state.knowledge_engine.questions.values()
         box_levels = [q.review_box for q in all_questions]
         story_trigger = st.session_state.story_manager.check_box_milestone(box_levels)
-        
+
         if story_trigger:
             st.session_state.pending_story_node = story_trigger
 
@@ -858,20 +858,20 @@ def load_emperor_test():
     """Load Emperor test scenario without file upload."""
     import json
     from pathlib import Path
-    
+
     try:
         # Load emperor card
         card_path = Path("data/emperor_card.json")
         if not card_path.exists():
             st.error("测试数据不存在，请先运行: python create_emperor_test.py")
             return False
-        
+
         with open(card_path, 'r', encoding='utf-8') as f:
             card_data = json.load(f)
-        
+
         # Create Persona from card
         from aegis_isle.interview.persona_manager import Persona
-        
+
         emperor = Persona(
             name=card_data.get("name", "人类帝皇"),
             role="人类之主，黄金王座的统治者",
@@ -883,30 +883,30 @@ def load_emperor_test():
             character_book=card_data.get("character_book", {}),
             avatar_path=None
         )
-        
+
         st.session_state.current_persona = emperor
-        
+
         # Load question database
         db_path = Path("data/emperor_test_db.json")
         if not db_path.exists():
             st.error("题库不存在，请先运行: python create_emperor_test.py")
             return False
-        
+
         with open(db_path, 'r', encoding='utf-8') as f:
             db_data = json.load(f)
-        
+
         # Load questions into knowledge engine
         from aegis_isle.interview.knowledge_engine import Question
-        
+
         st.session_state.knowledge_engine.questions = {}
         for qid, qdata in db_data.get("questions", {}).items():
             question = Question(**qdata)
             st.session_state.knowledge_engine.questions[qid] = question
-        
+
         st.session_state.knowledge_engine.save_database()
-        
+
         return True
-    
+
     except Exception as e:
         st.error(f"加载失败: {e}")
         return False
@@ -920,7 +920,7 @@ def render_sidebar():
     """Render configuration sidebar."""
     with st.sidebar:
         st.header(t("sidebar_config"))
-        
+
         # Language Selector
         selected_lang = st.selectbox(
             t("language_selector"),
@@ -931,12 +931,12 @@ def render_sidebar():
         if selected_lang != st.session_state.language:
             st.session_state.language = selected_lang
             st.rerun()
-        
+
         st.divider()
-        
+
         # === 快速测试 ===
         st.subheader("⚡ 快速测试" if st.session_state.language == "zh" else "⚡ Quick Test")
-        
+
         if st.button("👑 加载帝皇测试剧本" if st.session_state.language == "zh" else "👑 Load Emperor Test"):
             with st.spinner("正在召唤人类帝皇..." if st.session_state.language == "zh" else "Summoning the Emperor..."):
                 success = load_emperor_test()
@@ -945,9 +945,9 @@ def render_sidebar():
                     st.info("📋 已加载 5 道题目\n👑 角色：人类帝皇" if st.session_state.language == "zh" else "📋 5 questions loaded\n👑 Character: Emperor of Mankind")
                 else:
                     st.error("❌ 加载失败，请确保测试数据存在" if st.session_state.language == "zh" else "❌ Failed to load test data")
-        
+
         st.divider()
-        
+
         # Job Description
         st.subheader(t("jd_section"))
         st.session_state.jd_context = st.text_area(
@@ -972,7 +972,7 @@ def render_sidebar():
                 temp_path = Path(f"temp_{card_file.name}")
                 with open(temp_path, "wb") as f:
                     f.write(card_file.read())
-                
+
                 # Load
                 persona = st.session_state.persona_manager.load_card(temp_path)
                 st.session_state.current_persona = persona
@@ -980,7 +980,7 @@ def render_sidebar():
                 temp_path.unlink()
             except Exception as e:
                 st.error(t("card_error").format(e))
-        
+
         st.markdown("---")
         if st.session_state.current_persona:
             st.image(st.session_state.current_persona.avatar_path or "https://placehold.co/200x200?text=Avatar", width=150)
@@ -990,19 +990,19 @@ def render_sidebar():
 def render_intro():
     """Render the Cinematic Intro."""
     persona = st.session_state.current_persona
-    
+
     st.markdown(f"<h1 style='text-align: center; font-family: Cinzel'>{persona.name}</h1>", unsafe_allow_html=True)
-    
+
     # Cinematic Text Box
     st.markdown(f"""
     <div class="cinematic-box">
         {persona.first_message}
     </div>
     """, unsafe_allow_html=True)
-    
+
     # User Response
     user_response = st.text_input(t("intro_placeholder"), key="intro_input")
-    
+
     if st.button(t("start_button")):
         st.session_state.stage = "interview"
         # Trigger first question generation
@@ -1013,22 +1013,22 @@ def render_intro():
 def render_story_node():
     """Render a story node (cinematic moment)."""
     story_trigger = st.session_state.pending_story_node
-    
+
     if not story_trigger:
         return False
-    
+
     # Get trigger description
     trigger_info = st.session_state.story_manager.triggers.get(story_trigger)
-    
+
     st.markdown(f"""
     <div class="cinematic-box" style="border: 3px solid #ffd700; background: linear-gradient(180deg, #1a0a0a 0%, #000000 100%); box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);">
         <h2 style="text-align: center; color: #ffd700; font-size: 28px;">🌟 {trigger_info.description if trigger_info else '剧情节点'} 🌟</h2>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # Generate story content
     success_rate = st.session_state.story_manager.get_success_rate()
-    
+
     # Determine node type based on trigger
     if "box_1" in story_trigger:
         node_type = "node_a"
@@ -1039,7 +1039,7 @@ def render_story_node():
     else:
         node_type = "mastery"
         title = "👑 荣誉时刻 - Moment of Glory"
-    
+
     # Story content placeholder
     with st.spinner("剧情生成中..."):
         story_data = asyncio.run(st.session_state.generator.generate_story_node(
@@ -1048,22 +1048,22 @@ def render_story_node():
             success_rate,
             language=st.session_state.language
         ))
-        
+
         story_content = story_data.get("story_content", "剧情生成中...")
-        
+
     st.markdown(f"""
     <div class="cinematic-box" style="padding: 40px;">
         <h3 style="color: #ff6b9d; text-align: center; margin-bottom: 20px;">{title}</h3>
         <p style="font-size: 19px; line-height: 2.0; text-align: justify;">{story_content}</p>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # Button to continue
     if st.button("✨ 继续修行 ✨", key="continue_from_story"):
         st.session_state.pending_story_node = None
         asyncio.run(generate_new_question())
         st.rerun()
-    
+
     return True
 
 
@@ -1073,9 +1073,9 @@ def render_interview():
     if st.session_state.pending_story_node:
         if render_story_node():
             return  # Story node is being displayed
-    
+
     poly_q = st.session_state.polyphonic_question
-    
+
     if not poly_q:
         st.error("No question generated.")
         if st.button(t("retry")):
@@ -1086,7 +1086,7 @@ def render_interview():
     # === 乙女游戏元素：好感度条 ===
     success_rate = st.session_state.story_manager.get_success_rate()
     affection_percentage = int(success_rate * 100)
-    
+
     affection_label = "好感度" if st.session_state.language == "zh" else "Affection"
     st.markdown(f"""
     <div class="affection-meter">
@@ -1096,13 +1096,13 @@ def render_interview():
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
+
     # === 乙女游戏元素：角色名牌 ===
     character_name = st.session_state.current_persona.name
     st.markdown(f"""
     <div class="character-nameplate">{character_name}</div>
     """, unsafe_allow_html=True)
-    
+
     # === 对话框装饰容器 ===
     st.markdown('<div class="dialogue-container">', unsafe_allow_html=True)
 
@@ -1145,7 +1145,7 @@ def render_interview():
             {encouragement}
         </div>
         """, unsafe_allow_html=True)
-    
+
     # 关闭对话框装饰容器
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1161,7 +1161,7 @@ def render_interview():
         verdict_data = fb.get("verdict", {})
         status = verdict_data.get("status", "partial")
         color = "#4ade80" if status == "correct" else "#ef4444" if status == "incorrect" else "#ffa500"
-        
+
         st.markdown(f"""
         <div class="feedback-box" style="border-left: 5px solid {color}">
             <h3 style="color: {color}">【{status.upper()}】</h3>
@@ -1188,31 +1188,32 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    
+
     # Initialize session state
     initialize_session_state()
-    
+
     # Load custom CSS (simplified version)
     load_custom_css()
-    
+
     # Render Sidebar
     render_sidebar()
-    
+
     # Main Content Area
     if st.session_state.stage == "config":
         st.title(t("title"))
         st.subheader(t("subtitle"))
         st.info(t("config_info"))
-        
+
         if st.button(t("start_session")):
             st.session_state.stage = "intro"
             st.rerun()
-            
+
     elif st.session_state.stage == "intro":
         render_intro()
-        
+
     elif st.session_state.stage == "interview":
         render_interview()
+
 
 if __name__ == "__main__":
     main()  # Fixed: removed asyncio.run() since main() is not async
